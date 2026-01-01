@@ -1,0 +1,53 @@
+Title|Body|Labels|Milestone
+M0: App shell & layout|- Setup Tauri/React app\n- Main window layout\n- Docked panels\n- Status bar\n- Resizable panes|required,ux,infra|M0 - App Shell
+M0: Top-level menu system|- File/Edit/View menus\n- Profile actions\n- Connection actions|required,ux|M0 - App Shell
+M0: Sidebar navigation|- Profiles\n- Frames\n- Signals\n- Columns\n- Filters\n- TX|required,ux|M0 - App Shell
+M0: Command palette|- VSCode-style palette\n- Action registry\n- Keyboard shortcuts|required,ux|M0 - App Shell
+
+
+M1: Profile schema finalization,"- Freeze v1 schema\n- Versioning rules\n- Migration plan","required,profile","M1 – Profile Editor"
+M1: Profile loader & validator,"- JSON schema validation\n- Error diagnostics\n- Warnings","required,profile","M1 – Profile Editor"
+M1: Profile editor shell,"- Tree-based navigation\n- Section switching\n- Dirty state handling","required,profile-editor,ux","M1 – Profile Editor"
+M1: Signal editor UI,"- Byte/bit selector\n- Payload preview (0–64 bytes)\n- Factor & unit helpers","required,profile-editor","M1 – Profile Editor"
+M1: Derived field editor,"- Source selection\n- Expression editor\n- Dependency validation","required,profile-editor","M1 – Profile Editor"
+M1: Column editor,"- Source type selection\n- Drag/drop ordering\n- Visibility toggle","required,profile-editor","M1 – Profile Editor"
+M1: Filter editor (capture & display)," - Frame-level filters\n- Signal/derived filters\n- Expression filters\n- Test preview","required,profile-editor,filtering","M1 – Profile Editor"
+M1: TX frame editor,"- Form builder UI\n- Encode preview\n- Validation rules","required,profile-editor,tx","M1 – Profile Editor"
+M1: Live JSON preview,"- Read-only JSON view\n- Highlight active section","best-to-have,profile-editor","M1 – Profile Editor"
+M1: Undo/redo support,"- History stack\n- Keyboard shortcuts","best-to-have,profile-editor","M1 – Profile Editor"
+
+
+M2: Runtime profile engine,"- Load active profile\n- Resolve signals\n- Resolve derived fields","required,profile","M2 – Runtime Engine"
+M2: Expression engine,"- Safe evaluation\n- Dependency resolution\n- Error reporting","required,expression","M2 – Runtime Engine"
+M2: Signal decoder,"- Bit extraction\n- Factor/unit application\n- Endianness handling","required,decoder","M2 – Runtime Engine"
+M2: Derived field evaluator,"- Expression evaluation\n- Type handling\n- Caching","required,derived-field","M2 – Runtime Engine"
+M2: TX frame encoder,"- Payload construction\n- Validation\n- Error reporting","required,tx,encoder","M2 – Runtime Engine"
+
+
+M3: CAN bridge abstraction,"- Transport interface\n- Direction RX/TX","required,core,bridge","M3 – CAN Bridge"
+M3: SocketCAN support,"- Native Linux support\n- CAN-FD flags","required,core,can-fd","M3 – CAN Bridge"
+M3: WebSocket JSON bridge,"- Connect to daemon\n- Reconnect logic","required,core,bridge","M3 – CAN Bridge"
+M3: TCP JSONL bridge,"- Streaming support\n- Error recovery","optional,core,bridge","M3 – CAN Bridge"
+M3: gRPC bridge,"- Proto definitions\n- Streaming APIs","optional,core,bridge","M3 – CAN Bridge"
+M3: Mock bridge,"- Simulated frames\n- Configurable patterns","optional,core,bridge","M3 – CAN Bridge"
+
+
+
+M4: TX scheduler,"- Periodic send\n- Burst send\n- Stop/start","required,tx","M4 – Simulation"
+M4: Simulation controls,"- Play/pause\n- Rate control","optional,simulation","M4 – Simulation"
+M4: TX logging,"- Sent frame log\n- Export sent frames","optional,tx,export","M4 – Simulation"
+
+
+M5: Frame store,"- Ring buffer\n- Pause capture\n- Clear/reset","required,core","M5 – Filtering & Analysis"
+M5: Capture filtering,"- Frame-level predicates\n- Drop metrics","required,filtering","M5 – Filtering & Analysis"
+M5: Display filtering,"- Expression-based filtering\n- Live toggle","required,filtering,ui","M5 – Filtering & Analysis"
+M5: Table virtualization,"- Large dataset support","required,ui","M5 – Filtering & Analysis"
+M5: Column customization,"- Show/hide columns\n- Reorder columns\n- Resize columns","required,ui,column","M5 – Filtering & Analysis"
+M5: Export functionality,"- CSV export\n- JSONL export","required,export","M5 – Filtering & Analysis"
+
+
+M6: Theme system,"- Dark/light\n- Persist preference","optional,ux","M6 – Polish"
+M6: Metrics & stats,"- RX/TX counters\n- Latency","optional,observability","M6 – Polish"
+M6: Sample demo profiles,"- Classic CAN\n- CAN-FD","required,docs","M6 – Polish"
+M6: DBC importer,"- Basic DBC to JSON","best-to-have,profile","M6 – Polish"
+M6: User documentation,"- User guide\n- Profile schema reference","required,docs","M6 – Polish"
