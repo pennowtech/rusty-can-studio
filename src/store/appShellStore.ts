@@ -31,26 +31,32 @@ import { create } from "zustand";
 // Define the possible main application views
 export type AppView = "monitor" | "simulator" | "profile-editor" | "settings" | "help";
 
+type SidebarMode = "expanded" | "icon";
+
 // Define the shape of the application shell state
-// - includes current view and sidebar visibility
+// - includes current view and sidebar mode
 // - includes methods to update the state
 export type AppState = {
   view: AppView;
-  sidebarOpen: boolean;
+  sidebarMode: SidebarMode;
 
   setView: (view: AppView) => void;
-  toggleSidebar: () => void;
+  toggleSidebarMode: () => void;
 };
 
 // Create the Zustand store for application shell state
-// - manages active view and sidebar visibility
+// - manages active view and sidebar mode
 // - provides methods to update state
-// - initial view is "monitor" and sidebar is open by default
+// - initial view is "monitor" and sidebar is "expanded"
 // - no derived state, pure UI concerns
 export const useAppStore = create<AppState>((set) => ({
   view: "monitor",
-  sidebarOpen: true,
+  sidebarMode: "expanded",
 
   setView: (view) => set({ view }),
-  toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+
+  toggleSidebarMode: () =>
+    set((s) => ({
+      sidebarMode: s.sidebarMode === "expanded" ? "icon" : "expanded",
+    })),
 }));

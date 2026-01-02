@@ -14,8 +14,11 @@
  * - Commands should not directly manipulate UI components
  */
 
+import { Theme } from "@/components/ThemeProvider";
+
 export type CommandContext = {
   setView: (view: any) => void;
+  setTheme: (theme: Theme) => void;
 };
 
 export type AppCommand = {

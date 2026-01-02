@@ -18,7 +18,12 @@
  */
 
 import { AppShell } from "@/app/AppShell";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 export default function App() {
-  return <AppShell />;
+  return (
+    <ThemeProvider>
+      <AppShell />
+    </ThemeProvider>
+  );
 }

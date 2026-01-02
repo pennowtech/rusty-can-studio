@@ -38,4 +38,25 @@ export const commandRegistry: AppCommand[] = [
     keywords: ["profile", "editor"],
     handler: ({ setView }) => setView("profile-editor"),
   },
+  {
+    id: "theme.light",
+    title: "Theme: Light",
+    category: "Theme",
+    keywords: ["light", "appearance"],
+    handler: ({ setTheme }) => setTheme("light"),
+  },
+  {
+    id: "theme.dark",
+    title: "Theme: Dark",
+    category: "Theme",
+    keywords: ["dark", "appearance"],
+    handler: ({ setTheme }) => setTheme("dark"),
+  },
+  {
+    id: "theme.system",
+    title: "Theme: System",
+    category: "Theme",
+    keywords: ["system", "appearance"],
+    handler: ({ setTheme }) => setTheme("system"),
+  },
 ];

@@ -31,6 +31,10 @@ import {
   MenubarTrigger,
 } from "@/components/ui/menubar";
 import { useAppStore } from "@/store/appShellStore";
+import { useTheme } from "@/components/ThemeProvider";
+import { Button } from "@/components/ui/button";
+import { Command, Settings } from "lucide-react";
+import { useCommandPaletteStore } from "@/store/commandPaletteStore";
 
 // TopMenuBar component
 // - Renders the application top menu bar
@@ -41,40 +45,61 @@ import { useAppStore } from "@/store/appShellStore";
 // - Keyboard accessible
 export function TopMenuBar() {
   const setView = useAppStore((s) => s.setView);
-  const toggleSidebar = useAppStore((s) => s.toggleSidebar);
+  const { setTheme } = useTheme();
+  const toggleSidebarMode = useAppStore((s) => s.toggleSidebarMode);
+  const openPalette = useCommandPaletteStore((s) => s.openPalette);
 
   return (
-    <Menubar className="rounded-none border-b">
-      <MenubarMenu>
-        <MenubarTrigger>File</MenubarTrigger>
-        <MenubarContent>
-          <MenubarItem>Open Profile…</MenubarItem>
-          <MenubarItem>Save Profile</MenubarItem>
-          <MenubarSeparator />
-          <MenubarItem>Exit</MenubarItem>
-        </MenubarContent>
-      </MenubarMenu>
+    <div className="flex items-center border-b">
+      {/* LEFT ICON BUTTONS */}
+      <div className="flex items-center gap-1 px-2">
+        <Button variant="ghost" size="icon" onClick={openPalette} title="Command Palette (Ctrl+Shift+P)">
+          <Command className="h-4 w-4" />
+        </Button>
 
-      <MenubarMenu>
-        <MenubarTrigger>View</MenubarTrigger>
-        <MenubarContent>
-          <MenubarItem onClick={toggleSidebar}>Toggle Sidebar</MenubarItem>
-          <MenubarSeparator />
-          <MenubarItem onClick={() => setView("profile-editor")}>Profile Editor</MenubarItem>
-          <MenubarItem onClick={() => setView("monitor")}>CAN Monitor</MenubarItem>
-          <MenubarItem onClick={() => setView("simulator")}>CAN Simulator</MenubarItem>
-        </MenubarContent>
-      </MenubarMenu>
+        <Button variant="ghost" size="icon" onClick={() => setView("settings")} title="Settings">
+          <Settings className="h-4 w-4" />
+        </Button>
+      </div>
 
-      <MenubarMenu>
-        <MenubarTrigger>Help</MenubarTrigger>
-        <MenubarContent>
-          <MenubarItem>Documentation</MenubarItem>
-          <MenubarItem>Keyboard Shortcuts</MenubarItem>
-          <MenubarSeparator />
-          <MenubarItem>About</MenubarItem>
-        </MenubarContent>
-      </MenubarMenu>
-    </Menubar>
+      {/* MENUS */}
+      <Menubar className="rounded-none border-0 flex-1">
+        <MenubarMenu>
+          <MenubarTrigger>File</MenubarTrigger>
+          <MenubarContent>
+            <MenubarItem>Open Profile…</MenubarItem>
+            <MenubarItem>Save Profile</MenubarItem>
+            <MenubarSeparator />
+            <MenubarItem>Exit</MenubarItem>
+          </MenubarContent>
+        </MenubarMenu>
+
+        <MenubarMenu>
+          <MenubarTrigger>View</MenubarTrigger>
+          <MenubarContent>
+            <MenubarItem onClick={toggleSidebarMode}>Toggle Sidebar</MenubarItem>
+            <MenubarSeparator />
+            <MenubarItem onClick={() => setView("profile-editor")}>Profile Editor</MenubarItem>
+            <MenubarItem onClick={() => setView("monitor")}>CAN Monitor</MenubarItem>
+            <MenubarItem onClick={() => setView("simulator")}>CAN Simulator</MenubarItem>
+            <MenubarSeparator />
+
+            <MenubarItem onClick={() => setTheme("light")}>Appearance: Light</MenubarItem>
+            <MenubarItem onClick={() => setTheme("dark")}>Appearance: Dark</MenubarItem>
+            <MenubarItem onClick={() => setTheme("system")}>Appearance: System</MenubarItem>
+          </MenubarContent>
+        </MenubarMenu>
+
+        <MenubarMenu>
+          <MenubarTrigger>Help</MenubarTrigger>
+          <MenubarContent>
+            <MenubarItem>Documentation</MenubarItem>
+            <MenubarItem>Keyboard Shortcuts</MenubarItem>
+            <MenubarSeparator />
+            <MenubarItem>About</MenubarItem>
+          </MenubarContent>
+        </MenubarMenu>
+      </Menubar>
+    </div>
   );
 }
