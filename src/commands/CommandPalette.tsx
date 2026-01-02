@@ -26,10 +26,12 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { commandRegistry } from "@/commands/registry";
 import { useCommandPaletteStore } from "@/store/commandPaletteStore";
 import { useAppStore } from "@/store/appShellStore";
+import { useTheme } from "@/components/ThemeProvider";
 
 export function CommandPalette() {
   const { open, closePalette } = useCommandPaletteStore();
   const setView = useAppStore((s) => s.setView);
+  const { setTheme } = useTheme();
 
   return (
     <Dialog open={open} onOpenChange={closePalette}>
@@ -44,7 +46,7 @@ export function CommandPalette() {
                 key={cmd.id}
                 value={[cmd.title, ...(cmd.keywords ?? [])].join(" ")}
                 onSelect={() => {
-                  cmd.handler({ setView });
+                  cmd.handler({ setView, setTheme });
                   closePalette();
                 }}
               >
