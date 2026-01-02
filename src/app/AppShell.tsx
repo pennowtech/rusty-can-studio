@@ -29,10 +29,16 @@ import { MainView } from "./MainView";
 import { StatusBar } from "./StatusBar";
 import { CommandPalette } from "@/commands/CommandPalette";
 import { useCommandPaletteHotkey } from "@/commands/useCommandPaletteHotkey";
+import { CanConnectDialog } from "@/components/CanConnectDialog";
+import { useConnectDialogStore } from "@/store/canConnectDialogStore";
+import { useUiStore } from "@/store/uiStore";
+import { CanConnectionManagerDialog } from "@/components/CanConnectionManagerDialog";
 
 export function AppShell() {
   // Hook to enable command palette hotkey
   useCommandPaletteHotkey();
+  const { open, closeDialog } = useConnectDialogStore();
+  const { connectionManagerOpen, closeConnectionManager } = useUiStore();
 
   return (
     <>
@@ -49,6 +55,11 @@ export function AppShell() {
         <StatusBar />
       </div>
       <CommandPalette />
+      <CanConnectDialog open={open} onOpenChange={closeDialog} />
+      <CanConnectionManagerDialog
+        open={connectionManagerOpen}
+        onOpenChange={(v) => (v ? null : closeConnectionManager())}
+      />
     </>
   );
 }

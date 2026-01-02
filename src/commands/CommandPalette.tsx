@@ -56,7 +56,7 @@ export function CommandPalette() {
                 key={cmd.id}
                 value={[cmd.title, ...(cmd.keywords ?? [])].join(" ")}
                 onSelect={() => {
-                  cmd.handler({ setView, setTheme });
+                  cmd.handler({ setView, setTheme, openConnectDialog, openConnectionManager });
                   closePalette();
                 }}
               >

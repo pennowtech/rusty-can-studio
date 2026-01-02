@@ -35,6 +35,8 @@ import { useTheme } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
 import { Command, Settings } from "lucide-react";
 import { useCommandPaletteStore } from "@/store/commandPaletteStore";
+import { useConnectDialogStore } from "@/store/canConnectDialogStore";
+import { useUiStore } from "@/store/uiStore";
 
 // TopMenuBar component
 // - Renders the application top menu bar
@@ -48,6 +50,8 @@ export function TopMenuBar() {
   const { setTheme } = useTheme();
   const toggleSidebarMode = useAppStore((s) => s.toggleSidebarMode);
   const openPalette = useCommandPaletteStore((s) => s.openPalette);
+  const openConnectDialog = useConnectDialogStore((s) => s.openDialog);
+  const openConnectionManager = useUiStore((s) => s.openConnectionManager);
 
   return (
     <div className="flex items-center border-b">
@@ -87,6 +91,16 @@ export function TopMenuBar() {
             <MenubarItem onClick={() => setTheme("light")}>Appearance: Light</MenubarItem>
             <MenubarItem onClick={() => setTheme("dark")}>Appearance: Dark</MenubarItem>
             <MenubarItem onClick={() => setTheme("system")}>Appearance: System</MenubarItem>
+          </MenubarContent>
+        </MenubarMenu>
+
+        <MenubarMenu>
+          <MenubarTrigger>CAN</MenubarTrigger>
+          <MenubarContent>
+            <MenubarItem onClick={openConnectDialog}>Connect…</MenubarItem>
+            <MenubarItem disabled>Disconnect</MenubarItem>
+            <MenubarSeparator />
+            <MenubarItem onClick={() => openConnectionManager()}>Manage Connections…</MenubarItem>
           </MenubarContent>
         </MenubarMenu>
 

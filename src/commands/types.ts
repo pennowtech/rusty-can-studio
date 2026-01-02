@@ -19,6 +19,8 @@ import { Theme } from "@/components/ThemeProvider";
 export type CommandContext = {
   setView: (view: any) => void;
   setTheme: (theme: Theme) => void;
+  openConnectDialog: () => void;
+  openConnectionManager: () => void;
 };
 
 export type AppCommand = {

@@ -21,18 +21,24 @@
  * - No React Router dependency
  */
 
+import { CanConnectionManagerDialog } from "@/components/CanConnectionManagerDialog";
 import { useAppStore } from "@/store/appShellStore";
+import { useConnectDialogStore } from "@/store/canConnectDialogStore";
+import { useConnectionStore } from "@/store/connectionStore";
+import { useState } from "react";
 // import { EditorShell } from "@/editor/EditorShell";
 
 export function MainView() {
   const view = useAppStore((s) => s.view);
+
+  const [open, setOpen] = useState(false);
 
   switch (view) {
     case "profile-editor":
       return <div className="p-6 text-muted-foreground">Editor Shell (coming next)</div>;
 
     case "monitor":
-      return <div className="p-6 text-muted-foreground">CAN Monitor (coming next)</div>;
+      return <CanConnectionManagerDialog open={open} onOpenChange={setOpen} />;
 
     case "simulator":
       return <div className="p-6 text-muted-foreground">CAN Simulator (TX) (coming next)</div>;

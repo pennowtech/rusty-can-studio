@@ -18,6 +18,20 @@ import { AppCommand } from "./types";
 
 export const commandRegistry: AppCommand[] = [
   {
+    id: "can.connect",
+    title: "CAN: Connect",
+    category: "CAN",
+    keywords: ["connect", "socketcan", "daemon"],
+    handler: ({ openConnectDialog }) => openConnectDialog(),
+  },
+  {
+    id: "can.manageConnections",
+    title: "CAN: Manage Connections",
+    category: "CAN",
+    keywords: ["connect", "bridge", "daemon"],
+    handler: ({ openConnectionManager }) => openConnectionManager(),
+  },
+  {
     id: "view.monitor",
     title: "View: CAN Monitor",
     category: "View",

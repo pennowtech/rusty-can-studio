@@ -21,15 +21,29 @@
  * - Clickable indicators may be added later
  */
 
+import { CanConnectionManagerDialog } from "@/components/CanConnectionManagerDialog";
 import { useTheme } from "@/components/ThemeProvider";
+import { useConnectionStore } from "@/store/connectionStore";
+import { useState } from "react";
 
 export function StatusBar() {
   const { theme } = useTheme();
+  const { profiles, activeId } = useConnectionStore();
+  const active = profiles.find((p) => p.id === activeId);
+
+  const [open, setOpen] = useState(false);
+
   return (
-    <div className="h-6 border-t px-3 text-xs flex items-center justify-between text-muted-foreground">
-      <div>● Disconnected</div>
-      <div>Profile: None</div>
-      <div>Theme: {theme}</div>
-    </div>
+    <>
+      <div className="h-6 border-t px-3 text-xs flex items-center justify-between text-muted-foreground">
+        <div>● Disconnected</div>
+        <div>Profile: None</div>
+        <div>Theme: {theme}</div>
+        <button className="hover:underline" onClick={() => setOpen(true)}>
+          {active ? `🟢 ${active.name}` : "🔴 Disconnected"}
+        </button>
+      </div>
+      <CanConnectionManagerDialog open={open} onOpenChange={setOpen} />
+    </>
   );
 }
