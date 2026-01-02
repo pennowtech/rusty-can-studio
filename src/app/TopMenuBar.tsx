@@ -33,7 +33,7 @@ import {
 import { useAppStore } from "@/store/appShellStore";
 import { useTheme } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
-import { Command, Settings } from "lucide-react";
+import { Command, HelpCircle, Settings } from "lucide-react";
 import { useCommandPaletteStore } from "@/store/commandPaletteStore";
 import { useConnectDialogStore } from "@/store/canConnectDialogStore";
 import { useUiStore } from "@/store/uiStore";
@@ -107,6 +107,7 @@ export function TopMenuBar() {
         <MenubarMenu>
           <MenubarTrigger>Help</MenubarTrigger>
           <MenubarContent>
+            <MenubarItem onClick={() => setView("help")}>Open Help</MenubarItem>
             <MenubarItem>Documentation</MenubarItem>
             <MenubarItem>Keyboard Shortcuts</MenubarItem>
             <MenubarSeparator />
@@ -114,6 +115,10 @@ export function TopMenuBar() {
           </MenubarContent>
         </MenubarMenu>
       </Menubar>
+
+      <button onClick={() => setView("help")} className="ml-auto mr-2 p-1 rounded hover:bg-muted" title="Help">
+        <HelpCircle className="h-4 w-4" />
+      </button>
     </div>
   );
 }

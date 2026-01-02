@@ -73,4 +73,11 @@ export const commandRegistry: AppCommand[] = [
     keywords: ["system", "appearance"],
     handler: ({ setTheme }) => setTheme("system"),
   },
+  {
+    id: "help.user.documentation",
+    title: "Help: User Documentation",
+    category: "Help",
+    keywords: ["help", "documentation", "support"],
+    handler: ({ setView }) => setView("help"),
+  },
 ];

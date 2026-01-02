@@ -27,6 +27,7 @@
  */
 import { SidebarButton } from "@/components/SidebarButton";
 import { useAppStore } from "@/store/appShellStore";
+import { useHelpStore } from "@/store/helpStore";
 import { Activity, Sliders, Edit3, Settings, PanelLeftClose, PanelLeftOpen, HelpCircleIcon } from "lucide-react";
 
 export function Sidebar() {
@@ -87,7 +88,9 @@ export function Sidebar() {
         label="Help"
         active={view === "help"}
         collapsed={collapsed}
-        onClick={() => setView("help")}
+        onClick={() => {
+          setView("help");
+        }}
       />
     </div>
   );
