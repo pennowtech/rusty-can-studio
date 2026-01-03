@@ -26,7 +26,7 @@ import { HelpShell } from "@/components/help-system/HelpShell";
 import { useAppStore } from "@/store/appShellStore";
 import { useConnectDialogStore } from "@/store/canConnectDialogStore";
 import { useConnectionStore } from "@/store/connectionStore";
-import { useHelpStore } from "@/store/helpStore";
+import { useHelpStore } from "@/components/help-system/store/helpStore";
 import { useState } from "react";
 // import { EditorShell } from "@/editor/EditorShell";
 
@@ -51,9 +51,11 @@ export function MainView() {
       return <div className="p-6 text-muted-foreground">Settings</div>;
 
     case "help":
-      {
-        console.log("Help view selected", isHelpOpen);
-      }
+      // <Dialog open onOpenChange={close}>
+      //   <DialogContent className="max-w-6xl h-[85vh] p-0">
+      //     <HelpShell />
+      //   </DialogContent>
+      // </Dialog>
       return <HelpShell />;
 
     default:

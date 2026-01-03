@@ -6,14 +6,67 @@ import { HelpTOC } from "./HelpTOC";
 import { HelpEditor } from "./HelpEditor";
 import { HelpPreview } from "./HelpPreview";
 import { HelpDiff } from "./HelpDiff";
-import { useState } from "react";
-import { useHelpStore } from "@/store/helpStore";
+import { useEffect, useRef, useState } from "react";
+import { useHelpStore } from "@/components/help-system/store/helpStore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { HelpToolbar } from "./HelpToolbar";
+import { useHelpContentStore } from "./store/helpContentStore";
+import { FileQuestionMark } from "lucide-react";
+import { HelpSearchInput } from "./HelpSearchInput";
 
 type HelpMode = "view" | "edit" | "diff";
 
 export function HelpShell() {
   const [mode, setMode] = useState<HelpMode>("view");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const moveActive = useHelpStore((s) => s.moveActive);
+  const clearSearch = useHelpStore((s) => s.clearSearch);
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const isMac = /Mac|iPhone|iPod|iPad/.test(navigator.userAgent);
+
+      // Ctrl/Cmd + F → focus Help search
+      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+        return;
+      }
+
+      // F3 → next match
+      if (e.key === "F3" && !e.shiftKey) {
+        e.preventDefault();
+        moveActive(1);
+        return;
+      }
+
+      // Shift + F3 → previous match
+      if (e.key === "F3" && e.shiftKey) {
+        e.preventDefault();
+        moveActive(-1);
+        return;
+      }
+
+      // Esc → clear search (optional global)
+      if (e.key === "Escape") {
+        clearSearch();
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [moveActive, clearSearch]);
+
+  const loadHelpContent = useHelpContentStore((s) => s.loadHelp);
+
+  useEffect(() => {
+    loadHelpContent();
+  }, [loadHelpContent]);
 
   console.log("HelpDialog: rendering in mode", mode);
   return (
@@ -23,19 +76,33 @@ export function HelpShell() {
           <CardTitle>Help & Documentation</CardTitle>
         </CardHeader>
 
-        <CardContent className="text-sm text-muted-foreground">
-          <p>Welcome to the Help system.</p>
-          <p className="mt-2">This area will contain:</p>
-          <ul className="list-disc pl-5 mt-2 space-y-1">
-            <li>Editable Markdown documents</li>
-            <li>Live preview</li>
-            <li>Table of contents</li>
-            <li>Search</li>
-            <li>Versioned help entries</li>
-          </ul>
+        {/* Toolbar */}
+        <HelpToolbar ref={searchRef} />
 
-          <p className="mt-4 italic">(Content coming next)</p>
-        </CardContent>
+        {/* Mode Tabs */}
+        <Tabs value={mode} onValueChange={(v) => setMode(v as HelpMode)}>
+          <TabsList className="px-4">
+            <TabsTrigger value="view">View</TabsTrigger>
+            <TabsTrigger value="edit">Edit</TabsTrigger>
+            <TabsTrigger value="diff">Diff</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <Separator />
+
+        {/* Body */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Content */}
+          <main className="flex-1 overflow-hidden">
+            {mode === "view" && <HelpPreview />}
+            {mode === "edit" && <HelpEditor />}
+            {mode === "diff" && <HelpDiff />}
+          </main>
+          {/* TOC */}
+          <aside className="w-64 border-l overflow-auto">
+            <HelpTOC />
+          </aside>
+        </div>
       </Card>
     </div>
   );

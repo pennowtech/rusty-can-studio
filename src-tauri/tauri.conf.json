@@ -3,6 +3,7 @@
   "productName": "rusty-can-studio",
   "version": "0.1.0",
   "identifier": "com.sds.can-sim",
+
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -21,6 +22,7 @@
       "csp": null
     }
   },
+
   "bundle": {
     "active": true,
     "targets": "all",

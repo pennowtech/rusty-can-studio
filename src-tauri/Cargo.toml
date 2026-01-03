@@ -26,6 +26,7 @@ walkdir = "2"
 anyhow = "1.0.100"
 csv = "1.3"
 tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2.4.4"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 socketcan = "3.5.0"

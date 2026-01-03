@@ -1,0 +1,8 @@
+{
+  "fs": {
+    "read": true,
+    "write": true,
+    "delete": true,
+    "scope": ["$APP/help/**"]
+  }
+}
