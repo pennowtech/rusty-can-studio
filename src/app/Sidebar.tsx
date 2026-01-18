@@ -28,7 +28,16 @@
 import { SidebarButton } from "@/components/SidebarButton";
 import { useAppStore } from "@/store/appShellStore";
 import { useHelpStore } from "@/store/helpStore";
-import { Activity, Sliders, Edit3, Settings, PanelLeftClose, PanelLeftOpen, HelpCircleIcon } from "lucide-react";
+import {
+  Activity,
+  Sliders,
+  Edit3,
+  Settings,
+  PanelLeftClose,
+  PanelLeftOpen,
+  HelpCircleIcon,
+  FileJson,
+} from "lucide-react";
 
 export function Sidebar() {
   const { view, setView, sidebarMode, toggleSidebarMode } = useAppStore();
@@ -65,6 +74,14 @@ export function Sidebar() {
         active={view === "simulator"}
         collapsed={collapsed}
         onClick={() => setView("simulator")}
+      />
+
+      <SidebarButton
+        icon={FileJson}
+        label="Profile Viewer"
+        active={view === "profile-viewer"}
+        collapsed={collapsed}
+        onClick={() => setView("profile-viewer")}
       />
 
       <SidebarButton

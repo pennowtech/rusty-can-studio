@@ -28,7 +28,7 @@ import { useConnectDialogStore } from "@/store/canConnectDialogStore";
 import { useConnectionStore } from "@/store/connectionStore";
 import { useHelpStore } from "@/components/help-system/store/helpStore";
 import { useState } from "react";
-import { EditorShell } from "@/editor/EditorShell";
+import { ProfileMainShell } from "@/profile-editor/ProfileMainShell";
 // import { EditorShell } from "@/editor/EditorShell";
 
 export function MainView() {
@@ -39,8 +39,15 @@ export function MainView() {
   const isHelpOpen = useHelpStore((s) => s.isOpen);
 
   switch (view) {
+    case "profile-viewer":
+      return (
+        <div className="h-full p-6 overflow-auto">
+          <ProfileMainShell />
+        </div>
+      );
+
     case "profile-editor":
-      return <EditorShell />;
+      return <div className="p-6 text-muted-foreground">Coming soon</div>;
 
     case "monitor":
       return <CanConnectionManagerDialog open={connectOpen} onOpenChange={setConnectOpen} />;

@@ -14,5 +14,15 @@
     "label": "Run CanSim(Windows)",
     "command": "npm run tauri dev",
     "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Run Frontend-Tests(Windows)",
+    "command": "npx vitest",
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Run Frontend-Tests in Browser(Windows)",
+    "command": "npx vitest --ui",
+    "cwd": "$ZED_WORKTREE_ROOT"
   }
 ]

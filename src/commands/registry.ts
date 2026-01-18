@@ -46,6 +46,13 @@ export const commandRegistry: AppCommand[] = [
     handler: ({ setView }) => setView("simulator"),
   },
   {
+    id: "view.profileViewer",
+    title: "View: Profile Viewer",
+    category: "View",
+    keywords: ["profile", "editor"],
+    handler: ({ setView }) => setView("profile-viewer"),
+  },
+  {
     id: "view.profileEditor",
     title: "View: Profile Editor",
     category: "View",

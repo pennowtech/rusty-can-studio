@@ -37,6 +37,7 @@ import { Command, HelpCircle, Settings } from "lucide-react";
 import { useCommandPaletteStore } from "@/store/commandPaletteStore";
 import { useConnectDialogStore } from "@/store/canConnectDialogStore";
 import { useUiStore } from "@/store/uiStore";
+import { useProfileStore } from "@/profile-editor/store/profileStore";
 
 // TopMenuBar component
 // - Renders the application top menu bar
@@ -71,8 +72,15 @@ export function TopMenuBar() {
         <MenubarMenu>
           <MenubarTrigger>File</MenubarTrigger>
           <MenubarContent>
-            <MenubarItem>Open Profile…</MenubarItem>
-            <MenubarItem>Save Profile</MenubarItem>
+            <MenubarItem
+              onClick={() => {
+                useProfileStore.getState().importJson();
+                setView("profile-viewer");
+              }}
+            >
+              Open Profile…
+            </MenubarItem>
+            <MenubarItem onClick={() => setView("profile-viewer")}>Save Profile</MenubarItem>
             <MenubarSeparator />
             <MenubarItem>Exit</MenubarItem>
           </MenubarContent>
@@ -83,6 +91,7 @@ export function TopMenuBar() {
           <MenubarContent>
             <MenubarItem onClick={toggleSidebarMode}>Toggle Sidebar</MenubarItem>
             <MenubarSeparator />
+            <MenubarItem onClick={() => setView("profile-viewer")}>Profile Viewer</MenubarItem>
             <MenubarItem onClick={() => setView("profile-editor")}>Profile Editor</MenubarItem>
             <MenubarItem onClick={() => setView("monitor")}>CAN Monitor</MenubarItem>
             <MenubarItem onClick={() => setView("simulator")}>CAN Simulator</MenubarItem>
