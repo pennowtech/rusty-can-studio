@@ -29,7 +29,7 @@
 import { create } from "zustand";
 
 // Define the possible main application views
-export type AppView = "monitor" | "simulator" | "profile-editor" | "settings" | "help";
+export type AppView = "monitor" | "simulator" | "profile-editor" | "settings" | "help" | "shortcuts" | "about";
 
 type SidebarMode = "expanded" | "icon";
 

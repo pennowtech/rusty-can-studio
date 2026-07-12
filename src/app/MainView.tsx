@@ -27,6 +27,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { commandRegistry } from "@/commands/registry";
+import { displayShortcut, formatShortcutFromEvent, shortcutConflicts, useShortcutStore } from "@/commands/shortcutStore";
 import { useTheme } from "@/components/ThemeProvider";
 import type { Theme, ThemeDensity, ThemePalette } from "@/components/ThemeProvider";
 import { HelpShell } from "@/components/help-system/HelpShell";
@@ -34,6 +36,7 @@ import { useAppStore } from "@/store/appShellStore";
 import { useConnectionStore } from "@/store/connectionStore";
 import { ProfileMainShell } from "@/profile-editor/ProfileMainShell";
 import { useState } from "react";
+import { AlertTriangle, Info, Keyboard, Monitor, Palette, RotateCcw, Rows3, ShieldCheck } from "lucide-react";
 // import { EditorShell } from "@/editor/EditorShell";
 
 function SettingsView() {
@@ -207,6 +210,148 @@ function SettingsView() {
   );
 }
 
+function AboutView() {
+  const setView = useAppStore((s) => s.setView);
+  const { palette, density } = useTheme();
+
+  return (
+    <div className="h-full overflow-auto bg-muted/20 p-6">
+      <div className="mx-auto max-w-5xl space-y-5">
+        <section className="overflow-hidden rounded-xl border bg-background shadow-sm">
+          <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="p-8">
+              <Badge variant="outline" className="mb-4">Version 0.1.0</Badge>
+              <h1 className="text-3xl font-semibold tracking-tight">Rusty CAN Studio</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+                A desktop workbench for CAN-FD capture, profile-driven decoding, loaded trace inspection, display filtering, and transmit preparation.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-2">
+                <Button onClick={() => setView("monitor")}>Open Monitor</Button>
+                <Button variant="outline" onClick={() => setView("help")}>Open Help</Button>
+              </div>
+            </div>
+            <div className="border-t bg-[radial-gradient(circle_at_20%_20%,hsl(var(--primary)/0.18),transparent_32%),linear-gradient(135deg,hsl(var(--muted)),hsl(var(--background)))] p-6 lg:border-l lg:border-t-0">
+              <div className="grid gap-3">
+                {[
+                  ["Active palette", palette],
+                  ["Density", density],
+                  ["Profile format", "JSON schema profiles"],
+                  ["Trace source", "Live capture or loaded log"],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border bg-background/80 p-3">
+                    <div className="text-[11px] uppercase text-muted-foreground">{label}</div>
+                    <div className="mt-1 text-sm font-medium">{value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[
+            { icon: Monitor, title: "Monitor", text: "Sticky trace headers, display filters, decoded preview, context copy, and transmit staging." },
+            { icon: Rows3, title: "Profiles", text: "Visual editing for service, payload header, attributes, operations, and payload fields." },
+            { icon: Palette, title: "Themes", text: "Selectable color palettes and density modes for comfortable, compact, or dense workflows." },
+            { icon: ShieldCheck, title: "Help", text: "Searchable documentation, callouts, shortcuts, and workflow notes are available from Help." },
+          ].map((item) => (
+            <Card key={item.title} className="rounded-xl">
+              <CardHeader className="pb-2">
+                <item.icon className="h-5 w-5 text-primary" />
+                <CardTitle className="text-sm">{item.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">{item.text}</CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShortcutsView() {
+  const shortcuts = useShortcutStore((s) => s.shortcuts);
+  const setShortcut = useShortcutStore((s) => s.setShortcut);
+  const resetShortcut = useShortcutStore((s) => s.resetShortcut);
+  const resetAllShortcuts = useShortcutStore((s) => s.resetAllShortcuts);
+  const conflicts = shortcutConflicts(shortcuts);
+  const groupedCommands = commandRegistry.reduce<Record<string, typeof commandRegistry>>((groups, command) => {
+    const category = command.category ?? "Commands";
+    groups[category] ??= [];
+    groups[category].push(command);
+    return groups;
+  }, {});
+
+  return (
+    <div className="h-full overflow-auto p-6">
+      <div className="mx-auto max-w-5xl space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Keyboard className="h-5 w-5 text-primary" />
+              <h1 className="text-lg font-semibold">Keyboard shortcuts</h1>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">Click a shortcut field and press the new key combination. Changes are saved immediately.</p>
+          </div>
+          <Button variant="outline" onClick={resetAllShortcuts}>
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Reset all
+          </Button>
+        </div>
+
+        {conflicts.size > 0 && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>Some shortcuts are assigned to more than one command. Resolve highlighted rows before relying on those shortcuts.</div>
+          </div>
+        )}
+
+        <div className="grid gap-4">
+          {Object.entries(groupedCommands).map(([category, commands]) => (
+            <Card key={category} className="rounded-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">{category}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {commands.map((command) => {
+                  const hasConflict = conflicts.has(command.id);
+                  return (
+                    <div key={command.id} className={`grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_220px_auto] ${hasConflict ? "border-amber-500/60 bg-amber-500/10" : "bg-muted/20"}`}>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium">{command.title}</div>
+                        {command.description && <div className="mt-0.5 text-xs text-muted-foreground">{command.description}</div>}
+                      </div>
+                      <Input
+                        readOnly
+                        value={displayShortcut(shortcuts, command.id)}
+                        placeholder="No shortcut"
+                        className="font-mono text-xs"
+                        onKeyDown={(event) => {
+                          event.preventDefault();
+                          const nextShortcut = formatShortcutFromEvent(event.nativeEvent);
+                          if (nextShortcut) setShortcut(command.id, nextShortcut);
+                        }}
+                      />
+                      <Button variant="ghost" size="sm" onClick={() => resetShortcut(command.id)}>
+                        Reset
+                      </Button>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="flex items-start gap-2 rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>Shortcuts are stored locally for this desktop app installation. The command panel shows the same saved shortcuts.</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MainView() {
   const view = useAppStore((s) => s.view);
 
@@ -229,6 +374,12 @@ export function MainView() {
 
     case "help":
       return <HelpShell />;
+
+    case "shortcuts":
+      return <ShortcutsView />;
+
+    case "about":
+      return <AboutView />;
 
     default:
       return null;

@@ -14,18 +14,21 @@
  * - Commands should not directly manipulate UI components
  */
 
+import { AppView } from "@/store/appShellStore";
 import { Theme } from "@/components/ThemeProvider";
 
 export type CommandContext = {
-  setView: (view: any) => void;
+  setView: (view: AppView) => void;
   setTheme: (theme: Theme) => void;
   openConnectDialog: () => void;
   openConnectionManager: () => void;
+  openPalette: () => void;
 };
 
 export type AppCommand = {
   id: string;
   title: string;
+  description?: string;
   category?: string;
   keywords?: string[];
   shortcut?: string;

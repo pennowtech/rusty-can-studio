@@ -9,7 +9,7 @@ import {
 import { useAppStore } from "@/store/appShellStore";
 import { useTheme } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
-import { Command, HelpCircle, Settings } from "lucide-react";
+import { Command, HelpCircle } from "lucide-react";
 import { useCommandPaletteStore } from "@/store/commandPaletteStore";
 import { useConnectDialogStore } from "@/store/canConnectDialogStore";
 import { useUiStore } from "@/store/uiStore";
@@ -30,10 +30,6 @@ export function TopMenuBar() {
       <div className="flex items-center gap-1 px-2">
         <Button variant="ghost" size="icon" onClick={openPalette} title="Command Palette (Ctrl+Shift+P)">
           <Command className="h-4 w-4" />
-        </Button>
-
-        <Button variant="ghost" size="icon" onClick={() => setView("settings")} title="Settings">
-          <Settings className="h-4 w-4" />
         </Button>
       </div>
 
@@ -84,10 +80,10 @@ export function TopMenuBar() {
           <MenubarTrigger>Help</MenubarTrigger>
           <MenubarContent>
             <MenubarItem onClick={() => setView("help")}>Open Help</MenubarItem>
-            <MenubarItem>Documentation</MenubarItem>
-            <MenubarItem>Keyboard Shortcuts</MenubarItem>
+            <MenubarItem onClick={() => setView("help")}>Documentation</MenubarItem>
+            <MenubarItem onClick={() => setView("shortcuts")}>Keyboard Shortcuts</MenubarItem>
             <MenubarSeparator />
-            <MenubarItem>About</MenubarItem>
+            <MenubarItem onClick={() => setView("about")}>About</MenubarItem>
           </MenubarContent>
         </MenubarMenu>
       </Menubar>

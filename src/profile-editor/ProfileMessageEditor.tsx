@@ -122,6 +122,26 @@ function ensureCompactProfile(draft: CanProfile) {
   draft.attributes ??= [];
 }
 
+function definitionTitle(profile: CanProfile, node: ProfileNode) {
+  if (node.kind === "can-id") return "CAN ID layout";
+  if (node.kind === "service") return profile.service?.name ?? "Service";
+  if (node.kind === "payload-header") return "Payload header";
+  const attribute = selectedAttribute(profile, node);
+  const operation = selectedOperation(profile, node);
+  if (node.kind === "attribute") return attribute?.name ?? "Attribute";
+  if (node.kind === "operation") return operation?.type ?? "Operation";
+  return `${attribute?.name ?? "Attribute"} / ${operation?.type ?? "Operation"} / ${variantLabels[node.variant]}`;
+}
+
+function definitionNote(node: ProfileNode) {
+  if (node.kind === "can-id") return "Universal arbitration ID fields used before message matching.";
+  if (node.kind === "service") return "Profile-level service identity and byte order.";
+  if (node.kind === "payload-header") return "Shared payload header fields decoded for every matching frame.";
+  if (node.kind === "attribute") return "Attribute identity and operation list.";
+  if (node.kind === "operation") return "Feature index, operation name, and available direction variants.";
+  return "Payload fields for the selected message direction.";
+}
+
 export function ProfileMessageEditor() {
   const rawProfile = useProfileStore((s) => s.profile);
   const rawDraftProfile = useProfileStore((s) => s.draftProfile);
@@ -288,12 +308,18 @@ export function ProfileMessageEditor() {
 
   function addField() {
     updateProfile((draft) => {
-      const fields =
-        selectedNode.kind === "payload-header"
-          ? draft.payloadHeader?.fields
-          : selectedNode.kind === "variant"
-            ? draft.attributes?.[selectedNode.attributeIndex]?.operations?.[selectedNode.operationIndex]?.variants?.[selectedNode.variant]
-            : undefined;
+      let fields: PayloadFieldDef[] | undefined;
+      if (selectedNode.kind === "payload-header") {
+        draft.payloadHeader ??= { lengthBytes: 2, fields: [] };
+        draft.payloadHeader.fields ??= [];
+        fields = draft.payloadHeader.fields;
+      } else if (selectedNode.kind === "variant") {
+        const operation = draft.attributes?.[selectedNode.attributeIndex]?.operations?.[selectedNode.operationIndex];
+        if (!operation) return;
+        operation.variants ??= {};
+        operation.variants[selectedNode.variant] ??= [];
+        fields = operation.variants[selectedNode.variant];
+      }
       if (!fields) return;
       fields.push({
         name: `field_${fields.length + 1}`,
@@ -652,17 +678,21 @@ export function ProfileMessageEditor() {
   return (
     <div className="flex h-full min-h-0 gap-4 overflow-hidden">
       {renderOutline()}
-      <div className="min-h-0 min-w-[380px] flex-1 space-y-3 overflow-auto pb-8 pr-1">
-        <Card className="rounded-lg shadow-sm">
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm">Definition editor</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 text-xs text-muted-foreground">
-            Renders directly from the compact JSON profile sections.
-          </CardContent>
-        </Card>
-        {renderDefinition()}
-      </div>
+      <Card className="flex min-h-0 min-w-[380px] flex-1 flex-col rounded-lg shadow-sm">
+        <CardHeader className="border-b p-4 pb-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-xs font-medium uppercase text-muted-foreground">Definition editor</div>
+              <CardTitle className="mt-1 text-sm">{definitionTitle(currentProfile, selectedNode)}</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">{definitionNote(selectedNode)}</p>
+            </div>
+            {!editable && <Badge variant="outline">Read only</Badge>}
+          </div>
+        </CardHeader>
+        <CardContent className="min-h-0 flex-1 overflow-auto p-4 pb-8">
+          {renderDefinition()}
+        </CardContent>
+      </Card>
       <Card className="flex min-h-0 w-[360px] min-w-[300px] flex-col rounded-lg shadow-sm">
         <CardHeader className="p-4 pb-2">
           <CardTitle className="text-sm">Decoded preview</CardTitle>
