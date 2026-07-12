@@ -24,3 +24,10 @@ dist-ssr
 *.sw?
 src-tauri/target/
 src-tauri/gen/
+
+*.xml
+knossos_profile.json
+CAN-FD_Message_Profile.json
+candump.txt
+__pycache__/
+*.pyc

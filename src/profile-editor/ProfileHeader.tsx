@@ -1,4 +1,4 @@
-import { FileJson, Pencil, Eye, Check, X } from "lucide-react";
+import { FileJson, Pencil, Check, X, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProfileStore } from "@/profile-editor/store/profileStore";
 import { ProfileViewMode } from "@/profile-editor/model/profile";
@@ -6,7 +6,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export function ProfileHeader() {
   const { profile, viewMode, setViewMode, enterEditMode, cancelEdit, applyEdit, hasBlockingErrors } = useProfileStore();
-  const meta = profile?.meta;
+  const draftProfile = useProfileStore((s) => s.draftProfile);
+  const meta = (draftProfile ?? profile)?.meta;
 
   if (!meta) return null;
 
@@ -18,19 +19,26 @@ export function ProfileHeader() {
       </div>
 
       <div className="flex gap-2">
-        <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ProfileViewMode)}>
-          <ToggleGroupItem value="visual">
-            <Eye className="w-4 h-4 mr-1" />
-            Visual
-          </ToggleGroupItem>
-
+        <ToggleGroup
+          type="single"
+          value={viewMode}
+          onValueChange={(value) => {
+            if (!value) return;
+            setViewMode(value as ProfileViewMode);
+          }}
+        >
           <ToggleGroupItem value="json">
             <FileJson className="w-4 h-4 mr-1" />
             JSON
           </ToggleGroupItem>
+
+          <ToggleGroupItem value="edit">
+            <Eye className="w-4 h-4 mr-1" />
+            Visual
+          </ToggleGroupItem>
         </ToggleGroup>
 
-        {viewMode === "visual" || viewMode === "json" ? (
+        {!draftProfile ? (
           <Button size="sm" onClick={enterEditMode}>
             <Pencil className="w-4 h-4 mr-1" />
             Edit

@@ -17,16 +17,26 @@ export async function openJsonFile(): Promise<string | null> {
 }
 
 export async function saveJsonFile(contents: string, defaultName = "can-profile.json") {
-  const path = await save({
-    defaultPath: defaultName,
-    filters: [
-      {
-        name: "CAN Profile",
-        extensions: ["json"],
-      },
-    ],
-  });
+  try {
+    const path = await save({
+      defaultPath: defaultName,
+      filters: [
+        {
+          name: "CAN Profile",
+          extensions: ["json"],
+        },
+      ],
+    });
 
-  if (!path) return;
-  await writeTextFile(path, contents);
+    if (!path) return;
+    await writeTextFile(path, contents);
+  } catch {
+    const blob = new Blob([contents], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = defaultName;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 }

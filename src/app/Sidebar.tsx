@@ -27,7 +27,6 @@
  */
 import { SidebarButton } from "@/components/SidebarButton";
 import { useAppStore } from "@/store/appShellStore";
-import { useHelpStore } from "@/store/helpStore";
 import {
   Activity,
   Sliders,
@@ -36,79 +35,82 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   HelpCircleIcon,
-  FileJson,
 } from "lucide-react";
 
 export function Sidebar() {
   const { view, setView, sidebarMode, toggleSidebarMode } = useAppStore();
 
   const collapsed = sidebarMode === "icon";
+  const primaryItems = [
+    { icon: Activity, label: "CAN Monitor", view: "monitor" as const },
+    { icon: Sliders, label: "Simulator", view: "simulator" as const },
+  ];
+  const profileItems = [
+    { icon: Edit3, label: "Profile Editor", view: "profile-editor" as const },
+  ];
+  const supportItems = [
+    { icon: Settings, label: "Settings", view: "settings" as const },
+    { icon: HelpCircleIcon, label: "Help", view: "help" as const },
+  ];
 
   return (
     <div
       className={`
-         border-r p-2 space-y-2 transition-all
+         flex min-h-0 flex-col border-r bg-muted/20 p-2 transition-all
          ${collapsed ? "w-14" : "w-56"}
        `}
     >
-      {/* TOGGLE BUTTON */}
       <button
         onClick={toggleSidebarMode}
-        className="mb-2 flex justify-content-right w-full rounded-md p-2 hover:bg-muted"
+        className="mb-3 flex w-full items-center justify-center rounded-md border border-transparent p-2 text-muted-foreground hover:bg-background hover:text-foreground"
         title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
       >
         {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
       </button>
 
-      <SidebarButton
-        icon={Activity}
-        label="CAN Monitor"
-        active={view === "monitor"}
-        collapsed={collapsed}
-        onClick={() => setView("monitor")}
-      />
+      <nav className="flex min-h-0 flex-1 flex-col gap-4">
+        <div className="space-y-1">
+          {!collapsed && <div className="px-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground">Workspace</div>}
+          {primaryItems.map((item) => (
+            <SidebarButton
+              key={item.view}
+              icon={item.icon}
+              label={item.label}
+              active={view === item.view}
+              collapsed={collapsed}
+              onClick={() => setView(item.view)}
+            />
+          ))}
+        </div>
 
-      <SidebarButton
-        icon={Sliders}
-        label="Simulator"
-        active={view === "simulator"}
-        collapsed={collapsed}
-        onClick={() => setView("simulator")}
-      />
+        <div className="space-y-1">
+          {!collapsed && <div className="px-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground">Profiles</div>}
+          {profileItems.map((item) => (
+            <SidebarButton
+              key={item.view}
+              icon={item.icon}
+              label={item.label}
+              active={view === item.view}
+              collapsed={collapsed}
+              onClick={() => setView(item.view)}
+            />
+          ))}
+        </div>
 
-      <SidebarButton
-        icon={FileJson}
-        label="Profile Viewer"
-        active={view === "profile-viewer"}
-        collapsed={collapsed}
-        onClick={() => setView("profile-viewer")}
-      />
-
-      <SidebarButton
-        icon={Edit3}
-        label="Profile Editor"
-        active={view === "profile-editor"}
-        collapsed={collapsed}
-        onClick={() => setView("profile-editor")}
-      />
-
-      <SidebarButton
-        icon={Settings}
-        label="Settings"
-        active={view === "settings"}
-        collapsed={collapsed}
-        onClick={() => setView("settings")}
-      />
-
-      <SidebarButton
-        icon={HelpCircleIcon}
-        label="Help"
-        active={view === "help"}
-        collapsed={collapsed}
-        onClick={() => {
-          setView("help");
-        }}
-      />
+        <div className="mt-auto space-y-1">
+          {!collapsed && <div className="px-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground">System</div>}
+          {supportItems.map((item) => (
+            <SidebarButton
+              key={item.view}
+              icon={item.icon}
+              label={item.label}
+              active={view === item.view}
+              collapsed={collapsed}
+              onClick={() => setView(item.view)}
+            />
+          ))}
+        </div>
+      </nav>
     </div>
   );
 }

@@ -14,6 +14,7 @@ export function DerivedFieldEditor({ derivedId }: { derivedId: string }) {
   const { frames, selectedIndex } = usePreviewStore();
 
   const derived = profile.derivedFields[derivedId];
+
   const sampleFrame = frames[selectedIndex];
 
   // Collect available signals (flattened)
@@ -70,7 +71,7 @@ export function DerivedFieldEditor({ derivedId }: { derivedId: string }) {
             <div className="space-y-2">
               <Label>Source Signal</Label>
               <Select
-                value={derived.signalId}
+                value={derived.signalId ?? ""}
                 onValueChange={(value) =>
                   updateProfile((p) => {
                     p.derivedFields[derivedId].signalId = value;

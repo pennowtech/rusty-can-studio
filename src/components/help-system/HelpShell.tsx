@@ -1,6 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { HelpTOC } from "./HelpTOC";
 import { HelpEditor } from "./HelpEditor";
@@ -8,11 +6,8 @@ import { HelpPreview } from "./HelpPreview";
 import { HelpDiff } from "./HelpDiff";
 import { useEffect, useRef, useState } from "react";
 import { useHelpStore } from "@/components/help-system/store/helpStore";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HelpToolbar } from "./HelpToolbar";
 import { useHelpContentStore } from "./store/helpContentStore";
-import { FileQuestionMark } from "lucide-react";
-import { HelpSearchInput } from "./HelpSearchInput";
 
 type HelpMode = "view" | "edit" | "diff";
 
@@ -21,16 +16,31 @@ export function HelpShell() {
   const searchRef = useRef<HTMLInputElement>(null);
   const moveActive = useHelpStore((s) => s.moveActive);
   const clearSearch = useHelpStore((s) => s.clearSearch);
+  const loadHelpContent = useHelpContentStore((s) => s.loadHelp);
 
   useEffect(() => {
     searchRef.current?.focus();
   }, []);
 
   useEffect(() => {
+    loadHelpContent();
+  }, [loadHelpContent]);
+
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+
+    const timer = window.setTimeout(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+
+    return () => window.clearTimeout(timer);
+  }, [mode]);
+
+  useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const isMac = /Mac|iPhone|iPod|iPad/.test(navigator.userAgent);
 
-      // Ctrl/Cmd + F → focus Help search
       if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "f") {
         e.preventDefault();
         searchRef.current?.focus();
@@ -38,21 +48,12 @@ export function HelpShell() {
         return;
       }
 
-      // F3 → next match
-      if (e.key === "F3" && !e.shiftKey) {
+      if (e.key === "F3") {
         e.preventDefault();
-        moveActive(1);
+        moveActive(e.shiftKey ? -1 : 1);
         return;
       }
 
-      // Shift + F3 → previous match
-      if (e.key === "F3" && e.shiftKey) {
-        e.preventDefault();
-        moveActive(-1);
-        return;
-      }
-
-      // Esc → clear search (optional global)
       if (e.key === "Escape") {
         clearSearch();
       }
@@ -62,48 +63,36 @@ export function HelpShell() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [moveActive, clearSearch]);
 
-  const loadHelpContent = useHelpContentStore((s) => s.loadHelp);
-
-  useEffect(() => {
-    loadHelpContent();
-  }, [loadHelpContent]);
-
-  console.log("HelpDialog: rendering in mode", mode);
   return (
-    <div className="h-full flex flex-col">
-      <Card className="flex-1 rounded-none border-0">
-        <CardHeader>
-          <CardTitle>Help & Documentation</CardTitle>
-        </CardHeader>
+    <div className="flex h-full min-h-0 flex-col bg-background">
+      <header className="border-b px-4 py-3">
+        <h1 className="text-lg font-semibold">Help and Documentation</h1>
+        <p className="text-sm text-muted-foreground">CAN-FD workflow guidance, editable markdown, search, and table of contents.</p>
+      </header>
 
-        {/* Toolbar */}
-        <HelpToolbar ref={searchRef} />
+      <HelpToolbar ref={searchRef} />
 
-        {/* Mode Tabs */}
-        <Tabs value={mode} onValueChange={(v) => setMode(v as HelpMode)}>
-          <TabsList className="px-4">
-            <TabsTrigger value="view">View</TabsTrigger>
-            <TabsTrigger value="edit">Edit</TabsTrigger>
-            <TabsTrigger value="diff">Diff</TabsTrigger>
-          </TabsList>
-        </Tabs>
+      <Tabs value={mode} onValueChange={(value) => setMode(value as HelpMode)} className="border-b px-2 py-2">
+        <TabsList className="grid w-full grid-cols-3 sm:w-auto">
+          <TabsTrigger value="view">View</TabsTrigger>
+          <TabsTrigger value="edit">Edit</TabsTrigger>
+          <TabsTrigger value="diff">Diff</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-        <Separator />
+      <Separator />
 
-        {/* Body */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Content */}
-          <main className="flex-1 overflow-hidden">
-            {mode === "view" && <HelpPreview />}
-            {mode === "edit" && <HelpEditor />}
-            {mode === "diff" && <HelpDiff />}
-          </main>
-          {/* TOC */}
-          <aside className="w-64 border-l overflow-auto">
-            <HelpTOC />
-          </aside>
-        </div>
-      </Card>
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <main className="min-h-0 flex-1 overflow-hidden">
+          {mode === "view" && <HelpPreview />}
+          {mode === "edit" && <HelpEditor />}
+          {mode === "diff" && <HelpDiff />}
+        </main>
+
+        <aside className="order-first max-h-40 overflow-auto border-b lg:order-none lg:max-h-none lg:w-72 lg:border-b-0 lg:border-l">
+          <HelpTOC />
+        </aside>
+      </div>
     </div>
   );
 }

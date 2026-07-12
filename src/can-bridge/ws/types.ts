@@ -73,6 +73,11 @@ export type WsFrame = {
   id: number;
   is_fd: boolean;
   data_hex: string;
+  line_no?: number;
+  tx_status?: "pending" | "sent" | "failed";
+  tx_error?: string;
+  tx_origin?: "local" | "daemon";
+  tx_sequence?: number;
 };
 
 export type WsError = { type: "error"; message: string };

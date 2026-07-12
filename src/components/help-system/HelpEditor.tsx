@@ -6,15 +6,15 @@ import { defineGithubLightTheme, defineTokyoNightTheme } from "./monacoThemes";
 export function HelpEditor() {
   const value = useHelpContentStore((s) => s.customMarkdown ?? s.defaultMarkdown);
   const setCustomMarkdown = useHelpContentStore((s) => s.setCustomMarkdown);
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
 
   return (
     <Editor
-      height="80vh"
+      height="100%"
       language="markdown"
       value={value}
       onChange={(value) => setCustomMarkdown(value ?? "")}
-      theme={theme === "dark" ? "tokyo-night" : "github-light"}
+      theme={resolvedTheme === "dark" ? "tokyo-night" : "github-light"}
       beforeMount={(monaco) => {
         defineTokyoNightTheme(monaco);
         defineGithubLightTheme(monaco);
@@ -28,6 +28,7 @@ export function HelpEditor() {
         renderWhitespace: "selection",
         cursorSmoothCaretAnimation: "on",
         padding: { top: 8 },
+        automaticLayout: true,
       }}
     />
   );

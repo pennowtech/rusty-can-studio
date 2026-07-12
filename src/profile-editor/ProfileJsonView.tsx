@@ -4,29 +4,29 @@ import { useProfileStore } from "@/profile-editor/store/profileStore";
 import { Editor } from "@monaco-editor/react";
 
 export function ProfileJsonView() {
-  const { viewMode, updateDraftFromJson, draftProfile, profile, jsonError } = useProfileStore();
-  const activeProfile = viewMode === "edit" ? draftProfile : profile;
-  const { theme } = useTheme();
+  const { updateDraftFromJson, draftProfile, profile, jsonError } = useProfileStore();
+  const activeProfile = draftProfile ?? profile;
+  const { resolvedTheme } = useTheme();
 
   return (
     <div className="h-full border rounded-lg overflow-hidden">
       <Editor
-        height="78vh"
+        height="100%"
         language="json"
         value={JSON.stringify(activeProfile, null, 2)}
         onChange={(v) => {
-          if (viewMode === "edit" && v != null) {
+          if (draftProfile && v != null) {
             updateDraftFromJson(v);
           }
         }}
-        theme={theme === "dark" ? "tokyo-night" : "github-light"}
+        theme={resolvedTheme === "dark" ? "tokyo-night" : "github-light"}
         beforeMount={(monaco) => {
           defineTokyoNightTheme(monaco);
           defineGithubLightTheme(monaco);
         }}
         options={{
           wordWrap: "on",
-          readOnly: viewMode !== "edit",
+          readOnly: !draftProfile,
           fontSize: 13,
           minimap: { enabled: false },
           scrollBeyondLastLine: false,
@@ -34,6 +34,7 @@ export function ProfileJsonView() {
           renderWhitespace: "selection",
           cursorSmoothCaretAnimation: "on",
           padding: { top: 8 },
+          automaticLayout: true,
         }}
       />
 

@@ -24,41 +24,111 @@ import * as React from "react";
 import { createContext, useEffect, useState } from "react";
 
 export type Theme = "light" | "dark" | "system";
+export type ThemePalette = "default" | "graphite" | "zeiss-blue" | "high-contrast" | "terminal" | "warm-neutral";
+export type ThemeDensity = "comfortable" | "compact" | "dense";
+
+export type AppearanceSettings = {
+  theme: Theme;
+  palette: ThemePalette;
+  density: ThemeDensity;
+};
 
 type ThemeContextValue = {
   theme: Theme;
+  resolvedTheme: "light" | "dark";
+  palette: ThemePalette;
+  density: ThemeDensity;
   setTheme: (theme: Theme) => void;
+  setPalette: (palette: ThemePalette) => void;
+  setDensity: (density: ThemeDensity) => void;
+  setAppearance: (appearance: Partial<AppearanceSettings>) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const getInitialTheme = (): Theme => {
+const defaultAppearance: AppearanceSettings = {
+  theme: "system",
+  palette: "default",
+  density: "comfortable",
+};
+
+const palettes: ThemePalette[] = ["default", "graphite", "zeiss-blue", "high-contrast", "terminal", "warm-neutral"];
+const densities: ThemeDensity[] = ["comfortable", "compact", "dense"];
+
+function isTheme(value: unknown): value is Theme {
+  return value === "light" || value === "dark" || value === "system";
+}
+
+function isPalette(value: unknown): value is ThemePalette {
+  return palettes.includes(value as ThemePalette);
+}
+
+function isDensity(value: unknown): value is ThemeDensity {
+  return densities.includes(value as ThemeDensity);
+}
+
+const getInitialAppearance = (): AppearanceSettings => {
   try {
-    return (localStorage.getItem(STORAGE_KEY.THEME) as Theme) ?? "system";
+    const raw = localStorage.getItem(STORAGE_KEY.THEME);
+    if (!raw) return defaultAppearance;
+    if (raw === "light" || raw === "dark" || raw === "system") return { ...defaultAppearance, theme: raw };
+    const parsed = JSON.parse(raw) as Partial<AppearanceSettings>;
+    return {
+      theme: isTheme(parsed.theme) ? parsed.theme : defaultAppearance.theme,
+      palette: isPalette(parsed.palette) ? parsed.palette : defaultAppearance.palette,
+      density: isDensity(parsed.density) ? parsed.density : defaultAppearance.density,
+    };
   } catch {
-    return "system";
+    return defaultAppearance;
   }
 };
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+  const [appearance, setAppearanceState] = useState<AppearanceSettings>(getInitialAppearance);
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
     const root = window.document.documentElement;
 
-    root.classList.remove("light", "dark");
+    const apply = () => {
+      root.classList.remove("light", "dark");
+      root.classList.remove(...palettes.map((palette) => `theme-${palette}`));
+      root.classList.remove(...densities.map((density) => `density-${density}`));
 
-    if (theme === "system") {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      root.classList.add(prefersDark ? "dark" : "light");
-    } else {
-      root.classList.add(theme);
-    }
+      const nextResolvedTheme =
+        appearance.theme === "system"
+          ? window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light"
+          : appearance.theme;
 
-    localStorage.setItem(STORAGE_KEY.THEME, theme);
-  }, [theme]);
+      root.classList.add(nextResolvedTheme);
+      root.classList.add(`theme-${appearance.palette}`);
+      root.classList.add(`density-${appearance.density}`);
+      setResolvedTheme(nextResolvedTheme);
+    };
 
-  return <ThemeContext.Provider value={{ theme, setTheme: setThemeState }}>{children}</ThemeContext.Provider>;
+    apply();
+    localStorage.setItem(STORAGE_KEY.THEME, JSON.stringify(appearance));
+
+    if (appearance.theme !== "system") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, [appearance]);
+
+  const value: ThemeContextValue = {
+    theme: appearance.theme,
+    resolvedTheme,
+    palette: appearance.palette,
+    density: appearance.density,
+    setTheme: (theme) => setAppearanceState((current) => ({ ...current, theme })),
+    setPalette: (palette) => setAppearanceState((current) => ({ ...current, palette })),
+    setDensity: (density) => setAppearanceState((current) => ({ ...current, density })),
+    setAppearance: (next) => setAppearanceState((current) => ({ ...current, ...next })),
+  };
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

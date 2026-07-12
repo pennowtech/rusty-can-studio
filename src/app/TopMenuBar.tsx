@@ -1,27 +1,3 @@
-/**
- * TopMenuBar.tsx
- * ------------------------------------------------------------
- * Application-wide top menu bar.
- *
- * RESPONSIBILITY
- * - Renders the main application menu (File, View, Help, etc.)
- * - Exposes global commands:
- *   - File operations
- *   - View switching
- *   - Help / About
- * - Provides discoverability for command palette actions
- *
- * CONVENTIONS
- * - MUST NOT contain business logic
- * - MUST NOT directly perform file IO or CAN actions
- * - MUST NOT execute business logic directly
- * - Menu items should map to commands or app-store actions
- * - Actual behavior is delegated elsewhere
- * - Keyboard accessibility is mandatory
- * - Maintain state
- *
- */
-
 import {
   Menubar,
   MenubarContent,
@@ -37,15 +13,8 @@ import { Command, HelpCircle, Settings } from "lucide-react";
 import { useCommandPaletteStore } from "@/store/commandPaletteStore";
 import { useConnectDialogStore } from "@/store/canConnectDialogStore";
 import { useUiStore } from "@/store/uiStore";
-import { useProfileStore } from "@/profile-editor/store/profileStore";
+import { useConnectionStore } from "@/store/connectionStore";
 
-// TopMenuBar component
-// - Renders the application top menu bar
-// - Provides File, View, and Help menus
-// - Delegates actions to app store methods
-// - No direct business logic or state management
-// - State management is handled via appShellStore
-// - Keyboard accessible
 export function TopMenuBar() {
   const setView = useAppStore((s) => s.setView);
   const { setTheme } = useTheme();
@@ -53,10 +22,11 @@ export function TopMenuBar() {
   const openPalette = useCommandPaletteStore((s) => s.openPalette);
   const openConnectDialog = useConnectDialogStore((s) => s.openDialog);
   const openConnectionManager = useUiStore((s) => s.openConnectionManager);
+  const disconnect = useConnectionStore((s) => s.disconnect);
+  const connectionStatus = useConnectionStore((s) => s.status);
 
   return (
-    <div className="flex items-center border-b">
-      {/* LEFT ICON BUTTONS */}
+    <div className="flex min-w-0 items-center border-b">
       <div className="flex items-center gap-1 px-2">
         <Button variant="ghost" size="icon" onClick={openPalette} title="Command Palette (Ctrl+Shift+P)">
           <Command className="h-4 w-4" />
@@ -67,20 +37,17 @@ export function TopMenuBar() {
         </Button>
       </div>
 
-      {/* MENUS */}
-      <Menubar className="rounded-none border-0 flex-1">
+      <Menubar className="shrink-0 rounded-none border-0">
         <MenubarMenu>
           <MenubarTrigger>File</MenubarTrigger>
           <MenubarContent>
             <MenubarItem
               onClick={() => {
-                useProfileStore.getState().importJson();
-                setView("profile-viewer");
+                setView("profile-editor");
               }}
             >
-              Open Profile…
+              Profile Editor
             </MenubarItem>
-            <MenubarItem onClick={() => setView("profile-viewer")}>Save Profile</MenubarItem>
             <MenubarSeparator />
             <MenubarItem>Exit</MenubarItem>
           </MenubarContent>
@@ -91,12 +58,10 @@ export function TopMenuBar() {
           <MenubarContent>
             <MenubarItem onClick={toggleSidebarMode}>Toggle Sidebar</MenubarItem>
             <MenubarSeparator />
-            <MenubarItem onClick={() => setView("profile-viewer")}>Profile Viewer</MenubarItem>
             <MenubarItem onClick={() => setView("profile-editor")}>Profile Editor</MenubarItem>
             <MenubarItem onClick={() => setView("monitor")}>CAN Monitor</MenubarItem>
             <MenubarItem onClick={() => setView("simulator")}>CAN Simulator</MenubarItem>
             <MenubarSeparator />
-
             <MenubarItem onClick={() => setTheme("light")}>Appearance: Light</MenubarItem>
             <MenubarItem onClick={() => setTheme("dark")}>Appearance: Dark</MenubarItem>
             <MenubarItem onClick={() => setTheme("system")}>Appearance: System</MenubarItem>
@@ -106,10 +71,12 @@ export function TopMenuBar() {
         <MenubarMenu>
           <MenubarTrigger>CAN</MenubarTrigger>
           <MenubarContent>
-            <MenubarItem onClick={openConnectDialog}>Connect…</MenubarItem>
-            <MenubarItem disabled>Disconnect</MenubarItem>
+            <MenubarItem onClick={openConnectDialog}>Connect</MenubarItem>
+            <MenubarItem disabled={connectionStatus === "disconnected"} onClick={() => void disconnect()}>
+              Disconnect
+            </MenubarItem>
             <MenubarSeparator />
-            <MenubarItem onClick={() => openConnectionManager()}>Manage Connections…</MenubarItem>
+            <MenubarItem onClick={openConnectionManager}>Manage Connections</MenubarItem>
           </MenubarContent>
         </MenubarMenu>
 
@@ -125,7 +92,11 @@ export function TopMenuBar() {
         </MenubarMenu>
       </Menubar>
 
-      <button onClick={() => setView("help")} className="ml-auto mr-2 p-1 rounded hover:bg-muted" title="Help">
+      <div className="min-w-0 flex-1 truncate px-3 text-xs text-muted-foreground">
+        Connect to remote can-bridge-daemon, define packet formats, and monitor sent/received packets.
+      </div>
+
+      <button onClick={() => setView("help")} className="mr-2 shrink-0 rounded p-1 hover:bg-muted" title="Help">
         <HelpCircle className="h-4 w-4" />
       </button>
     </div>

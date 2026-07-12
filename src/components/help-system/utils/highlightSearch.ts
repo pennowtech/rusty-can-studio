@@ -11,9 +11,10 @@ export function clearHighlights(container: HTMLElement) {
 
 export function applyHighlights(container: HTMLElement, query: string): HTMLElement[] {
   clearHighlights(container);
-  if (!query) return [];
+  const normalizedQuery = query.trim();
+  if (!normalizedQuery) return [];
 
-  const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  const regex = new RegExp(normalizedQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
 
   const matches: HTMLElement[] = [];
 
@@ -21,19 +22,35 @@ export function applyHighlights(container: HTMLElement, query: string): HTMLElem
 
   let node: Node | null;
   while ((node = walker.nextNode())) {
-    if (!node.nodeValue?.trim()) continue;
-    if (!regex.test(node.nodeValue)) continue;
+    const text = node.nodeValue;
+    if (!text?.trim()) continue;
 
-    const span = document.createElement("span");
-    span.innerHTML = node.nodeValue.replace(regex, (m) => {
-      return `<${MARK_TAG} ${ATTR}>${m}</${MARK_TAG}>`;
-    });
+    regex.lastIndex = 0;
+    const parts: Node[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(document.createTextNode(text.slice(lastIndex, match.index)));
+      }
+
+      const mark = document.createElement(MARK_TAG);
+      mark.setAttribute(ATTR, "");
+      mark.textContent = match[0];
+      parts.push(mark);
+      matches.push(mark);
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (!parts.length) continue;
+    if (lastIndex < text.length) {
+      parts.push(document.createTextNode(text.slice(lastIndex)));
+    }
 
     const frag = document.createDocumentFragment();
-    Array.from(span.childNodes).forEach((n) => frag.appendChild(n));
+    parts.forEach((part) => frag.appendChild(part));
     node.parentNode!.replaceChild(frag, node);
-
-    span.querySelectorAll(`${MARK_TAG}`).forEach((m) => matches.push(m as HTMLElement));
   }
 
   return matches;
