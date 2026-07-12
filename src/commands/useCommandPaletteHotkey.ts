@@ -18,21 +18,41 @@
  */
 import { useEffect } from "react";
 import { useCommandPaletteStore } from "@/store/commandPaletteStore";
+import { commandRegistry } from "@/commands/registry";
+import { defaultShortcuts, shortcutMatches, useShortcutStore } from "@/commands/shortcutStore";
+import { useAppStore } from "@/store/appShellStore";
+import { useTheme } from "@/components/ThemeProvider";
+import { useConnectDialogStore } from "@/store/canConnectDialogStore";
+import { useUiStore } from "@/store/uiStore";
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  const tagName = target.tagName.toLowerCase();
+  return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
+}
 
 export function useCommandPaletteHotkey() {
-  const open = useCommandPaletteStore((s) => s.openPalette);
+  const openPalette = useCommandPaletteStore((s) => s.openPalette);
+  const closePalette = useCommandPaletteStore((s) => s.closePalette);
+  const paletteOpen = useCommandPaletteStore((s) => s.open);
+  const shortcuts = useShortcutStore((s) => s.shortcuts);
+  const setView = useAppStore((s) => s.setView);
+  const { setTheme } = useTheme();
+  const openConnectDialog = useConnectDialogStore((s) => s.openDialog);
+  const openConnectionManager = useUiStore((s) => s.openConnectionManager);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      const isMac = navigator.platform.includes("Mac");
+      if (isEditableTarget(e.target) && !paletteOpen) return;
+      const command = commandRegistry.find((cmd) => shortcutMatches(e, shortcuts[cmd.id] ?? defaultShortcuts[cmd.id] ?? cmd.shortcut ?? ""));
+      if (!command) return;
 
-      if ((isMac && e.metaKey && e.shiftKey && e.key === "P") || (!isMac && e.ctrlKey && e.shiftKey && e.key === "P")) {
-        e.preventDefault();
-        open();
-      }
+      e.preventDefault();
+      command.handler({ setView, setTheme, openConnectDialog, openConnectionManager, openPalette });
+      if (paletteOpen && command.id !== "app.commandPalette") closePalette();
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open]);
+  }, [closePalette, openConnectDialog, openConnectionManager, openPalette, paletteOpen, setTheme, setView, shortcuts]);
 }

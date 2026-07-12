@@ -488,6 +488,29 @@ Keyboard behavior:
 - Shift+F3 moves to the previous result.
 - Escape clears the search field.
 
+## Keyboard shortcuts and command panel
+
+Open Help > Keyboard Shortcuts to review and edit application shortcuts. Click a shortcut field, press the new key combination, and the change is saved immediately for this installation.
+
+Default shortcuts:
+
+- Ctrl+Shift+P: open the command panel.
+- Ctrl+1: open CAN Monitor.
+- Ctrl+2: open Profile Editor.
+- Ctrl+,: open Settings.
+- Ctrl+/: open Keyboard Shortcuts.
+- F1: open Help.
+
+The command panel shows the same saved shortcuts beside each command and can also open the shortcut editor. Duplicate shortcuts are highlighted in the shortcut editor so they can be resolved before use.
+
+:::tip
+Use the command panel when you do not remember a shortcut. Search by action name, view name, connection workflow, theme, or help topic.
+:::
+
+## About screen
+
+Open Help > About to view application information, current appearance settings, and quick links back to the monitor and help system.
+
 ## Appearance settings
 
 Open Settings to change how the whole application looks and feels. Appearance changes apply immediately and are saved for the next session.

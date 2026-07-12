@@ -18,8 +18,17 @@ import { AppCommand } from "./types";
 
 export const commandRegistry: AppCommand[] = [
   {
+    id: "app.commandPalette",
+    title: "Open Command Panel",
+    description: "Search commands, navigation, connection actions, and help.",
+    category: "Application",
+    keywords: ["command", "palette", "control", "panel"],
+    handler: ({ openPalette }) => openPalette(),
+  },
+  {
     id: "can.connect",
     title: "CAN: Connect",
+    description: "Open the connection dialog for local or remote capture.",
     category: "CAN",
     keywords: ["connect", "socketcan", "daemon"],
     handler: ({ openConnectDialog }) => openConnectDialog(),
@@ -27,6 +36,7 @@ export const commandRegistry: AppCommand[] = [
   {
     id: "can.manageConnections",
     title: "CAN: Manage Connections",
+    description: "Review saved local and remote connection entries.",
     category: "CAN",
     keywords: ["connect", "bridge", "daemon"],
     handler: ({ openConnectionManager }) => openConnectionManager(),
@@ -34,6 +44,7 @@ export const commandRegistry: AppCommand[] = [
   {
     id: "view.monitor",
     title: "View: CAN Monitor",
+    description: "Inspect live captures, loaded logs, filters, decoded preview, and transmit composer.",
     category: "View",
     keywords: ["monitor", "can", "rx"],
     handler: ({ setView }) => setView("monitor"),
@@ -41,6 +52,7 @@ export const commandRegistry: AppCommand[] = [
   {
     id: "view.simulator",
     title: "View: CAN Simulator",
+    description: "Open the transmit and simulation workspace.",
     category: "View",
     keywords: ["tx", "sim"],
     handler: ({ setView }) => setView("simulator"),
@@ -48,13 +60,23 @@ export const commandRegistry: AppCommand[] = [
   {
     id: "view.profileEditor",
     title: "View: Profile Editor",
+    description: "Edit message profile JSON through the visual profile editor.",
     category: "View",
     keywords: ["profile", "editor"],
     handler: ({ setView }) => setView("profile-editor"),
   },
   {
+    id: "view.settings",
+    title: "View: Settings",
+    description: "Configure appearance, density, and trace retention.",
+    category: "View",
+    keywords: ["settings", "appearance", "density"],
+    handler: ({ setView }) => setView("settings"),
+  },
+  {
     id: "theme.light",
     title: "Theme: Light",
+    description: "Use light appearance.",
     category: "Theme",
     keywords: ["light", "appearance"],
     handler: ({ setTheme }) => setTheme("light"),
@@ -62,6 +84,7 @@ export const commandRegistry: AppCommand[] = [
   {
     id: "theme.dark",
     title: "Theme: Dark",
+    description: "Use dark appearance.",
     category: "Theme",
     keywords: ["dark", "appearance"],
     handler: ({ setTheme }) => setTheme("dark"),
@@ -69,6 +92,7 @@ export const commandRegistry: AppCommand[] = [
   {
     id: "theme.system",
     title: "Theme: System",
+    description: "Follow the operating system appearance.",
     category: "Theme",
     keywords: ["system", "appearance"],
     handler: ({ setTheme }) => setTheme("system"),
@@ -76,8 +100,25 @@ export const commandRegistry: AppCommand[] = [
   {
     id: "help.user.documentation",
     title: "Help: User Documentation",
+    description: "Open the searchable help system.",
     category: "Help",
     keywords: ["help", "documentation", "support"],
     handler: ({ setView }) => setView("help"),
+  },
+  {
+    id: "help.shortcuts",
+    title: "Help: Keyboard Shortcuts",
+    description: "Review and edit keyboard shortcuts.",
+    category: "Help",
+    keywords: ["keyboard", "shortcuts", "hotkeys"],
+    handler: ({ setView }) => setView("shortcuts"),
+  },
+  {
+    id: "help.about",
+    title: "Help: About",
+    description: "Show product information and workspace capabilities.",
+    category: "Help",
+    keywords: ["about", "version", "info"],
+    handler: ({ setView }) => setView("about"),
   },
 ];
