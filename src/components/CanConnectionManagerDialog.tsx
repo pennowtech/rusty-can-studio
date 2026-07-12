@@ -24,7 +24,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useConnectionStore } from "@/store/connectionStore";
 import { CanConnectDialog } from "./CanConnectDialog";
 import { Pencil, Trash2, Plus } from "lucide-react";
@@ -37,10 +37,14 @@ export function CanConnectionManagerDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { profiles, activeId, connect, deleteProfile } = useConnectionStore();
+  const { profiles, activeId, connect, deleteProfile, cleanupProfiles } = useConnectionStore();
 
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
+
+  useEffect(() => {
+    if (open) cleanupProfiles();
+  }, [open, cleanupProfiles]);
 
   return (
     <>
@@ -63,7 +67,7 @@ export function CanConnectionManagerDialog({
                 className={`flex items-center justify-between rounded-md border p-3 cursor-pointer ${
                   p.id === activeId ? "bg-muted" : "hover:bg-muted/50"
                 }`}
-                onClick={() => connect(p.id)}
+                onClick={() => void connect(p.id)}
               >
                 <div>
                   <div className="font-medium flex items-center gap-2">

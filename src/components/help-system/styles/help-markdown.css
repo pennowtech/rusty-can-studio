@@ -1,8 +1,3 @@
-/* =========================
-   Help / Docs Markdown Style
-   ========================= */
-
-/* Base prose tweaks */
 .help-markdown .prose {
     --tw-prose-body: hsl(var(--foreground));
     --tw-prose-headings: hsl(var(--foreground));
@@ -14,30 +9,49 @@
     --tw-prose-quotes: hsl(var(--foreground));
     --tw-prose-quote-borders: hsl(var(--border));
     --tw-prose-captions: hsl(var(--muted-foreground));
+    font-family: Bookerly, Besley, Charter, Georgia, "Times New Roman", serif;
+    font-size: 0.94rem;
+    line-height: 1.62;
 }
 
-/* Headings — documentation style (not blog style) */
 .help-markdown .prose h1 {
-    font-size: 1.75rem;
-    margin-top: 0;
-    margin-bottom: 1rem;
+    font-size: 1.65rem;
+    margin-top: 5rem;
+    margin-bottom: 1.1rem;
     font-weight: 600;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
+    padding: 0 0 0.8rem 0;
+    border-bottom: 2px solid hsl(var(--border));
+    border-left: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.help-markdown .prose h1:first-child {
+    margin-top: 0;
 }
 
 .help-markdown .prose h2 {
-    font-size: 1.35rem;
-    margin-top: 2rem;
-    margin-bottom: 0.75rem;
+    font-size: 1.18rem;
+    margin-top: 2.25rem;
+    margin-bottom: 0.85rem;
     font-weight: 600;
-    padding-bottom: 0.25rem;
+    padding: 0.25rem 0 0.45rem 0.75rem;
+    border-left: 3px solid hsl(var(--primary));
+    border-top: 1px solid hsl(var(--border));
+    border-bottom: 0;
+    border-radius: 0;
+    background: transparent;
 }
 
 .help-markdown .prose h3 {
-    font-size: 1.1rem;
-    margin-top: 1.5rem;
-    margin-bottom: 0.5rem;
+    font-size: 1rem;
+    margin-top: 1.25rem;
+    margin-bottom: 0.45rem;
     font-weight: 600;
+    padding-left: 0;
+    border-left: 0;
+    color: hsl(var(--foreground));
 }
 
 .help-markdown .prose h4 {
@@ -48,14 +62,12 @@
     color: hsl(var(--muted-foreground));
 }
 
-/* Paragraphs */
 .help-markdown .prose p {
-    line-height: 1.7;
-    margin-top: 0.75rem;
-    margin-bottom: 0.75rem;
+    line-height: 1.62;
+    margin-top: 0.55rem;
+    margin-bottom: 0.55rem;
 }
 
-/* Lists */
 .help-markdown .prose ul,
 .help-markdown .prose ol {
     padding-left: 1.25rem;
@@ -64,12 +76,12 @@
 }
 
 .help-markdown .prose li {
-    margin-top: 0.25rem;
-    margin-bottom: 0.25rem;
+    margin-top: 0.18rem;
+    margin-bottom: 0.18rem;
 }
 
-/* Inline code */
 .help-markdown .prose code {
+    font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
     background: hsl(var(--muted));
     color: hsl(var(--foreground));
     padding: 0.15em 0.35em;
@@ -77,64 +89,13 @@
     font-size: 0.9em;
 }
 
-/* Remove Typography styling for fenced code blocks */
 .help-markdown .prose pre {
     background: transparent;
     padding: 0;
-    border-radius: 2;
-    border: 1px solid;
-    margin: 1rem 0;
-}
-
-/* Highlight.js owns fenced blocks */
-.hljs {
-    border-radius: 6px;
-    padding: 0.9rem 1rem;
-    font-size: 0.9rem;
-    line-height: 1.6;
-}
-
-/* Blockquotes — subtle, not loud */
-.help-markdown .prose blockquote {
-    border-left: 3px solid hsl(var(--border));
-    padding-left: 1rem;
-    color: hsl(var(--muted-foreground));
-    font-style: normal;
-}
-
-/* Tables — GitHub-like */
-.help-markdown .prose table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
-}
-
-.help-markdown .prose th,
-.help-markdown .prose td {
     border: 1px solid hsl(var(--border));
-    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    margin: 0.85rem 0;
 }
-
-.help-markdown .prose th {
-    background: hsl(var(--muted));
-    font-weight: 600;
-    text-align: left;
-}
-
-/* Horizontal rule */
-.help-markdown .prose hr {
-    margin: 2rem 0;
-}
-
-/* Links */
-.help-markdown .prose a {
-    text-decoration: underline;
-    text-underline-offset: 2px;
-}
-
-/* --- Fix prose + highlight.js conflict --- */
 
 .help-markdown .prose pre code {
     background: transparent;
@@ -149,29 +110,82 @@
 }
 
 .help-markdown .hljs {
+    font-family: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
     border-radius: 6px;
+    padding: 0.75rem 0.9rem;
+    font-size: 0.84rem;
+    line-height: 1.5;
 }
 
-/* Search highlight */
+.help-markdown .prose blockquote {
+    border-left: 3px solid hsl(var(--border));
+    padding-left: 1rem;
+    color: hsl(var(--muted-foreground));
+    font-style: normal;
+}
+
+.help-markdown .prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.84rem;
+}
+
+.help-markdown .prose th,
+.help-markdown .prose td {
+    border: 1px solid hsl(var(--border));
+    padding: 0.42rem 0.6rem;
+}
+
+.help-markdown .prose th {
+    background: hsl(var(--muted));
+    font-weight: 600;
+    text-align: left;
+}
+
+.help-markdown .prose hr {
+    margin: 2rem 0;
+}
+
+.help-markdown .prose h2:nth-of-type(4n + 1) {
+    border-left-color: hsl(210 80% 45%);
+}
+
+.help-markdown .prose h2:nth-of-type(4n + 2) {
+    border-left-color: hsl(145 55% 38%);
+}
+
+.help-markdown .prose h2:nth-of-type(4n + 3) {
+    border-left-color: hsl(38 90% 44%);
+}
+
+.help-markdown .prose h2:nth-of-type(4n + 4) {
+    border-left-color: hsl(270 55% 52%);
+}
+
+.help-markdown .prose a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 .help-markdown mark[data-help-search] {
-    background-color: hsl(var(--accent));
-    color: hsl(var(--accent-foreground) / 0.35);
+    background-color: hsl(48 96% 60% / 0.45);
+    color: hsl(var(--foreground));
     padding: 0.05em 0.15em;
     border-radius: 3px;
 }
 
 .help-markdown mark[data-help-search].active {
-    background-color: hsl(var(--accent));
-    color: hsl(var(--accent-foreground));
+    background-color: hsl(48 96% 52% / 0.9);
+    color: hsl(0 0% 10%);
 }
 
-/* Heading anchor */
 .help-markdown .prose a.heading-anchor {
     position: relative;
     text-decoration: none;
 }
 
-/* Icon */
 .help-markdown .heading-anchor::before {
     content: "#";
     position: absolute;
@@ -188,15 +202,14 @@
     opacity: 1;
 }
 
-/* =========================
-   Callout blocks
-   ========================= */
-
 .help-markdown .callout {
-    border-radius: 6px;
-    padding: 0.75rem 1rem;
-    margin: 1rem 0;
+    border-radius: 8px;
+    padding: 0.65rem 0.85rem;
+    margin: 0.85rem 0;
     border-left: 4px solid;
+    border-top: 1px solid hsl(var(--border) / 0.45);
+    border-right: 1px solid hsl(var(--border) / 0.45);
+    border-bottom: 1px solid hsl(var(--border) / 0.45);
 }
 
 .help-markdown .callout-header {
@@ -210,40 +223,38 @@
     letter-spacing: 0.04em;
 }
 
-.help-markdown .callout-icon {
-    width: 14px;
-    height: 14px;
+.help-markdown .callout-header::before {
+    content: "";
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: currentColor;
 }
 
 .help-markdown .callout-body {
-    font-size: 0.95rem;
+    font-size: 0.88rem;
 }
 
-/* NOTE */
 .help-markdown .callout-note {
-    background: hsl(var(--muted) / 0.5);
+    background: hsl(210 70% 96% / 0.75);
     border-color: hsl(var(--primary));
 }
 
-/* TIP */
 .help-markdown .callout-tip {
-    background: hsl(145 60% 90% / 0.4);
+    background: hsl(145 65% 94% / 0.8);
     border-color: hsl(145 60% 40%);
 }
 
-/* WARNING */
 .help-markdown .callout-warning {
-    background: hsl(40 100% 90% / 0.5);
+    background: hsl(40 100% 93% / 0.9);
     border-color: hsl(40 100% 45%);
 }
 
-/* DANGER */
 .help-markdown .callout-danger {
-    background: hsl(0 85% 92% / 0.5);
+    background: hsl(0 85% 95% / 0.9);
     border-color: hsl(0 70% 45%);
 }
 
-/* Dark mode tuning */
 .dark .help-markdown .callout-note {
     background: hsl(var(--muted) / 0.35);
 }
@@ -260,32 +271,18 @@
     background: hsl(0 40% 20% / 0.6);
 }
 
-/* Header row */
-.help-markdown .callout::before {
-    content: attr(data-label);
-    position: absolute;
-    top: 0.5rem;
-    left: 0.75rem;
-    font-weight: 600;
-    font-size: 0.75rem;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    opacity: 0.85;
-}
+@media (max-width: 640px) {
+    .help-markdown .prose h1 {
+        font-size: 1.35rem;
+        padding: 0 0 0.65rem 0;
+    }
 
-/* Icon container */
-.help-markdown .callout::after {
-    content: "";
-    position: absolute;
-    top: 0.55rem;
-    left: 0.75rem;
-    width: 14px;
-    height: 14px;
-    transform: translateX(-1.25rem);
-}
+    .help-markdown .prose h2 {
+        font-size: 1.05rem;
+        padding: 0.25rem 0 0.4rem 0.65rem;
+    }
 
-/* Callout icons via mask */
-.help-markdown .callout[data-callout="note"]::after {
-    mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><path d='...'/></svg>");
-    background: currentColor;
+    .help-markdown .heading-anchor::before {
+        display: none;
+    }
 }

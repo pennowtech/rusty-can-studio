@@ -54,7 +54,7 @@ export type AppState = {
 // - no derived state, pure UI concerns
 export const useAppStore = create<AppState>((set) => ({
   view: "monitor",
-  sidebarMode: "expanded",
+  sidebarMode: "icon",
   isMobile: false,
 
   setView: (view) => set({ view }),

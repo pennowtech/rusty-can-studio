@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Eye, EyeOff, Save, RotateCcw } from "lucide-react";
+import { Eye, EyeOff, RotateCcw, Save } from "lucide-react";
 import { useHelpStore } from "@/components/help-system/store/helpStore";
 import { HelpSearchInput } from "@/components/help-system/HelpSearchInput";
 import { useHelpContentStore } from "./store/helpContentStore";
@@ -15,37 +15,37 @@ export const HelpToolbar = forwardRef<HTMLInputElement>(function HelpToolbar(_, 
   const isSaving = useHelpContentStore((s) => s.isSaving);
   const save = useHelpContentStore((s) => s.saveCustomMarkdown);
   const reset = useHelpContentStore((s) => s.resetToDefaultMarkdown);
-  console.log("🔥 REAL HelpToolbar RENDERED");
+
+  async function confirmSave() {
+    if (!window.confirm("Save the current help markdown changes?")) return;
+    await save();
+  }
+
+  async function confirmReset() {
+    if (!window.confirm("Reset help content to the default markdown? Your custom changes will be removed.")) return;
+    await reset();
+  }
+
   return (
-    <div className="border-b flex flex-col">
-      {/* 🔝 Toolbar row */}
-      <div className="h-11 flex items-center gap-2 px-2">
+    <div className="flex flex-col border-b">
+      <div className="flex min-h-11 flex-wrap items-center gap-2 px-2 py-2">
         <HelpSearchInput ref={searchRef} />
 
-        <Separator orientation="vertical" className="mx-1 h-6" />
+        <Separator orientation="vertical" className="mx-1 hidden h-6 sm:block" />
 
-        {/* Preview toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={togglePreview}
-          title={previewEnabled ? "Hide Preview" : "Show Preview"}
-        >
+        <Button variant="ghost" size="icon" onClick={togglePreview} title={previewEnabled ? "Hide Preview" : "Show Preview"}>
           {previewEnabled ? <EyeOff size={16} /> : <Eye size={16} />}
         </Button>
 
-        {/* Save */}
-        <Button variant="ghost" size="icon" onClick={save} disabled={!isDirty || isSaving} title="Save help">
+        <Button variant="ghost" size="icon" onClick={confirmSave} disabled={!isDirty || isSaving} title="Save help">
           <Save size={16} />
         </Button>
 
-        {/* Reset */}
-        <Button variant="ghost" size="icon" onClick={reset} disabled={!isDirty} title="Reset to default">
+        <Button variant="ghost" size="icon" onClick={confirmReset} disabled={!isDirty} title="Reset to default">
           <RotateCcw size={16} />
         </Button>
       </div>
 
-      {/* 🔽 Search results (THIS WAS THE MISSING PART) */}
       <HelpSearchResults />
     </div>
   );

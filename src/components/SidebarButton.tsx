@@ -53,13 +53,13 @@ export function SidebarButton({
       onClick={onClick}
       title={collapsed ? label : undefined}
       className={`
-         flex items-center gap-2 rounded-md px-3 py-2 text-sm
-         ${active ? "bg-muted font-medium" : "hover:bg-muted"}
+         group flex w-full items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors
+         ${active ? "border-primary/30 bg-primary/10 font-medium text-primary shadow-sm" : "border-transparent text-muted-foreground hover:bg-background hover:text-foreground"}
          ${collapsed ? "justify-center px-2" : ""}
        `}
     >
-      <Icon className="h-4 w-4 shrink-0" />
-      {!collapsed && <span>{label}</span>}
+      <Icon className={`h-4 w-4 shrink-0 ${active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`} />
+      {!collapsed && <span className="truncate">{label}</span>}
     </button>
   );
 }

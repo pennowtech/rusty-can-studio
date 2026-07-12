@@ -19,11 +19,13 @@
 
 import { AppShell } from "@/app/AppShell";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { Toaster } from "sonner";
 
 export default function App() {
   return (
     <ThemeProvider>
       <AppShell />
+      <Toaster richColors />
     </ThemeProvider>
   );
 }

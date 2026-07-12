@@ -62,6 +62,7 @@ export class WsJsonDaemonClient {
   // If we fire a request and then `await waitFor(...)`,
   // that waiter object is stored here until matched.
   private readonly pendingResponses: PendingResponseWaiter[] = [];
+  private readonly unmatchedResponses: WsInbound[] = [];
 
   // Streaming frames are delivered via this callback (set by the app)
   private onFrame: FrameHandler | null = null;
@@ -98,12 +99,14 @@ export class WsJsonDaemonClient {
     // Wait until the socket is open
     await openPromise;
 
-    // Handshake: client_hello -> hello_ack. :contentReference[oaicite:8]{index=8}
-    // Timeout applies to the whole handshake.
+    const helloAckPromise = this.waitFor(
+      (message): message is WsHelloAck => message.type === "hello_ack",
+      timeoutMs,
+    );
+
     this.send({ type: "client_hello", client: params.clientName, protocol: "json" });
 
-    // waitFor resolves when a matching message arrives (hello_ack here)
-    const helloAck = await this.waitFor((message): message is WsHelloAck => message.type === "hello_ack", timeoutMs);
+    const helloAck = await helloAckPromise;
 
     return helloAck;
   }
@@ -196,8 +199,6 @@ export class WsJsonDaemonClient {
     // Otherwise, the first matching waiter will win.
     // This is aligned with test behavior. :contentReference[oaicite:10]{index=10}
     // E.g., multiple pings with different IDs will be matched correctly.
-    // If no pendingResponse waiter matches, the message is ignored.
-    // Hopefully this situation does not occur in practice.
     for (let i = 0; i < this.pendingResponses.length; i++) {
       const pendingResponse = this.pendingResponses[i];
       if (pendingResponse.matches(inboundMessage)) {
@@ -207,9 +208,17 @@ export class WsJsonDaemonClient {
         return;
       }
     }
+
+    this.unmatchedResponses.push(inboundMessage);
   }
 
   private waitFor<T extends WsInbound>(matches: (msg: WsInbound) => msg is T, timeoutMs: number): Promise<T> {
+    const queuedIndex = this.unmatchedResponses.findIndex(matches);
+    if (queuedIndex >= 0) {
+      const [message] = this.unmatchedResponses.splice(queuedIndex, 1);
+      return Promise.resolve(message as T);
+    }
+
     return new Promise<T>((resolve, reject) => {
       // If timeout triggers, remove respective pendingResponse and reject
       const timeoutId = window.setTimeout(() => {

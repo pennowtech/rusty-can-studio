@@ -1,17 +1,16 @@
 import { DiffEditor } from "@monaco-editor/react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useHelpContentStore } from "@/components/help-system/store/helpContentStore";
-import { defineTokyoNightTheme, defineGithubLightTheme } from "./monacoThemes";
+import { defineGithubLightTheme, defineTokyoNightTheme } from "./monacoThemes";
 
 export function HelpDiff() {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const defaultMarkdown = useHelpContentStore((s) => s.defaultMarkdown);
   const customMarkdown = useHelpContentStore((s) => s.customMarkdown);
 
-  // No custom changes → nothing to diff
   if (!customMarkdown || customMarkdown === defaultMarkdown) {
     return (
-      <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         No custom changes to compare
       </div>
     );
@@ -19,11 +18,11 @@ export function HelpDiff() {
 
   return (
     <DiffEditor
-      height="80vh"
+      height="100%"
       language="markdown"
       original={defaultMarkdown}
       modified={customMarkdown}
-      theme={theme === "dark" ? "tokyo-night" : "github-light"}
+      theme={resolvedTheme === "dark" ? "tokyo-night" : "github-light"}
       beforeMount={(monaco) => {
         defineTokyoNightTheme(monaco);
         defineGithubLightTheme(monaco);

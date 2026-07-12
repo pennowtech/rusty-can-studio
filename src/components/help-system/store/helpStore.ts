@@ -9,6 +9,7 @@ interface HelpState {
 
   setSearchQuery: (q: string) => void;
   setSearchResults(r: HTMLElement[]): void;
+  setActiveIndex(index: number): void;
   moveActive(delta: number): void;
   clearSearch(): void;
 
@@ -16,7 +17,7 @@ interface HelpState {
   togglePreview(): void;
 }
 
-export const useHelpStore = create<HelpState>((set, get) => ({
+export const useHelpStore = create<HelpState>((set) => ({
   showPreview: true,
   searchQuery: "",
   searchResults: [],
@@ -32,6 +33,8 @@ export const useHelpStore = create<HelpState>((set, get) => ({
       activeIndex: searchResults.length ? 0 : -1,
     }),
 
+  setActiveIndex: (activeIndex) => set({ activeIndex }),
+
   moveActive: (delta) =>
     set((s) => {
       if (!s.searchResults.length) return {};
@@ -43,6 +46,6 @@ export const useHelpStore = create<HelpState>((set, get) => ({
     set({
       searchQuery: "",
       searchResults: [],
-      activeIndex: 0,
+      activeIndex: -1,
     }),
 }));

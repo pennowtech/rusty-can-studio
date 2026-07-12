@@ -1,7 +1,7 @@
 [
   {
-    "label": "Run CanSim(WSL)",
-    "command": "npm run tauri dev",
+    "label": "Run CanSim UI(WSL)",
+    "command": "npm run dev",
     "cwd": "$ZED_WORKTREE_ROOT",
     "shell": {
       "with_arguments": {
@@ -11,8 +11,18 @@
     }
   },
   {
-    "label": "Run CanSim(Windows)",
-    "command": "npm run tauri dev",
+    "label": "Run CanSim UI(Windows)",
+    "command": "npm run dev",
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Run Frontend-Tests(Windows)",
+    "command": "npx vitest",
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Run Frontend-Tests in Browser(Windows)",
+    "command": "npx vitest --ui",
     "cwd": "$ZED_WORKTREE_ROOT"
   }
 ]
