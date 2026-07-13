@@ -601,6 +601,85 @@ Example workflow for periodically requesting \`on_off_cycles\`:
 Wait-for-CAN-response depends on subscribed live capture. If the expected response is filtered out by the daemon or the wrong interface is selected, cyclic TX will time out.
 :::
 
+## CAN Simulator sequences
+
+Use CAN Simulator when a workflow is larger than one manual transmit or one cyclic frame. The Sequences workspace models a reusable state machine without assuming any specific protocol or organization-specific message format.
+
+A sequence is made of ordered steps:
+
+- Send Once: send one manually defined frame or profile-referenced message.
+- Wait For Response: wait until live capture receives a matching RX frame.
+- Send Cyclic: repeatedly send a frame until a response, timeout, or stop policy ends the step.
+- Delay: wait for a fixed duration.
+- Branch: reserve a conditional decision point for simple expression-driven workflows.
+
+Typical start-then-poll workflow:
+
+1. Add a Send Once step for frame A.
+2. Add a Wait For Response step for response A.
+3. Set the success condition, for example \`message_good == 1\`.
+4. Add a Send Cyclic step for frame B.
+5. Set the cyclic stop response, for example \`message_b.response\`.
+6. Set the cyclic stop condition, for example \`message_good == 1\`.
+7. Set period, maximum duration, timeout policy, and late-response behavior.
+8. Run the sequence and inspect the run log plus CAN Monitor trace.
+
+Example sequence JSON:
+
+\`\`\`json
+{
+  "name": "Start then poll until response",
+  "steps": [
+    {
+      "type": "send",
+      "name": "Send frame A once",
+      "frameRef": "message_a.command",
+      "canId": "18203C01",
+      "payload": "01 01"
+    },
+    {
+      "type": "wait",
+      "name": "Wait for response A",
+      "expect": "message_a.response",
+      "condition": "message_good == 1",
+      "timeoutMs": 1000,
+      "onTimeout": "fail"
+    },
+    {
+      "type": "cyclic",
+      "name": "Cyclic frame B until response",
+      "frameRef": "message_b.command",
+      "canId": "14089C01",
+      "payload": "01 01 07 00 00 00",
+      "periodMs": 100,
+      "maxDurationMs": 10000,
+      "stopWhen": {
+        "expect": "message_b.response",
+        "condition": "message_good == 1",
+        "matches": 1
+      }
+    }
+  ]
+}
+\`\`\`
+
+Response matching uses decoded profile data when profiles are loaded. You can match by message name, decoded meaning, service name, attribute name, feature name, CAN ID, or expression fields.
+
+Useful conditions:
+
+\`\`\`text
+message == "on_off_cycles.get_current_value.response"
+message_good == 1
+error_status == null
+service_identifier == 810 && attribute_address == 3
+\`\`\`
+
+Scenario-related frames are marked in CAN Monitor with \`SEQ:tx\` for transmitted sequence frames and \`SEQ:rx-match\` for received frames that satisfied a wait or cyclic stop condition.
+
+:::tip
+Keep the transmit composer for quick manual sends. Use CAN Simulator sequences for multi-step workflows such as wake-up then poll, unlock then stream, request calibration then wait for event, or cyclic keepalive until state changes.
+:::
+
 ## Connection profiles
 
 Open Connect to create or edit connection profiles. Remote Daemon profiles can be saved without connecting, or saved and connected immediately. When the daemon is reachable, use Discover to load available CAN interfaces into a dropdown.

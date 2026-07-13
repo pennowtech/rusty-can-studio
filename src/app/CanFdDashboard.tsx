@@ -996,6 +996,8 @@ export function CanFdDashboard() {
           ? "bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 dark:text-amber-300"
           : frame.tx_status === "sent"
             ? "bg-sky-500/10 hover:bg-sky-500/15"
+            : frame.scenario_status
+              ? "bg-primary/10 hover:bg-primary/15"
             : "";
     return `cursor-pointer border-b last:border-0 hover:bg-muted/40 ${
       row.hasError ? "bg-destructive/10 text-destructive hover:bg-destructive/15" : ""
@@ -1143,6 +1145,7 @@ export function CanFdDashboard() {
             >
               {frame.dir.toUpperCase()}
               {frame.tx_status ? `:${frame.tx_status}` : ""}
+              {frame.scenario_status ? ` SEQ:${frame.scenario_status}` : ""}
             </Badge>
           </td>
         );
