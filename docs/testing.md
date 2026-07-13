@@ -52,6 +52,21 @@ It checks:
 
 The separate `Security` workflow handles dependency audits and Rust vulnerability checks.
 
+## Performance Benchmarks
+
+Run benchmarks when changing trace parsing, display filtering, sorting, profile decoding, or other paths that touch many frames:
+
+```bash
+npm run benchmark
+```
+
+The benchmark suite currently covers:
+
+- candump parsing for 10k and 50k frame traces
+- derived-field creation against a profile with many available signals
+
+Benchmark numbers vary by machine, so treat them as a local comparison tool. Run them before and after a performance-sensitive change and compare the same machine under similar load.
+
 ## What To Test When Adding Features
 
 Use this checklist when deciding whether a change needs more tests:
@@ -62,6 +77,7 @@ Use this checklist when deciding whether a change needs more tests:
 - Persistence: test migration/default behavior where practical.
 - UI-only changes: run the full build and manually inspect the changed screen.
 - Tauri/Rust changes: run `cargo check` and add Rust tests when logic moves out of command glue.
+- Performance-sensitive changes: run `npm run benchmark` before and after the change.
 
 ## Current Limits
 

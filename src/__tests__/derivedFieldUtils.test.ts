@@ -1,15 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { ProfileModel } from "@/model/profile";
+import type { CanProfile } from "@/profile-editor/model/profile";
 import { createDerivedField } from "@/utils/derivedFieldUtils";
 
 describe("createDerivedField", () => {
   it("creates expression-based derived field when no signals exist", () => {
-    const profile: ProfileModel = {
+    const profile = {
       meta: { name: "Test", version: "1.0" },
       frames: {}, //  no frames
       derivedFields: {},
       columns: [],
-    };
+    } as unknown as CanProfile;
 
     const result = createDerivedField(profile);
 
@@ -18,7 +18,7 @@ describe("createDerivedField", () => {
     expect(result.derivedField.signalId).toBeUndefined();
   });
   it("creates signal-based derived field when signals exist", () => {
-    const profile: ProfileModel = {
+    const profile = {
       meta: { name: "Test", version: "1.0" },
       frames: {
         "0x123": {
@@ -38,7 +38,7 @@ describe("createDerivedField", () => {
       },
       derivedFields: {},
       columns: [],
-    };
+    } as unknown as CanProfile;
 
     const result = createDerivedField(profile);
 

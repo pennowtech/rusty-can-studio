@@ -866,6 +866,16 @@ Use the fast test command while editing logic, then run the full quality check b
 The CI quality workflow runs install, tests, production build, and Rust compile checks on pull requests and pushes to main. The separate security workflow handles dependency vulnerability checks.
 :::
 
+### Performance benchmarks
+
+Run benchmarks when changing trace parsing, display filtering, sorting, profile decoding, or any path that may touch thousands of frames:
+
+\`\`\`bash
+npm run benchmark
+\`\`\`
+
+The benchmark suite covers candump parsing on larger traces and derived-field creation against a profile with many signals. Benchmark results vary by machine, so use them as before-and-after comparisons on the same computer.
+
 ## Transmit composer
 
 Use the transmit composer to prepare a single CAN-FD frame or a cyclic transmission.

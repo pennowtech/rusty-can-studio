@@ -1,10 +1,22 @@
-import { ProfileModel } from "@/model/profile";
+import type { CanProfile, SignalDef } from "@/profile-editor/model/profile";
 
-export function createDerivedField(profile: ProfileModel) {
+type LegacySignal = SignalDef & { id?: string };
+type LegacyFrame = { signals?: Record<string, LegacySignal> | LegacySignal[] };
+type DerivedFieldProfile = Pick<CanProfile, "frames"> | { frames: Record<string, LegacyFrame> };
+
+function collectSignals(profile: DerivedFieldProfile) {
+  return Object.values(profile.frames).flatMap((frame) => {
+    const signals = (frame as LegacyFrame).signals;
+    if (!signals) return [];
+    return Array.isArray(signals) ? signals : Object.values(signals);
+  });
+}
+
+export function createDerivedField(profile: DerivedFieldProfile) {
   const id = crypto.randomUUID();
 
-  // Collect all signals safely
-  const allSignals = Object.values(profile.frames).flatMap((f) => Object.values(f.signals));
+  const allSignals = collectSignals(profile);
+  const firstSignal = allSignals[0];
 
   return {
     id,
@@ -12,7 +24,7 @@ export function createDerivedField(profile: ProfileModel) {
       id,
       name: "NewDerived",
       source: allSignals.length > 0 ? "signal" : "expression",
-      signalId: allSignals.length > 0 ? allSignals[0].id : undefined,
+      signalId: firstSignal ? firstSignal.id ?? firstSignal.name : undefined,
       expr: allSignals.length === 0 ? "" : undefined,
     },
   };
