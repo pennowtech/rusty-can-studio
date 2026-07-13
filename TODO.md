@@ -9,7 +9,7 @@
 - [x] Error handling and logging improvements
 - [x] Configuration management (e.g., saving/loading settings)
 - [x] Localization and internationalization support
-- [] Mobile app for remote CAN monitoring
+- [x] Mobile app for remote CAN monitoring
 - [x] Data visualization tools (graphs, charts)
 - [x] Alerting system for specific CAN events
 - [] Historical data storage and retrieval
@@ -42,9 +42,9 @@
 - [x] Date and number formatting based on locale.
 - [x] Right-to-left (RTL) layout support.
 **Responsive design:**
-- Table layout adapts to different screen sizes.
-- Horizontal scrolling for wide tables on small screens.
-- Touch-friendly interactions for mobile devices.
+- [x] Table layout adapts to different screen sizes.
+- [x] Horizontal scrolling for wide tables on small screens.
+- [x] Touch-friendly interactions for mobile devices.
 **Testing:**
 - [x] Comprehensive unit and integration tests.
 - Performance benchmarks to ensure responsiveness.

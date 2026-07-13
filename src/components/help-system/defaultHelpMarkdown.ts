@@ -542,6 +542,29 @@ Terminal Trace is a presentation view. It does not replace CAN Monitor filtering
 For very busy live buses, keep the terminal line limit at 1000 or below and leave Follow enabled. This keeps the text stream responsive while still showing the newest traffic.
 :::
 
+## Mobile remote monitoring
+
+Rusty CAN Studio can be installed as a browser-based mobile web app from the PWA build. This is intended for remote monitoring on a phone or tablet while the CAN bridge daemon runs on the Linux or WSL host where the CAN interfaces exist.
+
+Recommended mobile workflow:
+
+1. Start can-bridge-daemon on the machine attached to the CAN bus.
+2. Serve the web build on a network address reachable from the mobile device.
+3. Open the app in the mobile browser.
+4. Use the browser option to add the app to the home screen.
+5. Open Connect and create a Remote Daemon profile pointing to the daemon host and WebSocket port.
+6. Use CAN Monitor or Terminal Trace for live traffic.
+
+The mobile layout gives the monitor the full screen width, hides the desktop sidebar, stacks decoded preview and transmit panels below the trace, and keeps the status bar compact. The top menu and command panel remain available for navigation.
+
+:::warning
+Mobile browsers can block insecure WebSocket connections depending on network, HTTPS, and browser policy. For reliable field use, serve the app and daemon endpoint with a network setup accepted by the target device.
+:::
+
+:::note
+The mobile web app is for remote monitoring and light inspection. Profile editing, large loaded log analysis, and complex simulator sequences are still more comfortable on desktop.
+:::
+
 Field layout expressions can control how a payload value is displayed. Expressions are intentionally small: arithmetic, comparisons, ternary conditions, and quoted display strings are supported. Statements, loops, imports, global objects, and full JavaScript programs are not allowed.
 
 \`\`\`text

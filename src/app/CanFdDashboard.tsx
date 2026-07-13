@@ -1627,11 +1627,11 @@ export function CanFdDashboard() {
       />
 
       <div
-        className={`grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 ${
+        className={`grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto p-2 sm:p-3 xl:overflow-hidden ${
           showDecodedPreview || showTransmitComposer ? "xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]" : ""
         }`}
       >
-        <div className="h-full min-h-0 min-w-0 overflow-hidden">
+        <div className="min-h-[65vh] min-w-0 overflow-hidden xl:h-full xl:min-h-0">
           <section className="grid h-full min-h-0 min-w-0">
             <Card className="flex min-h-0 min-w-0 flex-col rounded-lg border-border/70 shadow-sm">
               <CardHeader className="flex-row items-center justify-between gap-2 border-b bg-muted/20 p-2.5">
@@ -1993,7 +1993,7 @@ export function CanFdDashboard() {
         </div>
 
         {(showDecodedPreview || showTransmitComposer) && (
-        <aside className="min-w-0 flex min-h-0 flex-col gap-3 overflow-hidden">
+        <aside className="min-w-0 flex min-h-[45vh] flex-col gap-3 overflow-visible xl:min-h-0 xl:overflow-hidden">
           {showDecodedPreview && (
           <Card className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border-border/70 shadow-sm">
             <CardHeader className="p-4 pb-2">

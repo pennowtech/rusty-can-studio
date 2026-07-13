@@ -22,7 +22,7 @@ export function StatusBar() {
 
   return (
     <>
-      <div className="flex h-6 min-w-0 items-center gap-4 border-t px-3 text-xs text-muted-foreground">
+      <div className="flex min-h-6 min-w-0 flex-wrap items-center gap-x-4 gap-y-1 border-t px-3 py-1 text-xs text-muted-foreground sm:h-6 sm:flex-nowrap sm:py-0">
         <div className={`min-w-0 flex-1 truncate font-medium ${statusClass}`}>CAN: {statusLabel}</div>
         <div className="hidden max-w-48 truncate md:block">Iface: {subscribedIfaces.join(", ") || "None"}</div>
         <div className="hidden max-w-64 truncate lg:block">Source: {source}</div>

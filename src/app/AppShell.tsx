@@ -59,8 +59,10 @@ export function AppShell() {
       <div className="flex h-screen flex-col">
         <TopMenuBar />
 
-        <div className="flex flex-1 overflow-hidden">
-          <Sidebar />
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div className="hidden md:block">
+            <Sidebar />
+          </div>
           <div className="min-w-0 flex-1 overflow-hidden">
             <MainView />
           </div>
