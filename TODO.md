@@ -21,11 +21,11 @@
 
 **Pagination:**
 
-- Controls at bottom: first, previous, next, last page.
-- Select rows per page: 10, 25, 50, 100, 250, 500, 1000.
-- Shows current page and total pages.
-- Pagination state is remembered across app restarts.
-- Works with filtering and sorting.
+- [x] Controls at bottom: first, previous, next, last page.
+- [x] Select rows per page: 10, 25, 50, 100, 250, 500, 1000.
+- [x] Shows current page and total pages.
+- [x] Pagination state is remembered across app restarts.
+- [x] Works with filtering and sorting.
 
 **Keyboard navigation:**
 - [x] Arrow Up/Down → move selection up/down.

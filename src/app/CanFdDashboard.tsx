@@ -16,7 +16,7 @@ import { useConnectionStore } from "@/store/connectionStore";
 import { useAppStore } from "@/store/appShellStore";
 import { useUiStore } from "@/store/uiStore";
 import { useTransmitDraftStore } from "@/store/transmitDraftStore";
-import { monitorColumnLabels, MonitorColumnId, useMonitorPreferencesStore } from "@/store/monitorPreferencesStore";
+import { loadedTracePageSizes, monitorColumnLabels, MonitorColumnId, useMonitorPreferencesStore } from "@/store/monitorPreferencesStore";
 import { resolveProfileReferences, useProfileStore } from "@/profile-editor/store/profileStore";
 import { DecodedField, DecodedFrame, decodeFrameWithProfiles } from "@/profile-editor/decodeProfile";
 import { DecodedPreviewColumnMenu, DecodedPreviewPanel } from "@/profile-editor/DecodedPreviewPanel";
@@ -578,6 +578,10 @@ export function CanFdDashboard() {
   const setDynamicMonitorColumns = useMonitorPreferencesStore((s) => s.setDynamicMonitorColumns);
   const columnOrder = useMonitorPreferencesStore((s) => s.columnOrder);
   const setColumnOrder = useMonitorPreferencesStore((s) => s.setColumnOrder);
+  const loadedPageSize = useMonitorPreferencesStore((s) => s.loadedPageSize);
+  const loadedPageIndex = useMonitorPreferencesStore((s) => s.loadedPageIndex);
+  const setLoadedPageSize = useMonitorPreferencesStore((s) => s.setLoadedPageSize);
+  const setLoadedPageIndex = useMonitorPreferencesStore((s) => s.setLoadedPageIndex);
   const showDecodedPreview = useMonitorPreferencesStore((s) => s.showDecodedPreview);
   const setShowDecodedPreview = useMonitorPreferencesStore((s) => s.setShowDecodedPreview);
   const showTransmitComposer = useMonitorPreferencesStore((s) => s.showTransmitComposer);
@@ -605,6 +609,7 @@ export function CanFdDashboard() {
   const [filterPresets, setFilterPresets] = useState<DisplayFilterPreset[]>(loadDisplayFilterPresets);
   const [selectedFilterPresetId, setSelectedFilterPresetId] = useState("");
   const [alertRules, setAlertRules] = useState<MonitorAlertRule[]>(loadMonitorAlertRules);
+  const lastTraceSourceNameRef = useRef<string | undefined>(traceSourceName);
 
   useEffect(() => {
     setDraftSearch(search);
@@ -632,6 +637,35 @@ export function CanFdDashboard() {
   );
 
   const filteredRows = useMemo(() => traceRows.filter((row) => rowMatchesFilter(row, parsedFilter)), [parsedFilter, traceRows]);
+  const loadedTracePaginationEnabled = Boolean(traceSourceName);
+  const loadedTracePageCount = loadedTracePaginationEnabled ? Math.max(1, Math.ceil(filteredRows.length / loadedPageSize)) : 1;
+  const safeLoadedPageIndex = loadedTracePaginationEnabled ? Math.min(loadedPageIndex, loadedTracePageCount - 1) : 0;
+  const pageStartIndex = loadedTracePaginationEnabled ? safeLoadedPageIndex * loadedPageSize : 0;
+  const pageEndIndex = loadedTracePaginationEnabled ? Math.min(pageStartIndex + loadedPageSize, filteredRows.length) : filteredRows.length;
+  const visibleRows = useMemo(
+    () => (loadedTracePaginationEnabled ? filteredRows.slice(pageStartIndex, pageEndIndex) : filteredRows),
+    [filteredRows, loadedTracePaginationEnabled, pageEndIndex, pageStartIndex],
+  );
+
+  useEffect(() => {
+    if (!loadedTracePaginationEnabled) return;
+    if (loadedPageIndex > loadedTracePageCount - 1) setLoadedPageIndex(loadedTracePageCount - 1);
+  }, [loadedPageIndex, loadedTracePageCount, loadedTracePaginationEnabled, setLoadedPageIndex]);
+
+  useEffect(() => {
+    if (traceSourceName && traceSourceName !== lastTraceSourceNameRef.current) {
+      setLoadedPageIndex(0);
+    }
+    lastTraceSourceNameRef.current = traceSourceName;
+  }, [setLoadedPageIndex, traceSourceName]);
+
+  useEffect(() => {
+    if (!loadedTracePaginationEnabled) return;
+    tableVirtuosoRef.current?.scrollToIndex({ index: 0, align: "start" });
+    if (visibleRows.length && !visibleRows.some((row) => row.key === selectedFrameKey)) {
+      setSelectedFrameKey(visibleRows[0].key);
+    }
+  }, [loadedPageSize, loadedTracePaginationEnabled, safeLoadedPageIndex, selectedFrameKey, setSelectedFrameKey, visibleRows]);
   const traceStats = useMemo(() => {
     const total = filteredRows.length;
     const rx = filteredRows.filter((row) => row.frame.dir === "rx").length;
@@ -763,6 +797,7 @@ export function CanFdDashboard() {
   const cyclicDisabledReason = cyclicActive ? undefined : txDisabledReason;
   const visibleMonitorColumnCount =
     visibleTraceColumns.length;
+  const keyboardRows = loadedTracePaginationEnabled ? visibleRows : filteredRows;
 
   useEffect(() => {
     if (status !== "connected" || traceSourceName) return;
@@ -787,16 +822,16 @@ export function CanFdDashboard() {
   }
 
   function selectTraceRowAt(index: number) {
-    if (!filteredRows.length) return;
-    const nextIndex = Math.max(0, Math.min(filteredRows.length - 1, index));
-    const nextRow = filteredRows[nextIndex];
+    if (!keyboardRows.length) return;
+    const nextIndex = Math.max(0, Math.min(keyboardRows.length - 1, index));
+    const nextRow = keyboardRows[nextIndex];
     setSelectedFrameKey(nextRow.key);
     tableVirtuosoRef.current?.scrollToIndex({ index: nextIndex, align: "center" });
   }
 
   function handleMonitorKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (shouldIgnoreNavigationKey(event)) return;
-    const selectedIndex = Math.max(0, filteredRows.findIndex((row) => row.key === selectedFrameKey));
+    const selectedIndex = Math.max(0, keyboardRows.findIndex((row) => row.key === selectedFrameKey));
     const pageSize = 10;
 
     if (event.key === "ArrowDown") {
@@ -816,7 +851,7 @@ export function CanFdDashboard() {
       selectTraceRowAt(0);
     } else if (event.key === "End") {
       event.preventDefault();
-      selectTraceRowAt(filteredRows.length - 1);
+      selectTraceRowAt(keyboardRows.length - 1);
     } else if (event.key === "Enter" && selectedFrame) {
       event.preventDefault();
       setShowDecodedPreview(!showDecodedPreview);
@@ -1637,7 +1672,7 @@ export function CanFdDashboard() {
                 <TableVirtuoso
                   ref={tableVirtuosoRef}
                   className="h-full"
-                  data={filteredRows}
+                  data={visibleRows}
                   components={virtuosoComponents}
                   computeItemKey={(_index, row) => row.key}
                   fixedHeaderContent={fixedHeaderContent}
@@ -1646,6 +1681,71 @@ export function CanFdDashboard() {
                   followOutput={status === "connected" && !traceSourceName ? "smooth" : false}
                 />
               </CardContent>
+              {loadedTracePaginationEnabled && (
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/20 px-3 py-2 text-xs">
+                  <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                    <span className="font-medium text-foreground">Loaded trace pages</span>
+                    <span>
+                      {filteredRows.length === 0 ? "0 frames" : `${pageStartIndex + 1}-${pageEndIndex} of ${filteredRows.length} frames`}
+                    </span>
+                    {frames.length !== filteredRows.length && <span>filtered from {frames.length}</span>}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-muted-foreground">Rows</span>
+                    <Select value={String(loadedPageSize)} onValueChange={(value) => setLoadedPageSize(Number(value))}>
+                      <SelectTrigger className="h-8 w-24 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {loadedTracePageSizes.map((size) => (
+                          <SelectItem key={size} value={String(size)}>
+                            {size}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      disabled={safeLoadedPageIndex === 0}
+                      onClick={() => setLoadedPageIndex(0)}
+                    >
+                      First
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      disabled={safeLoadedPageIndex === 0}
+                      onClick={() => setLoadedPageIndex(safeLoadedPageIndex - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <span className="min-w-24 text-center font-mono text-[11px] text-muted-foreground">
+                      Page {safeLoadedPageIndex + 1} / {loadedTracePageCount}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      disabled={safeLoadedPageIndex >= loadedTracePageCount - 1}
+                      onClick={() => setLoadedPageIndex(safeLoadedPageIndex + 1)}
+                    >
+                      Next
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      disabled={safeLoadedPageIndex >= loadedTracePageCount - 1}
+                      onClick={() => setLoadedPageIndex(loadedTracePageCount - 1)}
+                    >
+                      Last
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
           </section>
         </div>

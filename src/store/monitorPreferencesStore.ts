@@ -3,10 +3,14 @@ import { create } from "zustand";
 export type MonitorColumnId = "line" | "time" | "iface" | "canId" | "dir" | "len" | "mode" | "payload";
 export type DecodedPreviewColumnId = "field" | "bits" | "raw" | "value" | "meaning";
 
+export const loadedTracePageSizes = [10, 25, 50, 100, 250, 500, 1000] as const;
+
 type MonitorPreferencesState = {
   search: string;
   selectedTraceRowKey?: string;
   columnOrder: string[];
+  loadedPageSize: number;
+  loadedPageIndex: number;
   showDecodedPreview: boolean;
   showTransmitComposer: boolean;
   monitorColumns: Record<MonitorColumnId, boolean>;
@@ -15,6 +19,8 @@ type MonitorPreferencesState = {
   setSearch: (search: string) => void;
   setSelectedTraceRowKey: (key: string | null) => void;
   setColumnOrder: (columns: string[]) => void;
+  setLoadedPageSize: (size: number) => void;
+  setLoadedPageIndex: (index: number) => void;
   setShowDecodedPreview: (visible: boolean) => void;
   setShowTransmitComposer: (visible: boolean) => void;
   toggleMonitorColumn: (column: MonitorColumnId) => void;
@@ -45,6 +51,17 @@ const defaultDecodedPreviewColumns: Record<DecodedPreviewColumnId, boolean> = {
 };
 
 const defaultColumnOrder: string[] = ["line", "time", "iface", "canId", "dir", "len", "mode", "payload"];
+const defaultLoadedPageSize = 100;
+
+function normalizePageSize(value: unknown) {
+  const numeric = Number(value);
+  return loadedTracePageSizes.includes(numeric as (typeof loadedTracePageSizes)[number]) ? numeric : defaultLoadedPageSize;
+}
+
+function normalizePageIndex(value: unknown) {
+  const numeric = Math.trunc(Number(value));
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : 0;
+}
 
 function loadPreferences() {
   try {
@@ -53,6 +70,8 @@ function loadPreferences() {
       search: typeof parsed.search === "string" ? parsed.search : "",
       selectedTraceRowKey: typeof parsed.selectedTraceRowKey === "string" ? parsed.selectedTraceRowKey : undefined,
       columnOrder: Array.isArray(parsed.columnOrder) ? parsed.columnOrder : defaultColumnOrder,
+      loadedPageSize: normalizePageSize(parsed.loadedPageSize),
+      loadedPageIndex: normalizePageIndex(parsed.loadedPageIndex),
       showDecodedPreview: typeof parsed.showDecodedPreview === "boolean" ? parsed.showDecodedPreview : true,
       showTransmitComposer: typeof parsed.showTransmitComposer === "boolean" ? parsed.showTransmitComposer : true,
       monitorColumns: { ...defaultMonitorColumns, ...parsed.monitorColumns },
@@ -64,6 +83,8 @@ function loadPreferences() {
       search: "",
       selectedTraceRowKey: undefined,
       columnOrder: defaultColumnOrder,
+      loadedPageSize: defaultLoadedPageSize,
+      loadedPageIndex: 0,
       showDecodedPreview: true,
       showTransmitComposer: true,
       monitorColumns: defaultMonitorColumns,
@@ -79,6 +100,8 @@ function savePreferences(
     | "search"
     | "selectedTraceRowKey"
     | "columnOrder"
+    | "loadedPageSize"
+    | "loadedPageIndex"
     | "showDecodedPreview"
     | "showTransmitComposer"
     | "monitorColumns"
@@ -92,6 +115,8 @@ function savePreferences(
       search: state.search,
       selectedTraceRowKey: state.selectedTraceRowKey,
       columnOrder: state.columnOrder,
+      loadedPageSize: state.loadedPageSize,
+      loadedPageIndex: state.loadedPageIndex,
       showDecodedPreview: state.showDecodedPreview,
       showTransmitComposer: state.showTransmitComposer,
       monitorColumns: state.monitorColumns,
@@ -126,6 +151,8 @@ export const useMonitorPreferencesStore = create<MonitorPreferencesState>((set) 
   search: initial.search,
   selectedTraceRowKey: initial.selectedTraceRowKey,
   columnOrder: initial.columnOrder,
+  loadedPageSize: initial.loadedPageSize,
+  loadedPageIndex: initial.loadedPageIndex,
   showDecodedPreview: initial.showDecodedPreview,
   showTransmitComposer: initial.showTransmitComposer,
   monitorColumns: initial.monitorColumns,
@@ -151,6 +178,22 @@ export const useMonitorPreferencesStore = create<MonitorPreferencesState>((set) 
       const next = { ...state, columnOrder };
       savePreferences(next);
       return { columnOrder };
+    }),
+
+  setLoadedPageSize: (loadedPageSize) =>
+    set((state) => {
+      const normalizedSize = normalizePageSize(loadedPageSize);
+      const next = { ...state, loadedPageSize: normalizedSize, loadedPageIndex: 0 };
+      savePreferences(next);
+      return { loadedPageSize: normalizedSize, loadedPageIndex: 0 };
+    }),
+
+  setLoadedPageIndex: (loadedPageIndex) =>
+    set((state) => {
+      const normalizedIndex = normalizePageIndex(loadedPageIndex);
+      const next = { ...state, loadedPageIndex: normalizedIndex };
+      savePreferences(next);
+      return { loadedPageIndex: normalizedIndex };
     }),
 
   setShowDecodedPreview: (showDecodedPreview) =>
