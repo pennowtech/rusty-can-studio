@@ -436,6 +436,30 @@ Right click a column header to build a filter from that column. The menu can rep
 
 Error rows are highlighted in red when a matching loaded profile decodes a bad response through its \`errorStatus\` block. Use \`error\` for a quick error-only filter, or use \`hasError == true\`, \`errorCode == 12\`, and \`errorText contains POSITION\` when you need a precise error view.
 
+### Monitor sorting
+
+CAN Monitor supports multi-column sorting after display filtering. Sorting is applied before loaded-log pagination, so every page follows the same ordered result set.
+
+Right click a column header to:
+
+- sort ascending
+- sort descending
+- add the column as the next ascending sort priority
+- add the column as the next descending sort priority
+- clear the current sort rules
+
+Active sort rules are shown in the sort strip above the trace summary. Each rule shows its priority, column name, and direction. Use the up and down controls on the rule chip to change priority, click the direction text to toggle ascending or descending, or click \`X\` to remove that one rule.
+
+:::tip
+Use sorting for offline analysis, for example sort by \`canId\`, then \`time\`, or sort by \`errorCode\`, then \`attributeName\`. For live capture, original stream order is usually easier to follow.
+:::
+
+Sort presets let you save a useful rule set and restore it later. Build the active sort rules, click Save in the sort strip, give the preset a name, and then reload it from the Sort presets dropdown. Delete removes only the selected sort preset, not the trace data.
+
+:::note
+Sorting does not modify the loaded candump file or captured frame buffer. It only changes table presentation and CSV export order.
+:::
+
 ### Monitor columns
 
 When schema profiles are loaded, CAN Monitor keeps the table stable by showing:
@@ -461,11 +485,40 @@ Use a smaller live trace retention limit when the bus is very busy. It keeps dec
 
 The status bar Frames value is the total captured or loaded frame count. It does not shrink when a display filter is active or when live trace retention removes older rows. Table line numbers keep increasing during live capture, so removed rows do not cause reused sequence numbers.
 
-Use Log to export retained trace rows as standard candump text. Use CSV to export the current decoded table view with the active display filter, visible columns, and column order.
+### Loaded trace pagination
+
+Loaded candump and log files use pagination at the bottom of CAN Monitor. Live capture does not use pagination; it continues to append and follow the newest frame as before.
+
+The pagination footer provides:
+
+- First, Previous, Next, and Last page controls
+- row count choices: 10, 25, 50, 100, 250, 500, and 1000
+- current page and total page count
+- visible row range and total filtered row count
+
+The selected row count and current page are saved with monitor preferences. When a new log is opened, the table starts at page 1. If a display filter reduces the result set and the old page no longer exists, the app automatically moves to the last valid page.
+
+:::warning
+Pagination is only for loaded traces. Do not expect live capture to pause at page boundaries; live capture is intentionally stream-oriented.
+:::
+
+Use Log to export retained trace rows as standard candump text. Use CSV to export the current decoded table view with the active display filter, active sorting, visible columns, and column order.
 
 :::note
 CSV export follows the table as currently configured. Hide columns or apply a display filter before exporting when you only need a focused subset.
 :::
+
+### Monitor keyboard navigation
+
+When focus is on CAN Monitor and not inside an input field, the table supports keyboard navigation:
+
+- Arrow Up and Arrow Down move the selected row.
+- Page Up and Page Down move by a larger step.
+- Home moves to the first visible row.
+- End moves to the last visible row.
+- Enter toggles the decoded preview panel.
+
+For loaded traces, keyboard navigation follows the current page. For live capture, it follows the current filtered and sorted stream.
 
 Field layout expressions can control how a payload value is displayed. Expressions are intentionally small: arithmetic, comparisons, ternary conditions, and quoted display strings are supported. Statements, loops, imports, global objects, and full JavaScript programs are not allowed.
 
