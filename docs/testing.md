@@ -24,6 +24,7 @@ This runs:
 
 - TypeScript unit tests
 - production frontend build
+- accessibility baseline checks
 - npm dependency audit
 - `cargo check` for the Tauri Rust crate
 
@@ -48,6 +49,7 @@ It checks:
 - dependency installation with `npm ci`
 - Vitest unit tests
 - production build
+- accessibility baseline checks
 - Rust `cargo check`
 
 The separate `Security` workflow handles dependency audits and Rust vulnerability checks.
@@ -76,8 +78,28 @@ Use this checklist when deciding whether a change needs more tests:
 - Filter or sort behavior: test the expression or ordering helper directly.
 - Persistence: test migration/default behavior where practical.
 - UI-only changes: run the full build and manually inspect the changed screen.
+- Accessibility-sensitive changes: run `npm run accessibility:check`, verify keyboard focus order, and inspect screen-reader names for icon-only controls.
 - Tauri/Rust changes: run `cargo check` and add Rust tests when logic moves out of command glue.
 - Performance-sensitive changes: run `npm run benchmark` before and after the change.
+
+## Accessibility Baseline
+
+Run:
+
+```powershell
+npm run accessibility:check
+```
+
+The baseline checks for document language, viewport, document title, accessible icon button fallback, screen-reader-only text, alert roles, interactive hover/help text, and raw button `type` attributes.
+
+This is not a full WCAG audit. It is a repeatable guard for common regressions. For larger UI changes, also test:
+
+- keyboard-only navigation
+- visible focus state
+- screen-reader names for icon buttons
+- readable contrast in each theme
+- zoom at 200 percent
+- compact and dense layouts
 
 ## Current Limits
 

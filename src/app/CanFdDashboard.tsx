@@ -1793,8 +1793,7 @@ export function CanFdDashboard() {
                     <span key={rule.id} className="inline-flex items-center gap-1 rounded-md border bg-muted/30 px-2 py-1">
                       <span className="text-[10px] text-muted-foreground">{index + 1}</span>
                       <span className="font-medium">{rule.label}</span>
-                      <button
-                        type="button"
+                      <button type="button"
                         className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
                         title="Toggle sort direction"
                         onClick={() => flipSortRule(rule.id)}
@@ -1804,8 +1803,7 @@ export function CanFdDashboard() {
                       <button type="button" className="text-muted-foreground hover:text-foreground" disabled={index === 0} title="Move earlier" onClick={() => moveSortRule(rule.id, "up")}>
                         <ArrowUp className="h-3 w-3" />
                       </button>
-                      <button
-                        type="button"
+                      <button type="button"
                         className="text-muted-foreground hover:text-foreground"
                         disabled={index === sortRules.length - 1}
                         title="Move later"
@@ -1894,8 +1892,7 @@ export function CanFdDashboard() {
                   ) : (
                     alertRules.map((rule) => (
                       <span key={rule.id} className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs">
-                        <button
-                          type="button"
+                        <button type="button"
                           className={rule.enabled ? "font-medium text-amber-600 dark:text-amber-300" : "text-muted-foreground"}
                           title={rule.expression}
                           onClick={() => toggleAlertRule(rule.id)}
@@ -2188,39 +2185,34 @@ export function CanFdDashboard() {
             <div className="mt-0.5 truncate font-mono text-xs">{filterFieldForColumn(headerContextMenu.column)}</div>
           </div>
           <div className="my-1 border-t" />
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => applyColumnSort(headerContextMenu.column, "asc", "replace")}
           >
             <span>Sort ascending</span>
             <ArrowUp className="h-3.5 w-3.5" />
           </button>
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => applyColumnSort(headerContextMenu.column, "desc", "replace")}
           >
             <span>Sort descending</span>
             <ArrowDown className="h-3.5 w-3.5" />
           </button>
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => applyColumnSort(headerContextMenu.column, "asc", "add")}
           >
             Add as next ascending sort
           </button>
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => applyColumnSort(headerContextMenu.column, "desc", "add")}
           >
             Add as next descending sort
           </button>
           {sortRules.length > 0 && (
-            <button
-              type="button"
+            <button type="button"
               className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-destructive hover:bg-destructive/10"
               onClick={clearSortRules}
             >
@@ -2233,8 +2225,7 @@ export function CanFdDashboard() {
             const canAppend = headerCanAppend();
             return (
               <>
-                <button
-                  type="button"
+                <button type="button"
                   className="flex w-full items-center justify-between gap-3 rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={selectedValue == null}
                   onClick={() => selectedValue != null && applyColumnFilter(headerContextMenu.column, "replace", selectedValue)}
@@ -2242,16 +2233,14 @@ export function CanFdDashboard() {
                   <span>Replace with selected value</span>
                   <span className="max-w-28 truncate font-mono text-xs text-muted-foreground">{selectedValue ?? "No row"}</span>
                 </button>
-                <button
-                  type="button"
+                <button type="button"
                   className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={selectedValue == null || !canAppend}
                   onClick={() => selectedValue != null && applyColumnFilter(headerContextMenu.column, "and", selectedValue)}
                 >
                   Add AND selected value
                 </button>
-                <button
-                  type="button"
+                <button type="button"
                   className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={selectedValue == null || !canAppend}
                   onClick={() => selectedValue != null && applyColumnFilter(headerContextMenu.column, "or", selectedValue)}
@@ -2259,23 +2248,20 @@ export function CanFdDashboard() {
                   Add OR selected value
                 </button>
                 <div className="my-1 border-t" />
-                <button
-                  type="button"
+                <button type="button"
                   className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
                   onClick={() => applyColumnFilter(headerContextMenu.column, "replace")}
                 >
                   Start editable condition
                 </button>
-                <button
-                  type="button"
+                <button type="button"
                   className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={!canAppend}
                   onClick={() => applyColumnFilter(headerContextMenu.column, "and")}
                 >
                   Add AND editable condition
                 </button>
-                <button
-                  type="button"
+                <button type="button"
                   className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={!canAppend}
                   onClick={() => applyColumnFilter(headerContextMenu.column, "or")}
@@ -2285,8 +2271,7 @@ export function CanFdDashboard() {
                 {currentFilterForAppend() && (
                   <>
                     <div className="my-1 border-t" />
-                    <button
-                      type="button"
+                    <button type="button"
                       className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-destructive hover:bg-destructive/10"
                       onClick={clearDisplayFilter}
                     >
@@ -2311,51 +2296,44 @@ export function CanFdDashboard() {
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(event) => event.stopPropagation()}
         >
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => copyText(contextMenu.value)}
           >
             Copy Value
           </button>
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => copyText(formatCanMessage(contextMenu.frame))}
           >
             Copy CAN Message
           </button>
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => copyText(formatCandumpLine(contextMenu.frame))}
           >
             Copy candump Line
           </button>
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => stageFrameForTransmit(contextMenu.frame)}
           >
             Use in Transmit Composer
           </button>
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => stageFrameForSimulator(contextMenu.frame)}
           >
             Copy to Simulator TX
           </button>
           <div className="my-1 border-t" />
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => defineMessageStructure(contextMenu.frame)}
           >
             Define Message Structure
           </button>
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => {
               editFrameFromTrace(contextMenu.frame);
@@ -2369,3 +2347,5 @@ export function CanFdDashboard() {
     </div>
   );
 }
+
+

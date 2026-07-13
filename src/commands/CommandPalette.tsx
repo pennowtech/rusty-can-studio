@@ -66,8 +66,7 @@ export function CommandPalette() {
           </CommandList>
           <div className="flex items-center justify-between border-t bg-muted/20 px-4 py-2 text-xs text-muted-foreground">
             <span>Use arrow keys and Enter to run a command.</span>
-            <button
-              type="button"
+            <button type="button"
               className="rounded px-2 py-1 hover:bg-muted hover:text-foreground"
               onClick={() => {
                 setView("shortcuts");
@@ -82,3 +81,4 @@ export function CommandPalette() {
     </Dialog>
   );
 }
+

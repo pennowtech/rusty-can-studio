@@ -389,8 +389,7 @@ export function ProfileMessageEditor() {
                 return (
                   <div key={`${attribute.name}-${attributeIndex}`} className="space-y-1">
                     <div className="flex items-stretch gap-1">
-                      <button
-                        type="button"
+                      <button type="button"
                         className="rounded-md border px-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                         title={expanded ? "Collapse attribute" : "Expand attribute"}
                         onClick={() => setExpandedAttributes((state) => ({ ...state, [attributeIndex]: !expanded }))}
@@ -419,9 +418,8 @@ export function ProfileMessageEditor() {
                             <div className="ml-4 flex flex-wrap gap-1">
                               {(["command", "response", "event"] as VariantKey[]).map((variant) =>
                                 variant in (operation.variants ?? {}) ? (
-                                  <button
+                                  <button type="button"
                                     key={variant}
-                                    type="button"
                                     onClick={() => setSelectedNode({ kind: "variant", attributeIndex, operationIndex, variant })}
                                     className={`rounded border px-2 py-1 text-[11px] hover:bg-muted ${
                                       nodeKey(selectedNode) === nodeKey({ kind: "variant", attributeIndex, operationIndex, variant }) ? "border-primary bg-muted" : ""
@@ -449,8 +447,7 @@ export function ProfileMessageEditor() {
   function OutlineButton(props: { node: ProfileNode; icon: React.ReactNode; title: string; detail?: string }) {
     const active = nodeKey(selectedNode) === nodeKey(props.node);
     return (
-      <button
-        type="button"
+      <button type="button"
         onClick={() => setSelectedNode(props.node)}
         className={`w-full rounded-md border px-3 py-2 text-left text-sm hover:bg-muted ${active ? "border-primary bg-muted" : "border-border"}`}
       >
@@ -745,3 +742,5 @@ export function ProfileMessageEditor() {
     </div>
   );
 }
+
+

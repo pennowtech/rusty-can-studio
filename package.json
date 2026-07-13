@@ -10,6 +10,7 @@
     "tauri": "tauri",
     "test": "vitest run",
     "benchmark": "vitest bench --run --config vitest.benchmark.config.ts",
+    "accessibility:check": "powershell -ExecutionPolicy Bypass -File scripts/accessibility-check.ps1",
     "audit": "npm audit --audit-level=moderate",
     "security:audit": "powershell -ExecutionPolicy Bypass -File scripts/security-audit.ps1",
     "quality:check": "powershell -ExecutionPolicy Bypass -File scripts/quality-check.ps1"

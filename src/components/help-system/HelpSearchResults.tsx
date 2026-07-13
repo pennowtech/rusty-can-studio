@@ -14,8 +14,7 @@ export function HelpSearchResults() {
 
   return (
     <div className="border-t px-3 py-2 text-sm text-muted-foreground">
-      <button
-        type="button"
+      <button type="button"
         className="hover:text-foreground"
         onClick={() => {
           setActiveIndex(activeIndex >= 0 ? activeIndex : 0);
@@ -27,3 +26,4 @@ export function HelpSearchResults() {
     </div>
   );
 }
+

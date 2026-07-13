@@ -30,7 +30,7 @@ export function StatusBar() {
         <div className="shrink-0 truncate" title={`${frames.length} rows retained in the table`}>
           Frames: {totalFrames}
         </div>
-        <button className="max-w-40 shrink-0 truncate hover:underline" onClick={() => setOpen(true)}>
+        <button type="button" className="max-w-40 shrink-0 truncate hover:underline" onClick={() => setOpen(true)}>
           {active ? active.name : "Disconnected"}
         </button>
       </div>

@@ -27,6 +27,10 @@ Invoke-Step "Production build" {
   npm run build
 }
 
+Invoke-Step "Accessibility baseline" {
+  npm run accessibility:check
+}
+
 if (-not $SkipAudit) {
   Invoke-Step "npm dependency audit" {
     npm run audit

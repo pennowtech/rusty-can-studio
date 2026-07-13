@@ -17,7 +17,7 @@ export function NavigationTree() {
 
         {Object.values(canIdLayouts).map((layout) => (
           <div key={layout.id}>
-            <button
+            <button type="button"
               className="font-medium text-left w-full"
               onClick={() => select({ type: "canIdLayout", layoutId: layout.id })}
             >
@@ -25,7 +25,7 @@ export function NavigationTree() {
             </button>
 
             {Object.values(layout.fields).map((field) => (
-              <button
+              <button type="button"
                 key={field.id}
                 className="ml-4 text-sm text-left w-full"
                 onClick={() =>
@@ -48,7 +48,7 @@ export function NavigationTree() {
           <div key={frame.id}>
             <div className="font-medium">{frame.id}</div>
             {Object.values(frame.signals).map((sig) => (
-              <button
+              <button type="button"
                 key={sig.id}
                 className="ml-4"
                 onClick={() =>
@@ -75,7 +75,7 @@ export function NavigationTree() {
         )}
 
         {Object.values(profile.derivedFields).map((df) => (
-          <button
+          <button type="button"
             key={df.id}
             className="ml-2 text-sm text-left hover:underline"
             onClick={() => select({ type: "derived", derivedId: df.id })}
@@ -109,7 +109,7 @@ export function NavigationTree() {
                 selected ? "bg-accent text-accent-foreground" : "hover:bg-muted"
               }`}
             >
-              <button
+              <button type="button"
                 className="flex-1 text-left"
                 onClick={() =>
                   select({
@@ -143,10 +143,11 @@ export function NavigationTree() {
       <div className="space-y-1">
         <div className="text-xs font-medium text-muted-foreground">Columns</div>
 
-        <button className="ml-2 text-sm hover:underline" onClick={() => select({ type: "columns" })}>
+        <button type="button" className="ml-2 text-sm hover:underline" onClick={() => select({ type: "columns" })}>
           Edit Columns
         </button>
       </div>
     </div>
   );
 }
+

@@ -12,9 +12,8 @@ export function HelpTOC() {
       <div className="text-xs font-medium uppercase text-muted-foreground">On this page</div>
       <nav className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-1 lg:overflow-visible lg:pb-0">
         {toc.map((item) => (
-          <button
+          <button type="button"
             key={item.id}
-            type="button"
             onClick={() => scrollTo(item.id)}
             className={clsx(
               "shrink-0 cursor-pointer rounded-md px-2 py-1 text-left hover:bg-muted hover:text-foreground lg:block lg:w-full",

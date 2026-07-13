@@ -274,7 +274,7 @@ export function CanConnectDialog({
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <Label>CAN Interface on Daemon Host</Label>
-                  <Button type="button" size="sm" variant="outline" disabled={discovering} onClick={() => void discoverIfaces()}>
+                  <Button size="sm" variant="outline" disabled={discovering} onClick={() => void discoverIfaces()}>
                     {discovering ? "Discovering" : "Discover"}
                   </Button>
                 </div>
@@ -452,3 +452,4 @@ export function CanConnectDialog({
     </Dialog>
   );
 }
+

@@ -95,9 +95,10 @@ export function TopMenuBar() {
         Connect to remote can-bridge-daemon, define packet formats, and monitor sent/received packets.
       </div>
 
-      <button onClick={() => setView("help")} className="mr-2 shrink-0 rounded p-1 hover:bg-muted" title="Help">
+      <button type="button" onClick={() => setView("help")} className="mr-2 shrink-0 rounded p-1 hover:bg-muted" title="Help">
         <HelpCircle className="h-4 w-4" />
       </button>
     </div>
   );
 }
+

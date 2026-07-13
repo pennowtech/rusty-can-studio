@@ -64,7 +64,7 @@ export function Sidebar() {
          ${collapsed ? "w-14" : "w-56"}
        `}
     >
-      <button
+      <button type="button"
         onClick={toggleSidebarMode}
         className="mb-3 flex w-full items-center justify-center rounded-md border border-transparent p-2 text-muted-foreground hover:bg-background hover:text-foreground"
         title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}

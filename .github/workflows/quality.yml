@@ -37,6 +37,10 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Accessibility baseline
+        shell: pwsh
+        run: npm run accessibility:check
+
       - name: Rust check
         working-directory: src-tauri
         run: cargo check
