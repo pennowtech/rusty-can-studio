@@ -3,14 +3,14 @@
 - [] Support for different CAN bitrates
 - [] Real-time display of CAN messages in terminal
 - [] Graceful shutdown and cleanup of CAN interfaces
-- [] GUI for visualizing CAN data
+- [x] GUI for visualizing CAN data
 - [] Unit tests for core functionalities
 - [] Integration with popular CAN hardware interfaces
 - [] Error handling and logging improvements
 - [] Configuration management (e.g., saving/loading settings)
 - [] Localization and internationalization support
 - [] Mobile app for remote CAN monitoring
-- [] Data visualization tools (graphs, charts)
+- [x] Data visualization tools (graphs, charts)
 - [] Alerting system for specific CAN events
 - [] Historical data storage and retrieval
 - [] User-friendly installation scripts and guides

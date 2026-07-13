@@ -608,6 +608,28 @@ export function CanFdDashboard() {
   );
 
   const filteredRows = useMemo(() => traceRows.filter((row) => rowMatchesFilter(row, parsedFilter)), [parsedFilter, traceRows]);
+  const traceStats = useMemo(() => {
+    const total = filteredRows.length;
+    const rx = filteredRows.filter((row) => row.frame.dir === "rx").length;
+    const tx = filteredRows.filter((row) => row.frame.dir === "tx").length;
+    const errors = filteredRows.filter((row) => row.hasError).length;
+    const txFailed = filteredRows.filter((row) => row.frame.tx_status === "failed").length;
+    const byCanId = new Map<string, number>();
+    for (const row of filteredRows) {
+      const id = formatCanId(row.frame.id);
+      byCanId.set(id, (byCanId.get(id) ?? 0) + 1);
+    }
+    const topIds = Array.from(byCanId.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    return {
+      total,
+      rx,
+      tx,
+      errors,
+      txFailed,
+      uniqueIds: byCanId.size,
+      topIds,
+    };
+  }, [filteredRows]);
 
   const dynamicCanIdColumns = useMemo<DynamicMonitorColumn[]>(() => {
     const byId = new Map<string, DynamicMonitorColumn>();
@@ -1461,6 +1483,41 @@ export function CanFdDashboard() {
                 >
                   {filterStatusText()}
                 </div>
+              </div>
+              <div className="border-b bg-muted/20 px-3 py-2">
+                <div className="grid gap-2 text-xs md:grid-cols-[repeat(6,minmax(0,1fr))]">
+                  {[
+                    ["Frames", traceStats.total],
+                    ["RX", traceStats.rx],
+                    ["TX", traceStats.tx],
+                    ["Decoded errors", traceStats.errors],
+                    ["TX failed", traceStats.txFailed],
+                    ["Unique IDs", traceStats.uniqueIds],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md border bg-background px-2 py-1.5">
+                      <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
+                      <div className="mt-0.5 font-mono text-sm font-semibold">{value}</div>
+                    </div>
+                  ))}
+                </div>
+                {traceStats.topIds.length > 0 && (
+                  <div className="mt-2 grid gap-1 md:grid-cols-5">
+                    {traceStats.topIds.map(([id, count]) => {
+                      const width = traceStats.total ? Math.max(4, Math.round((count / traceStats.total) * 100)) : 0;
+                      return (
+                        <div key={id} className="min-w-0">
+                          <div className="mb-1 flex justify-between gap-2 font-mono text-[11px]">
+                            <span className="truncate">{id}</span>
+                            <span className="text-muted-foreground">{count}</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-muted">
+                            <div className="h-1.5 rounded-full bg-primary" style={{ width: `${width}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <CardContent className="min-h-0 min-w-0 flex-1 p-0">
                 <TableVirtuoso
