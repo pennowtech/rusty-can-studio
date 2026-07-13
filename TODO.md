@@ -59,7 +59,7 @@
 - [x] Option to export user settings to a file.
 - [x] Option to import user settings from a file.
 **Advanced filtering:**
-- Save and load filter presets.
+- [x] Save and load filter presets.
 **Advanced sorting:**
 - Multi-level sorting with drag-and-drop priority.
 - Custom sort functions for specific columns.

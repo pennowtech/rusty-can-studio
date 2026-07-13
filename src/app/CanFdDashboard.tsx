@@ -391,6 +391,27 @@ type HeaderContextMenu = {
   column: TraceColumn;
 };
 
+type DisplayFilterPreset = {
+  id: string;
+  name: string;
+  expression: string;
+};
+
+const DISPLAY_FILTER_PRESETS_KEY = "cansim.monitor.filterPresets.v1";
+
+function loadDisplayFilterPresets(): DisplayFilterPreset[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DISPLAY_FILTER_PRESETS_KEY) ?? "[]") as DisplayFilterPreset[];
+    return Array.isArray(parsed) ? parsed.filter((preset) => preset.name && preset.expression) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveDisplayFilterPresets(presets: DisplayFilterPreset[]) {
+  localStorage.setItem(DISPLAY_FILTER_PRESETS_KEY, JSON.stringify(presets));
+}
+
 function filterFieldForColumn(column: TraceColumn) {
   if (column.kind === "canId") return column.id;
   if (column.kind === "payloadHeader") return column.id;
@@ -558,6 +579,8 @@ export function CanFdDashboard() {
   const [cyclicActive, setCyclicActive] = useState(false);
   const [contextMenu, setContextMenu] = useState<CellContextMenu | null>(null);
   const [headerContextMenu, setHeaderContextMenu] = useState<HeaderContextMenu | null>(null);
+  const [filterPresets, setFilterPresets] = useState<DisplayFilterPreset[]>(loadDisplayFilterPresets);
+  const [selectedFilterPresetId, setSelectedFilterPresetId] = useState("");
 
   useEffect(() => {
     setDraftSearch(search);
@@ -977,6 +1000,42 @@ export function CanFdDashboard() {
     setDraftSearch(value);
   }
 
+  function updateFilterPresets(next: DisplayFilterPreset[]) {
+    setFilterPresets(next);
+    saveDisplayFilterPresets(next);
+  }
+
+  function saveCurrentFilterPreset() {
+    const expression = draftSearch.trim();
+    if (!expression) return;
+    const name = window.prompt("Preset name", selectedFilterPresetId ? filterPresets.find((preset) => preset.id === selectedFilterPresetId)?.name : "");
+    if (!name?.trim()) return;
+    const existingId = selectedFilterPresetId || `preset_${Date.now()}`;
+    const nextPreset: DisplayFilterPreset = {
+      id: existingId,
+      name: name.trim(),
+      expression,
+    };
+    const next = [...filterPresets.filter((preset) => preset.id !== existingId), nextPreset].sort((a, b) => a.name.localeCompare(b.name));
+    updateFilterPresets(next);
+    setSelectedFilterPresetId(nextPreset.id);
+  }
+
+  function applyFilterPreset(id: string) {
+    setSelectedFilterPresetId(id);
+    const preset = filterPresets.find((item) => item.id === id);
+    if (preset) setDisplayFilter(preset.expression);
+  }
+
+  function deleteSelectedFilterPreset() {
+    if (!selectedFilterPresetId) return;
+    const preset = filterPresets.find((item) => item.id === selectedFilterPresetId);
+    if (!preset) return;
+    if (!window.confirm(`Delete filter preset "${preset.name}"?`)) return;
+    updateFilterPresets(filterPresets.filter((item) => item.id !== selectedFilterPresetId));
+    setSelectedFilterPresetId("");
+  }
+
   function filterTextActive() {
     return draftSearch.trim();
   }
@@ -1362,6 +1421,39 @@ export function CanFdDashboard() {
                   </div>
                   <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" title="Open display filter help" onClick={openDisplayFilterHelp}>
                     <HelpCircle className="h-4 w-4" />
+                  </Button>
+                  <Select value={selectedFilterPresetId || "__none"} onValueChange={(value) => value === "__none" ? setSelectedFilterPresetId("") : applyFilterPreset(value)}>
+                    <SelectTrigger className="h-9 w-40 shrink-0 text-xs">
+                      <SelectValue placeholder="Presets" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">Filter presets</SelectItem>
+                      {filterPresets.map((preset) => (
+                        <SelectItem key={preset.id} value={preset.id}>
+                          {preset.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 shrink-0 px-2 text-xs"
+                    disabled={!draftSearch.trim()}
+                    title="Save current display filter as a preset"
+                    onClick={saveCurrentFilterPreset}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 shrink-0 px-2 text-xs"
+                    disabled={!selectedFilterPresetId}
+                    title="Delete selected filter preset"
+                    onClick={deleteSelectedFilterPreset}
+                  >
+                    Delete
                   </Button>
                 </div>
                 <div

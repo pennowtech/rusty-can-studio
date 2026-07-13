@@ -57,6 +57,7 @@ function SettingsView() {
     "can-connection-profiles",
     "cansim.trace.settings.v1",
     "cansim.monitor.preferences.v1",
+    "cansim.monitor.filterPresets.v1",
     "cansim.shortcuts.v1",
     "cansim.help.customMarkdown",
     "can-simulator-sequences:v1",
