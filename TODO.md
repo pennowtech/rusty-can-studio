@@ -28,10 +28,10 @@
 - Works with filtering and sorting.
 
 **Keyboard navigation:**
-- Arrow Up/Down → move selection up/down.
-- Page Up/Down → scroll up/down one page.
-- Home/End → go to first/last row.
-- Enter → expand/collapse row details.
+- [x] Arrow Up/Down → move selection up/down.
+- [x] Page Up/Down → scroll up/down one page.
+- [x] Home/End → go to first/last row.
+- [x] Enter → expand/collapse row details.
 
 **Performance optimizations:**
 - Debounced filtering and sorting to prevent excessive re-renders.

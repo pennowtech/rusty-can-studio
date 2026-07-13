@@ -23,7 +23,7 @@ import { DecodedPreviewColumnMenu, DecodedPreviewPanel } from "@/profile-editor/
 import { parseCandump } from "@/can/candump";
 import { Activity, Cable, Columns3, Download, Eye, EyeOff, FileUp, Gauge, HelpCircle, Pause, Play, RadioTower, Search, Send, Trash2, X } from "lucide-react";
 import { forwardRef, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import type { HTMLAttributes, MouseEvent } from "react";
+import type { HTMLAttributes, KeyboardEvent, MouseEvent } from "react";
 import { TableVirtuoso } from "react-virtuoso";
 import type { TableComponents, TableVirtuosoHandle } from "react-virtuoso";
 import type { WsFrame } from "@/can-bridge/ws/types";
@@ -688,6 +688,50 @@ export function CanFdDashboard() {
     [],
   );
 
+  function shouldIgnoreNavigationKey(event: KeyboardEvent<HTMLElement>) {
+    const target = event.target as HTMLElement | null;
+    if (!target) return false;
+    const tagName = target.tagName.toLowerCase();
+    return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
+  }
+
+  function selectTraceRowAt(index: number) {
+    if (!filteredRows.length) return;
+    const nextIndex = Math.max(0, Math.min(filteredRows.length - 1, index));
+    const nextRow = filteredRows[nextIndex];
+    setSelectedFrameKey(nextRow.key);
+    tableVirtuosoRef.current?.scrollToIndex({ index: nextIndex, align: "center" });
+  }
+
+  function handleMonitorKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (shouldIgnoreNavigationKey(event)) return;
+    const selectedIndex = Math.max(0, filteredRows.findIndex((row) => row.key === selectedFrameKey));
+    const pageSize = 10;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      selectTraceRowAt(selectedIndex + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      selectTraceRowAt(selectedIndex - 1);
+    } else if (event.key === "PageDown") {
+      event.preventDefault();
+      selectTraceRowAt(selectedIndex + pageSize);
+    } else if (event.key === "PageUp") {
+      event.preventDefault();
+      selectTraceRowAt(selectedIndex - pageSize);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      selectTraceRowAt(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      selectTraceRowAt(filteredRows.length - 1);
+    } else if (event.key === "Enter" && selectedFrame) {
+      event.preventDefault();
+      setShowDecodedPreview(!showDecodedPreview);
+    }
+  }
+
   useEffect(() => {
     if (!connected) stopCyclicTx();
   }, [connected]);
@@ -1185,7 +1229,7 @@ export function CanFdDashboard() {
   }
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background" onClick={() => {
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background" tabIndex={0} onKeyDown={handleMonitorKeyDown} onClick={() => {
       setContextMenu(null);
       setHeaderContextMenu(null);
     }}>
