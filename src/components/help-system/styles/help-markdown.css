@@ -9,16 +9,19 @@
     --tw-prose-quotes: hsl(var(--foreground));
     --tw-prose-quote-borders: hsl(var(--border));
     --tw-prose-captions: hsl(var(--muted-foreground));
-    font-family: "Bookerly Regular", Bookerly, Besley, Charter, Georgia, "Times New Roman", serif;
-    font-size: 0.94rem;
-    line-height: 1.62;
+    max-width: 88ch;
+    margin: 0 auto;
+    font-family: "Segoe UI Variable Text", "Segoe UI", Inter, "Source Sans 3", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 0.96rem;
+    line-height: 1.68;
+    letter-spacing: 0;
 }
 
 .help-markdown .prose h1 {
-    font-size: 1.65rem;
+    font-size: 1.7rem;
     margin-top: 5rem;
     margin-bottom: 1.1rem;
-    font-weight: 600;
+    font-weight: 650;
     letter-spacing: 0;
     padding: 0 0 0.8rem 0;
     border-bottom: 2px solid hsl(var(--border));
@@ -32,10 +35,10 @@
 }
 
 .help-markdown .prose h2 {
-    font-size: 1.18rem;
+    font-size: 1.2rem;
     margin-top: 2.25rem;
     margin-bottom: 0.85rem;
-    font-weight: 600;
+    font-weight: 650;
     padding: 0.25rem 0 0.45rem 0.75rem;
     border-left: 3px solid hsl(var(--primary));
     border-top: 1px solid hsl(var(--border));
@@ -45,7 +48,7 @@
 }
 
 .help-markdown .prose h3 {
-    font-size: 1rem;
+    font-size: 1.03rem;
     margin-top: 1.25rem;
     margin-bottom: 0.45rem;
     font-weight: 600;
@@ -63,9 +66,9 @@
 }
 
 .help-markdown .prose p {
-    line-height: 1.62;
-    margin-top: 0.55rem;
-    margin-bottom: 0.55rem;
+    line-height: 1.68;
+    margin-top: 0.6rem;
+    margin-bottom: 0.6rem;
 }
 
 .help-markdown .prose ul,
@@ -129,6 +132,7 @@
     border-collapse: collapse;
     margin-top: 1rem;
     margin-bottom: 1rem;
+    font-family: "Segoe UI Variable Text", "Segoe UI", Inter, "Source Sans 3", Roboto, "Helvetica Neue", Arial, sans-serif;
     font-size: 0.84rem;
 }
 
