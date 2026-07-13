@@ -1,4 +1,6 @@
 import type { WsFrame } from "@/can-bridge/ws/types";
+import { normalizeToCanonicalProfile } from "@/profile-editor/canonical/normalizeToCanonicalProfile";
+import type { CanonicalField, CanonicalProfile } from "@/profile-editor/model/canonicalProfile";
 import type {
   BitFieldDef,
   CanIdLayoutDef,
@@ -131,6 +133,30 @@ function decodedDisplay(physical: number, unit: string | undefined, meaning: str
   return meaning ?? formatPhysical(physical, unit);
 }
 
+function bitMaskFor(length: number) {
+  return length >= 32 ? 0xffffffff : 2 ** length - 1;
+}
+
+function extractCanonicalFromCanId(id: number, field: CanonicalField) {
+  if (field.name === "can_id") return id & bitMaskFor(field.bitLength);
+  return Math.floor(id / 2 ** field.startBit) & bitMaskFor(field.bitLength);
+}
+
+function extractCanonicalFromBytes(bytes: number[], field: { startBit: number; bitLength: number }, byteOrder: "little" | "big") {
+  let raw = 0;
+  if (byteOrder === "little") {
+    for (let i = 0; i < field.bitLength; i++) {
+      raw += getPayloadBit(bytes, field.startBit + i) * 2 ** i;
+    }
+    return raw;
+  }
+
+  for (let i = 0; i < field.bitLength; i++) {
+    raw = raw * 2 + getPayloadBit(bytes, field.startBit + i);
+  }
+  return raw;
+}
+
 function decodeCanIdField(id: number, field: BitFieldDef, values?: Record<string, string>): DecodedField {
   const raw = extractFromCanId(id, field);
   const meaning = fieldMeaning(raw, field, values);
@@ -141,6 +167,22 @@ function decodeCanIdField(id: number, field: BitFieldDef, values?: Record<string
     displayValue: decodedDisplay(raw, undefined, meaning),
     startBit: field.startBit,
     length: field.length,
+    source: "canId",
+    meaning,
+  };
+}
+
+function decodeCanonicalCanIdField(id: number, field: CanonicalField, profile: CanonicalProfile): DecodedField {
+  const raw = extractCanonicalFromCanId(id, field);
+  const dictionaryId = field.dictionary ?? field.name;
+  const meaning = profile.dictionaries?.[dictionaryId]?.[String(raw)];
+  return {
+    name: field.name,
+    raw,
+    physical: raw,
+    displayValue: decodedDisplay(raw, undefined, meaning),
+    startBit: field.startBit,
+    length: field.bitLength,
     source: "canId",
     meaning,
   };
@@ -172,6 +214,37 @@ function decodePayloadField(
     unit,
     startBit,
     length: field.length,
+    source: "payload",
+    meaning,
+  };
+}
+
+function decodeCanonicalPayloadField(
+  bytes: number[],
+  field: CanonicalField,
+  byteOrder: "little" | "big",
+  profile: CanonicalProfile,
+  context: Record<string, number> = {},
+): DecodedField {
+  const raw = extractCanonicalFromBytes(bytes, field, byteOrder);
+  const scaled = raw * (field.factor ?? 1) + (field.offset ?? 0);
+  const expressionValue = evaluateExpression(field.display?.expression, {
+    ...context,
+    raw,
+    value: scaled,
+  });
+  const physical = typeof expressionValue === "number" ? expressionValue : scaled;
+  const dictionaryId = field.dictionary ?? field.name;
+  const meaning = profile.dictionaries?.[dictionaryId]?.[String(raw)];
+  const displayValue = typeof expressionValue === "string" ? expressionValue : decodedDisplay(physical, field.unit, meaning);
+  return {
+    name: field.name,
+    raw,
+    physical,
+    displayValue,
+    unit: field.unit,
+    startBit: field.startBit,
+    length: field.bitLength,
     source: "payload",
     meaning,
   };
@@ -251,6 +324,118 @@ function readInteger(bytes: number[], byteOffset: number, byteLength: number, by
     value = byteOrder === "little" ? value + byte * 256 ** index : value * 256 + byte;
   }
   return value;
+}
+
+function canonicalMatches(message: CanonicalProfile["messages"][number], values: Record<string, number>) {
+  return Object.entries(message.identifyBy ?? {}).every(([field, expected]) => matchesExpected(values[field], expected as number | string | boolean));
+}
+
+function expressionErrorState(expression: string, values: Record<string, number>) {
+  const notEqual = expression.match(/^\s*([A-Za-z_]\w*)\s*!=\s*(.+?)\s*$/);
+  if (notEqual) {
+    const [, field, rawExpected] = notEqual;
+    const expected = Number(rawExpected);
+    return Number.isFinite(expected) ? values[field] !== expected : String(values[field]) !== rawExpected.replace(/^["']|["']$/g, "");
+  }
+
+  const equal = expression.match(/^\s*([A-Za-z_]\w*)\s*==\s*(.+?)\s*$/);
+  if (equal) {
+    const [, field, rawExpected] = equal;
+    const expected = Number(rawExpected);
+    return Number.isFinite(expected) ? values[field] === expected : String(values[field]) === rawExpected.replace(/^["']|["']$/g, "");
+  }
+
+  return Boolean(evaluateExpression(expression, values));
+}
+
+function decodeCanonical(profile: CanonicalProfile, frame: WsFrame): DecodedFrame {
+  const bytes = bytesFromHex(frame.data_hex);
+  const byteOrder = profile.bus.byteOrder;
+  const canIdFields = profile.layouts.canId.fields.map((field) => decodeCanonicalCanIdField(frame.id, field, profile));
+  const canValues = valuesByName(canIdFields);
+  const candidateMessages = profile.messages.filter((message) =>
+    Object.entries(message.identifyBy ?? {})
+      .filter(([field]) => field in canValues || field === "can_id")
+      .every(([field, expected]) => matchesExpected(canValues[field], expected as number | string | boolean)),
+  );
+
+  if (!candidateMessages.length) {
+    return {
+      serviceIdentifier: canValues.service_identifier,
+      sourceAddress: canValues.source_address,
+      destinationAddress: canValues.destination_address,
+      commandClass: canIdFields.find((field) => field.name === "command_class")?.displayValue,
+      canIdFields,
+      payloadFields: [],
+      fields: canIdFields,
+      requiresSchema: true,
+      meaning: "CAN ID does not match this profile",
+    };
+  }
+
+  const context: Record<string, number> = { ...canValues };
+  const headerFields: DecodedField[] = [];
+  for (const field of profile.layouts.payloadHeader?.fields ?? []) {
+    const decoded = decodeCanonicalPayloadField(bytes, field, byteOrder, profile, context);
+    headerFields.push(decoded);
+    context[decoded.name] = decoded.physical;
+  }
+  const headerValues = valuesByName(headerFields);
+  const allIdentificationValues = { ...canValues, ...headerValues };
+  const message = candidateMessages.find((item) => canonicalMatches(item, allIdentificationValues));
+
+  if (!message) {
+    return {
+      serviceIdentifier: canValues.service_identifier,
+      sourceAddress: canValues.source_address,
+      destinationAddress: canValues.destination_address,
+      commandClass: canIdFields.find((field) => field.name === "command_class")?.displayValue,
+      canIdFields,
+      payloadFields: headerFields,
+      fields: [...canIdFields, ...headerFields],
+      requiresSchema: true,
+      meaning: "CAN ID and payload header decoded; matching message definition is missing",
+    };
+  }
+
+  const payloadValues: Record<string, number> = {};
+  const routeFields: DecodedField[] = [];
+  for (const field of message.payload.fields ?? []) {
+    const decoded = decodeCanonicalPayloadField(bytes, field, byteOrder, profile, context);
+    routeFields.push(decoded);
+    context[decoded.name] = decoded.physical;
+    payloadValues[decoded.name] = decoded.physical;
+  }
+
+  const payloadFields = [...headerFields, ...routeFields];
+  const fields = [...canIdFields, ...payloadFields];
+  const allValues = { ...allIdentificationValues, ...payloadValues };
+  const errorRule = profile.errors?.find((rule) => expressionErrorState(rule.when, allValues));
+  const errorCode = errorRule ? extractCanonicalFromBytes(bytes, errorRule.source, errorRule.source.byteOrder ?? byteOrder) : undefined;
+  const errorText = errorRule?.dictionary && errorCode != null ? profile.dictionaries?.[errorRule.dictionary]?.[String(errorCode)] : undefined;
+  const messageGoodField = fields.find((field) => field.name === "message_good");
+
+  return {
+    frameName: message.id,
+    commandClass: canIdFields.find((field) => field.name === "command_class")?.displayValue,
+    sourceAddress: canValues.source_address,
+    destinationAddress: canValues.destination_address,
+    serviceIdentifier: canValues.service_identifier,
+    instanceName: fields.find((field) => field.name === "instance_index")?.meaning,
+    instanceIndex: headerValues.instance_index,
+    attributeName: fields.find((field) => field.name === "attribute_address")?.meaning,
+    attributeAddress: headerValues.attribute_address,
+    featureName: fields.find((field) => field.name === "feature_index")?.meaning,
+    featureIndex: headerValues.feature_index,
+    messageGood: messageGoodField ? Boolean(messageGoodField.raw) : undefined,
+    errorCode,
+    errorText,
+    canIdFields,
+    payloadFields,
+    fields,
+    requiresSchema: false,
+    meaning: message.label ?? message.id,
+  };
 }
 
 function schemaFromKnossos(knossos: KnossosSchemaDef): ResolvedMessageSchema {
@@ -447,16 +632,15 @@ function decodeGeneric(profile: CanProfile, frame: WsFrame): DecodedFrame {
   };
 }
 
-export function decodeFrameWithProfile(profile: CanProfile | null, frame: WsFrame): DecodedFrame | null {
+const legacyDecodeHelpers = [resolveSchema, decodeWithSchema, decodeGeneric];
+void legacyDecodeHelpers;
+
+export function decodeFrameWithProfile(profile: CanProfile | CanonicalProfile | null, frame: WsFrame): DecodedFrame | null {
   if (!profile) return null;
-
-  const schema = resolveSchema(profile);
-  if (schema) return decodeWithSchema(profile, schema, frame);
-
-  return decodeGeneric(profile, frame);
+  return decodeCanonical(normalizeToCanonicalProfile(profile), frame);
 }
 
-export function decodeFrameWithProfiles(profiles: CanProfile[], frame: WsFrame): DecodedFrame | null {
+export function decodeFrameWithProfiles(profiles: Array<CanProfile | CanonicalProfile>, frame: WsFrame): DecodedFrame | null {
   let fallback: DecodedFrame | null = null;
 
   for (const profile of profiles) {

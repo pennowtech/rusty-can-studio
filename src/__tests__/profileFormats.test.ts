@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseCandump } from "@/can/candump";
 import { decodeFrameWithProfiles } from "@/profile-editor/decodeProfile";
+import type { CanonicalProfile } from "@/profile-editor/model/canonicalProfile";
 import type { CanProfile } from "@/profile-editor/model/profile";
 
 function decodedMap(decoded: NonNullable<ReturnType<typeof decodeFrameWithProfiles>>) {
@@ -9,6 +10,95 @@ function decodedMap(decoded: NonNullable<ReturnType<typeof decodeFrameWithProfil
 }
 
 describe("profile decoding across unrelated CAN-FD formats", () => {
+  it("decodes the canonical motor profile shape directly", () => {
+    const profile: CanonicalProfile = {
+      schemaVersion: "1.0",
+      meta: { id: "motor_generic", name: "Motor Controller Generic", version: "1.0.0" },
+      bus: { type: "can", idFormat: "standard", byteOrder: "little" },
+      layouts: {
+        canId: {
+          label: "Standard 11-bit ID",
+          bitLength: 11,
+          fields: [
+            { name: "node_id", startBit: 0, bitLength: 7, type: "uint" },
+            { name: "message_class", startBit: 7, bitLength: 4, type: "uint" },
+            { name: "can_id", startBit: 0, bitLength: 11, type: "uint" },
+          ],
+        },
+      },
+      messages: [
+        {
+          id: "motor_status",
+          label: "Motor Status",
+          identifyBy: { can_id: 0x321 },
+          payload: {
+            bitLength: 32,
+            fields: [
+              { name: "rpm", startBit: 0, bitLength: 16, type: "uint", factor: 0.25, unit: "rpm" },
+              { name: "temperature", startBit: 16, bitLength: 8, type: "uint", offset: -40, unit: "degC" },
+              { name: "enabled", startBit: 24, bitLength: 1, type: "bool" },
+            ],
+          },
+        },
+      ],
+    };
+    const [frame] = parseCandump("(000.000000) can0 321 [08] 20 4E 64 01 00 00 00 00");
+    const decoded = decodeFrameWithProfiles([profile], frame);
+
+    expect(decoded?.meaning).toBe("Motor Status");
+    expect(decodedMap(decoded!)).toMatchObject({
+      node_id: "33",
+      message_class: "6",
+      rpm: "5000 rpm",
+      temperature: "60 degC",
+      enabled: "1",
+    });
+  });
+
+  it("decodes the canonical J1939 profile shape directly", () => {
+    const profile: CanonicalProfile = {
+      schemaVersion: "1.0",
+      meta: { id: "j1939_engine", name: "J1939 Engine Snapshot", version: "1.0.0" },
+      bus: { type: "can", idFormat: "extended", byteOrder: "little" },
+      layouts: {
+        canId: {
+          label: "J1939 29-bit ID",
+          bitLength: 29,
+          fields: [
+            { name: "source_address", startBit: 0, bitLength: 8, type: "uint" },
+            { name: "pgn", startBit: 8, bitLength: 18, type: "uint" },
+            { name: "priority", startBit: 26, bitLength: 3, type: "uint" },
+          ],
+        },
+      },
+      messages: [
+        {
+          id: "j1939.engine_speed",
+          label: "Engine Speed",
+          identifyBy: { pgn: 0xf004 },
+          payload: {
+            bitLength: 64,
+            fields: [
+              { name: "actual_torque", startBit: 16, bitLength: 8, type: "uint", offset: -125, unit: "%" },
+              { name: "engine_speed", startBit: 24, bitLength: 16, type: "uint", factor: 0.125, unit: "rpm" },
+            ],
+          },
+        },
+      ],
+    };
+    const [frame] = parseCandump("(000.000000) can0 0CF00401 [08] FF FF 7D 20 4E FF FF FF");
+    const decoded = decodeFrameWithProfiles([profile], frame);
+
+    expect(decoded?.meaning).toBe("Engine Speed");
+    expect(decodedMap(decoded!)).toMatchObject({
+      priority: "3",
+      pgn: "61444",
+      source_address: "1",
+      actual_torque: "0 %",
+      engine_speed: "2500 rpm",
+    });
+  });
+
   it("decodes a generic exact-CAN-ID motor status profile", () => {
     const profile: CanProfile = {
       meta: { name: "Motor Controller Generic", version: "1.0.0" },
