@@ -305,6 +305,8 @@ git push origin v0.2.1
 
 The release workflow builds Linux, Windows, and macOS bundles and attaches them to the GitHub Release for that tag.
 
+Installation instructions for release artifacts are in `docs/install-release.md`.
+
 ## Troubleshooting
 
 ### `cargo` Is Not Found
