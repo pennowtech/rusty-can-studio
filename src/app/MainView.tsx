@@ -39,6 +39,8 @@ import { openJsonFile, saveJsonFile } from "@/profile-editor/tauriFileIO";
 import { useAppStore } from "@/store/appShellStore";
 import { useConnectionStore } from "@/store/connectionStore";
 import { DiagnosticLevel, useDiagnosticsStore } from "@/store/diagnosticsStore";
+import { useTraceArchiveStore } from "@/store/traceArchiveStore";
+import { parseCandump } from "@/can/candump";
 import { ProfileMainShell } from "@/profile-editor/ProfileMainShell";
 import { useState } from "react";
 import { AlertTriangle, Info, Keyboard, Monitor, Palette, RotateCcw, Rows3, ShieldCheck } from "lucide-react";
@@ -47,7 +49,12 @@ import { AlertTriangle, Info, Keyboard, Monitor, Palette, RotateCcw, Rows3, Shie
 function SettingsView() {
   const traceFrameLimit = useConnectionStore((s) => s.traceFrameLimit);
   const frames = useConnectionStore((s) => s.frames);
+  const loadTraceFrames = useConnectionStore((s) => s.loadTraceFrames);
   const setTraceFrameLimit = useConnectionStore((s) => s.setTraceFrameLimit);
+  const traceArchive = useTraceArchiveStore((s) => s.entries);
+  const addTraceArchiveEntry = useTraceArchiveStore((s) => s.addEntry);
+  const deleteTraceArchiveEntry = useTraceArchiveStore((s) => s.deleteEntry);
+  const clearTraceArchive = useTraceArchiveStore((s) => s.clear);
   const diagnostics = useDiagnosticsStore((s) => s.entries);
   const clearDiagnostics = useDiagnosticsStore((s) => s.clear);
   const locale = useI18nStore((s) => s.locale);
@@ -67,6 +74,7 @@ function SettingsView() {
     "cansim.locale.v1",
     "can-connection-profiles",
     "cansim.trace.settings.v1",
+    "cansim.traceArchive.v1",
     "cansim.monitor.preferences.v1",
     "cansim.monitor.filterPresets.v1",
     "cansim.monitor.alertRules.v1",
@@ -167,6 +175,68 @@ App version: 0.2.0
     if (level === "error") return "text-destructive";
     if (level === "warning") return "text-amber-600 dark:text-amber-300";
     return "text-muted-foreground";
+  }
+
+  function formatCanId(id: number) {
+    return id.toString(16).toUpperCase().padStart(id > 0x7ff ? 8 : 3, "0");
+  }
+
+  function byteLength(dataHex: string) {
+    return Math.floor(dataHex.replace(/[^0-9a-fA-F]/g, "").length / 2);
+  }
+
+  function formatPayloadBytes(dataHex: string) {
+    const cleaned = dataHex.replace(/[^0-9a-fA-F]/g, "").toUpperCase();
+    return cleaned.match(/.{1,2}/g)?.join(" ") ?? "";
+  }
+
+  function formatCandumpLine(frame: (typeof frames)[number]) {
+    return `(${(frame.ts_ms / 1000).toFixed(6)}) ${frame.iface} ${formatCanId(frame.id)} [${byteLength(frame.data_hex).toString().padStart(2, "0")}] ${formatPayloadBytes(frame.data_hex)}`.trim();
+  }
+
+  function downloadTextFile(filename: string, contents: string) {
+    const blob = new Blob([contents], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function saveCurrentTraceToArchive() {
+    if (!frames.length) return;
+    const name = window.prompt("Trace name", `trace-${new Date().toISOString().replace(/[:.]/g, "-")}.candump.log`);
+    if (!name?.trim()) return;
+    addTraceArchiveEntry({
+      name: name.trim(),
+      frameCount: frames.length,
+      candumpText: frames.map(formatCandumpLine).join("\n"),
+    });
+  }
+
+  function loadArchivedTrace(id: string) {
+    const entry = traceArchive.find((item) => item.id === id);
+    if (!entry) return;
+    loadTraceFrames(entry.name, parseCandump(entry.candumpText));
+  }
+
+  function exportArchivedTrace(id: string) {
+    const entry = traceArchive.find((item) => item.id === id);
+    if (!entry) return;
+    downloadTextFile(entry.name.endsWith(".log") ? entry.name : `${entry.name}.candump.log`, entry.candumpText);
+  }
+
+  function deleteArchivedTrace(id: string) {
+    const entry = traceArchive.find((item) => item.id === id);
+    if (!entry) return;
+    if (!window.confirm(`Delete archived trace "${entry.name}"?`)) return;
+    deleteTraceArchiveEntry(id);
+  }
+
+  function clearArchivedTraces() {
+    if (!window.confirm("Delete all archived traces?")) return;
+    clearTraceArchive();
   }
 
   const densityDescription = {
@@ -354,6 +424,44 @@ App version: 0.2.0
             </div>
             <div className="text-xs text-muted-foreground">
               Current trace: {frames.length} rows. Saved limit: {traceFrameLimit} rows.
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-sm">Historical traces</CardTitle>
+              <Badge variant="outline">{formatNumber(traceArchive.length)} saved</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Save the current retained trace as candump text for later inspection. Archived traces can be loaded back into CAN Monitor, exported, or deleted.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" disabled={!frames.length} onClick={saveCurrentTraceToArchive}>Save current trace</Button>
+              <Button variant="outline" disabled={!traceArchive.length} onClick={clearArchivedTraces}>Clear archive</Button>
+            </div>
+            <div className="max-h-72 overflow-auto rounded-md border bg-muted/20">
+              {traceArchive.length ? (
+                traceArchive.map((entry) => (
+                  <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 last:border-0">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{entry.name}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {formatNumber(entry.frameCount)} frames, saved {formatDateTime(entry.createdAt)}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Button variant="outline" size="sm" onClick={() => loadArchivedTrace(entry.id)}>Load</Button>
+                      <Button variant="ghost" size="sm" onClick={() => exportArchivedTrace(entry.id)}>Export</Button>
+                      <Button variant="ghost" size="sm" onClick={() => deleteArchivedTrace(entry.id)}>Delete</Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 text-sm text-muted-foreground">No archived traces yet.</div>
+              )}
             </div>
           </CardContent>
         </Card>

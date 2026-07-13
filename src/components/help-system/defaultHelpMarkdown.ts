@@ -695,6 +695,23 @@ Use Export diagnostics when you need to share troubleshooting information. Use C
 Diagnostics can include host names, interface names, CAN IDs, profile names, and error text. Review exported diagnostics before sharing them outside your team.
 :::
 
+## Historical traces
+
+Open Settings > Historical traces to save and reload retained trace snapshots.
+
+The archive stores the current retained CAN Monitor frame buffer as candump text. Saved traces can be:
+
+- loaded back into CAN Monitor
+- exported as candump log files
+- deleted individually
+- cleared as a group
+
+Use this for short-term investigation workflows, for example saving a failing live capture before reconnecting, preserving a filtered test run, or keeping a known reference trace available for profile work.
+
+:::note
+Historical traces are stored locally in browser/Tauri storage and are capped to the newest saved entries. For long-term evidence, export the trace as a candump log and store it in your normal project or test-result location.
+:::
+
 ## Transmit composer
 
 Use the transmit composer to prepare a single CAN-FD frame or a cyclic transmission.
