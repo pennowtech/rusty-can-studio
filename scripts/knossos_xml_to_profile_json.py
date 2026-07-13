@@ -619,6 +619,156 @@ def compact_profile_from_expanded(profile: dict[str, Any]) -> dict[str, Any]:
     return compact
 
 
+def slugify(value: str, fallback: str) -> str:
+    text = re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("_")
+    return text or fallback
+
+
+def absolute_start_bit(field: dict[str, Any]) -> int:
+    return int(field.get("startBit", 0)) + int(field.get("byte", 0)) * 8
+
+
+def canonical_field(field: dict[str, Any], dictionaries: dict[str, dict[str, str]]) -> dict[str, Any]:
+    values = field.get("values")
+    if values:
+        dictionaries[field["name"]] = {str(key): str(value) for key, value in values.items()}
+
+    result: dict[str, Any] = {
+        "name": field["name"],
+        "startBit": absolute_start_bit(field),
+        "bitLength": int(field.get("bitLength", field.get("length", 1))),
+    }
+    if field.get("type"):
+        result["type"] = field["type"]
+    if values:
+        result["dictionary"] = field["name"]
+    for key in ("factor", "offset", "unit", "count"):
+        if key in field:
+            result[key] = field[key]
+    if "stride" in field:
+        result["strideBits"] = int(field["stride"]) * 8
+    if field.get("expression"):
+        result["display"] = {"expression": field["expression"]}
+    return result
+
+
+def canonical_payload_bit_length(fields: list[dict[str, Any]]) -> int:
+    if not fields:
+        return 0
+    return max(absolute_start_bit(field) + int(field.get("bitLength", field.get("length", 1))) for field in fields)
+
+
+def canonical_from_compact(profile: dict[str, Any]) -> dict[str, Any]:
+    dictionaries: dict[str, dict[str, str]] = {}
+    service = profile.get("service", {})
+    payload_header = profile.get("payloadHeader", {"fields": [], "lengthBytes": 0})
+    dictionaries["service_identifier"] = {str(service.get("identifier", 0)): str(service.get("name", "service"))}
+
+    can_id_fields = [
+        {"name": "command_class", "startBit": 26, "bitLength": 4, "type": "enum", "dictionary": "command_class"},
+        {"name": "broadcast", "startBit": 25, "bitLength": 1, "type": "enum", "dictionary": "broadcast"},
+        {"name": "destination_address", "startBit": 19, "bitLength": 6, "type": "uint"},
+        {"name": "source_address", "startBit": 13, "bitLength": 6, "type": "uint"},
+        {"name": "start_of_transfer", "startBit": 12, "bitLength": 1, "type": "enum", "dictionary": "start_of_transfer"},
+        {"name": "end_of_transfer", "startBit": 11, "bitLength": 1, "type": "enum", "dictionary": "end_of_transfer"},
+        {"name": "toggle", "startBit": 10, "bitLength": 1, "type": "uint"},
+        {"name": "service_identifier", "startBit": 0, "bitLength": 10, "type": "enum", "dictionary": "service_identifier"},
+    ]
+    dictionaries.update(
+        {
+            "command_class": {"6": "command/request", "5": "response", "3": "event/notification"},
+            "broadcast": {"0": "unicast", "1": "broadcast"},
+            "start_of_transfer": {"0": "not start", "1": "start"},
+            "end_of_transfer": {"0": "not end", "1": "end"},
+        }
+    )
+
+    payload_header_fields = [canonical_field(field, dictionaries) for field in payload_header.get("fields", [])]
+    messages: list[dict[str, Any]] = []
+    for attribute in profile.get("attributes", []):
+        dictionaries.setdefault("attribute_address", {})[str(attribute.get("address", 0))] = str(attribute.get("name", "attribute"))
+        for operation in attribute.get("operations", []):
+            feature_index = operation.get("featureIndex", 0)
+            dictionaries.setdefault("feature_index", {})[str(feature_index)] = str(operation.get("type", "operation"))
+            for variant, fields in operation.get("variants", {}).items():
+                command_class = {"command": 6, "response": 5, "event": 3}.get(variant)
+                if command_class is None:
+                    continue
+                message_id = f"{service.get('name', 'service')}.{attribute.get('name', 'attribute')}.{operation.get('type', 'operation')}.{variant}"
+                canonical_fields = [canonical_field(field, dictionaries) for field in fields]
+                messages.append(
+                    {
+                        "id": slugify(message_id, "message"),
+                        "label": f"{attribute.get('name', 'attribute')}.{operation.get('type', 'operation')}.{variant}",
+                        "description": message_id,
+                        "identifyBy": {
+                            "service_identifier": service.get("identifier", 0),
+                            "command_class": command_class,
+                            "attribute_address": attribute.get("address", 0),
+                            "feature_index": feature_index,
+                        },
+                        "payload": {
+                            "bitLength": canonical_payload_bit_length(fields),
+                            "fields": canonical_fields,
+                        },
+                    }
+                )
+
+    errors: list[dict[str, Any]] = []
+    error_status = profile.get("errorStatus")
+    if error_status:
+        codes = error_status.get("codes") or {}
+        if codes:
+            dictionaries["error_status"] = {str(key): str(value) for key, value in codes.items()}
+        errors.append(
+            {
+                "id": "default_error_status",
+                "when": f"{error_status.get('field', 'message_good')} != {json.dumps(error_status.get('goodValue', 1))}",
+                "source": {
+                    "startBit": int(error_status.get("byteOffset", 2)) * 8,
+                    "bitLength": int(error_status.get("byteLength", 4)) * 8,
+                    "type": "uint",
+                    "byteOrder": error_status.get("byteOrder", "little"),
+                },
+                "dictionary": "error_status" if codes else None,
+                "display": "Error ${raw}: ${text}",
+            }
+        )
+        errors = [{key: value for key, value in error.items() if value is not None} for error in errors]
+
+    return {
+        "schemaVersion": "1.0",
+        "meta": {
+            "id": slugify(profile.get("meta", {}).get("source", profile.get("meta", {}).get("name", "profile")).removesuffix(".xml"), "profile"),
+            "name": profile.get("meta", {}).get("name", "CAN-FD Schema Profile"),
+            "version": profile.get("meta", {}).get("version", "1.0.0"),
+            **({"description": profile.get("meta", {}).get("description")} if profile.get("meta", {}).get("description") else {}),
+            **({"source": profile.get("meta", {}).get("source")} if profile.get("meta", {}).get("source") else {}),
+        },
+        "bus": {
+            "type": "can-fd",
+            "idFormat": "extended",
+            "byteOrder": profile.get("byteOrder", "little"),
+        },
+        "layouts": {
+            "canId": {
+                "label": "Universal CAN ID Layout",
+                "bitLength": 29,
+                "fields": can_id_fields,
+            },
+            "payloadHeader": {
+                "label": "Payload header",
+                "bitLength": int(payload_header.get("bitLength", int(payload_header.get("lengthBytes", 0)) * 8)),
+                "fields": payload_header_fields,
+            },
+        },
+        "dictionaries": {key: value for key, value in dictionaries.items() if value},
+        "messages": messages,
+        "errors": errors,
+        "display": {},
+    }
+
+
 def convert_one(path: Path) -> dict[str, Any]:
     profile = base_profile([path], embed_can_id_layout=True)
     root = ET.parse(path).getroot()
@@ -629,25 +779,27 @@ def convert_one(path: Path) -> dict[str, Any]:
     apply_payload_header_values(profile, extract_instances(root))
     profile["meta"]["name"] = profile_name_for(path)
     profile["meta"]["source"] = path.name
-    return compact_profile_from_expanded(profile)
+    return canonical_from_compact(compact_profile_from_expanded(profile))
 
 
 def can_id_fragment() -> dict[str, Any]:
-    profile = base_profile([])
+    profile = canonical_from_compact(
+        {
+            "meta": {
+                "name": "Universal CAN ID Layout",
+                "version": "1.0.0",
+                "description": "Reusable 29-bit arbitration ID layout fragment.",
+            },
+            "byteOrder": "little",
+            "payloadHeader": {"lengthBytes": 0, "fields": []},
+            "service": {"name": "layout", "identifier": 0},
+            "attributes": [],
+        }
+    )
     return {
-        "meta": {
-            "name": "Knossos Universal CAN ID Layout",
-            "version": "1.0.0",
-            "description": "Reusable 29-bit Knossos arbitration ID layout fragment. Generated split profiles reference this layout by id.",
-        },
-        "defaultCanIdLayoutId": profile["defaultCanIdLayoutId"],
-        "byteOrder": "little",
-        "protocol": "generic",
-        "canIdLayouts": profile["canIdLayouts"],
-        "frames": {},
-        "fieldTypes": {},
-        "derivedFields": [],
-        "columns": [],
+        **profile,
+        "messages": [],
+        "errors": [],
     }
 
 
@@ -663,8 +815,8 @@ def write_split_profiles(paths: list[Path], output_dir: Path) -> None:
         output_path.write_text(json.dumps(profile, indent=2), encoding="utf-8")
         print(
             f"Wrote {output_path} "
-            f"({len(profile.get('attributes', []))} attributes, "
-            f"{len(profile.get('errorStatus', {}).get('codes', {}))} errors)"
+            f"({len(profile.get('messages', []))} messages, "
+            f"{len(profile.get('dictionaries', {}).get('error_status', {}))} errors)"
         )
 
 
@@ -688,11 +840,11 @@ def main() -> int:
         print("Either --output or --split-dir is required.", file=sys.stderr)
         return 2
 
-    profile = convert(args.xml)
+    profile = canonical_from_compact(compact_profile_from_expanded(convert(args.xml)))
     args.output.write_text(json.dumps(profile, indent=2), encoding="utf-8")
     print(f"Wrote {args.output}")
-    print(f"Message definitions: {len(profile['messageSchema']['messageDefinitions'])}")
-    print(f"Errors: {len(profile['messageSchema']['errors'])}")
+    print(f"Messages: {len(profile['messages'])}")
+    print(f"Errors: {len(profile.get('dictionaries', {}).get('error_status', {}))}")
     return 0
 
 

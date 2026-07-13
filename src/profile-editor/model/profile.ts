@@ -227,3 +227,5 @@ export type CanProfile = {
   derivedFields: DerivedFieldDef[];
   columns: ColumnDef[];
 };
+
+export type ProfileDocument = CanProfile;

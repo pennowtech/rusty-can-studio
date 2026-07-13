@@ -184,45 +184,42 @@ When adding live-frame behavior, avoid expensive synchronous work in frame handl
 
 File: `src/profile-editor/model/profile.ts`
 
-Primary type:
+Runtime profile contract:
 
 ```ts
-type CanProfile = {
-  meta: ProfileMeta;
-  byteOrder?: "little" | "big";
-  protocol?: "generic" | "knossos" | "schema";
-  canIdLayoutRef?: string;
-  service?: CompactProfileServiceDef;
-  payloadHeader?: SchemaFieldLayoutDef;
-  attributes?: CompactProfileAttributeDef[];
-  errorStatus?: CompactProfileErrorStatusDef;
-  canIdLayouts: Record<string, CanIdLayoutDef>;
-  frames: Record<string, FrameDef>;
-  fieldTypes: Record<string, FieldTypeDef>;
-  derivedFields: DerivedFieldDef[];
-  columns: ColumnDef[];
+type CanonicalProfile = {
+  schemaVersion: "1.0";
+  meta: CanonicalProfileMeta;
+  bus: CanonicalProfileBus;
+  layouts: {
+    canId: CanonicalLayout;
+    payloadHeader?: CanonicalLayout;
+  };
+  dictionaries?: Record<string, Record<string, string>>;
+  messages: CanonicalMessage[];
+  errors?: CanonicalErrorRule[];
+  display?: Record<string, unknown>;
 }
 ```
 
-Compact schema profiles should keep service, payload header, attributes, operations, variants, and error status in the source JSON. Runtime decode helpers derive matching rules from that structure.
+Profile Editor Visual, JSON view, CAN Monitor decoding, display filters, transmit helpers, and simulator matching should consume the canonical profile shape. Older or external formats belong at import/conversion boundaries only.
 
 ### Profile decoding
 
 Files:
 
 - `src/profile-editor/decodeProfile.ts`
-- `src/profile-editor/profileAdapter.ts`
-- `src/profile-editor/normalizeProfile.ts`
+- `src/profile-editor/canonical/normalizeToCanonicalProfile.ts`
 
 Decoder rules:
 
-- resolve shared CAN ID layouts when profiles reference them
-- decode CAN ID fields from configured bit layout
+- convert older inputs to canonical before decode when needed
+- decode CAN ID fields from `layouts.canId.fields`
 - decode payload header fields before message matching
-- match only profiles whose service/header/message criteria apply
-- decode route-specific payload fields after a match
-- expose raw and display values when value maps exist
-- decode `errorStatus` only when the configured status field indicates failure
+- match only profiles whose `messages[].identifyBy` criteria apply
+- decode message-specific `payload.fields` after a match
+- expose raw and display values when dictionaries exist
+- evaluate `errors[]` only when the configured condition indicates failure
 
 Do not hardcode product or protocol meanings in decoder code.
 

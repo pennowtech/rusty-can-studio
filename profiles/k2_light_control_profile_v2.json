@@ -1,480 +1,868 @@
 {
+  "schemaVersion": "1.0",
   "meta": {
+    "id": "k2_light_control",
     "name": "k2_light_control CAN-FD Schema Profile v2",
     "version": "1.0.0",
     "source": "k2_light_control.xml"
   },
-  "byteOrder": "little",
-  "protocol": "schema",
-  "canIdLayoutRef": "knossos_can_id",
-  "service": {
-    "name": "k2_light_control",
-    "identifier": 810
+  "bus": {
+    "type": "can-fd",
+    "idFormat": "extended",
+    "byteOrder": "little"
   },
-  "payloadHeader": {
-    "lengthBytes": 2,
-    "fields": [
-      {
-        "name": "attribute_address",
-        "byte": 0,
-        "startBit": 1,
-        "length": 7
-      },
-      {
-        "name": "message_good",
-        "byte": 0,
-        "startBit": 0,
-        "length": 1,
-        "type": "bool",
-        "values": {
-          "0": "bad",
-          "1": "good"
-        }
-      },
-      {
-        "name": "instance_index",
-        "byte": 1,
-        "startBit": 4,
-        "length": 4,
-        "values": {
-          "0": "FIELD_LED",
-          "1": "SCI_LED",
-          "2": "TWO_DEGREE_LED"
-        }
-      },
-      {
-        "name": "feature_index",
-        "byte": 1,
-        "startBit": 0,
-        "length": 4
-      }
-    ]
-  },
-  "attributes": [
-    {
-      "name": "light_switch",
-      "address": 0,
-      "operations": [
+  "layouts": {
+    "canId": {
+      "label": "Universal CAN ID Layout",
+      "bitLength": 29,
+      "fields": [
         {
-          "type": "get_current_value",
-          "featureIndex": 1,
-          "variants": {
-            "command": [],
-            "response": [
-              {
-                "name": "enable",
-                "byte": 2,
-                "startBit": 0,
-                "length": 1,
-                "type": "bool"
-              }
-            ]
-          }
+          "name": "command_class",
+          "startBit": 26,
+          "bitLength": 4,
+          "type": "enum",
+          "dictionary": "command_class"
         },
         {
-          "type": "set_current_value",
-          "featureIndex": 9,
-          "variants": {
-            "command": [
-              {
-                "name": "enable",
-                "byte": 2,
-                "startBit": 0,
-                "length": 1,
-                "type": "bool"
-              }
-            ],
-            "response": []
-          }
-        }
-      ]
-    },
-    {
-      "name": "brightness",
-      "address": 1,
-      "operations": [
-        {
-          "type": "get_current_value",
-          "featureIndex": 1,
-          "variants": {
-            "command": [],
-            "response": [
-              {
-                "name": "value",
-                "byte": 2,
-                "startBit": 0,
-                "length": 16,
-                "type": "uint",
-                "unit": "per mille"
-              }
-            ]
-          }
+          "name": "broadcast",
+          "startBit": 25,
+          "bitLength": 1,
+          "type": "enum",
+          "dictionary": "broadcast"
         },
         {
-          "type": "set_current_value",
-          "featureIndex": 9,
-          "variants": {
-            "command": [
-              {
-                "name": "value",
-                "byte": 2,
-                "startBit": 0,
-                "length": 16,
-                "type": "uint",
-                "unit": "per mille"
-              }
-            ],
-            "response": []
-          }
-        }
-      ]
-    },
-    {
-      "name": "xyz",
-      "address": 2,
-      "operations": [
-        {
-          "type": "get_current_value",
-          "featureIndex": 1,
-          "variants": {
-            "command": [],
-            "response": [
-              {
-                "name": "value_x",
-                "byte": 2,
-                "startBit": 0,
-                "length": 16,
-                "type": "uint"
-              },
-              {
-                "name": "value_y",
-                "byte": 4,
-                "startBit": 0,
-                "length": 16,
-                "type": "uint"
-              },
-              {
-                "name": "value_z",
-                "byte": 6,
-                "startBit": 0,
-                "length": 16,
-                "type": "uint"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "on_off_cycles",
-      "address": 3,
-      "operations": [
-        {
-          "type": "get_current_value",
-          "featureIndex": 1,
-          "variants": {
-            "command": [],
-            "response": [
-              {
-                "name": "on_off_cycles",
-                "byte": 2,
-                "startBit": 0,
-                "length": 32,
-                "type": "uint"
-              }
-            ]
-          }
+          "name": "destination_address",
+          "startBit": 19,
+          "bitLength": 6,
+          "type": "uint"
         },
         {
-          "type": "set_current_value",
-          "featureIndex": 9,
-          "variants": {
-            "command": [
-              {
-                "name": "on_off_cycles",
-                "byte": 2,
-                "startBit": 0,
-                "length": 32,
-                "type": "uint"
-              }
-            ],
-            "response": []
-          }
-        }
-      ]
-    },
-    {
-      "name": "total_ontime_unweighted",
-      "address": 4,
-      "operations": [
-        {
-          "type": "get_current_value",
-          "featureIndex": 1,
-          "variants": {
-            "command": [],
-            "response": [
-              {
-                "name": "total_ontime",
-                "byte": 2,
-                "startBit": 0,
-                "length": 32,
-                "type": "uint",
-                "unit": "s"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "ontime_clusters",
-      "address": 6,
-      "operations": [
-        {
-          "type": "get_current_value",
-          "featureIndex": 1,
-          "variants": {
-            "command": [],
-            "response": [
-              {
-                "name": "ontime_clusters",
-                "byte": 2,
-                "startBit": 0,
-                "length": 32,
-                "type": "uint",
-                "unit": "s",
-                "count": 10,
-                "stride": 4
-              }
-            ]
-          }
+          "name": "source_address",
+          "startBit": 13,
+          "bitLength": 6,
+          "type": "uint"
         },
         {
-          "type": "set_current_value",
-          "featureIndex": 9,
-          "variants": {
-            "command": [
-              {
-                "name": "ontime_clusters",
-                "byte": 2,
-                "startBit": 0,
-                "length": 32,
-                "type": "uint",
-                "unit": "s",
-                "count": 10,
-                "stride": 4
-              }
-            ],
-            "response": []
-          }
-        }
-      ]
-    },
-    {
-      "name": "calibration_data",
-      "address": 7,
-      "operations": [
-        {
-          "type": "get_current_value",
-          "featureIndex": 1,
-          "variants": {
-            "command": [
-              {
-                "name": "index",
-                "byte": 2,
-                "startBit": 0,
-                "length": 32,
-                "type": "uint"
-              }
-            ],
-            "response": [
-              {
-                "name": "index",
-                "byte": 2,
-                "startBit": 0,
-                "length": 32,
-                "type": "uint"
-              },
-              {
-                "name": "current",
-                "byte": 6,
-                "startBit": 0,
-                "length": 16,
-                "type": "uint",
-                "unit": "mA"
-              },
-              {
-                "name": "value_y",
-                "byte": 8,
-                "startBit": 0,
-                "length": 16,
-                "type": "uint"
-              }
-            ]
-          }
+          "name": "start_of_transfer",
+          "startBit": 12,
+          "bitLength": 1,
+          "type": "enum",
+          "dictionary": "start_of_transfer"
         },
         {
-          "type": "set_current_value",
-          "featureIndex": 9,
-          "variants": {
-            "command": [
-              {
-                "name": "index",
-                "byte": 2,
-                "startBit": 0,
-                "length": 32,
-                "type": "uint"
-              },
-              {
-                "name": "current",
-                "byte": 6,
-                "startBit": 0,
-                "length": 16,
-                "type": "uint",
-                "unit": "mA"
-              },
-              {
-                "name": "value_y",
-                "byte": 8,
-                "startBit": 0,
-                "length": 16,
-                "type": "uint"
-              }
-            ],
-            "response": [
-              {
-                "name": "index",
-                "byte": 2,
-                "startBit": 0,
-                "length": 32,
-                "type": "uint"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "calibration_status",
-      "address": 8,
-      "operations": [
-        {
-          "type": "get_static_value",
-          "featureIndex": 2,
-          "variants": {
-            "command": [],
-            "response": [
-              {
-                "name": "led_is_calibrated",
-                "byte": 2,
-                "startBit": 0,
-                "length": 1,
-                "type": "bool"
-              }
-            ]
-          }
+          "name": "end_of_transfer",
+          "startBit": 11,
+          "bitLength": 1,
+          "type": "enum",
+          "dictionary": "end_of_transfer"
         },
         {
-          "type": "set_static_value",
-          "featureIndex": 10,
-          "variants": {
-            "command": [
-              {
-                "name": "led_is_calibrated",
-                "byte": 2,
-                "startBit": 0,
-                "length": 1,
-                "type": "bool"
-              }
-            ],
-            "response": []
-          }
+          "name": "toggle",
+          "startBit": 10,
+          "bitLength": 1,
+          "type": "uint"
+        },
+        {
+          "name": "service_identifier",
+          "startBit": 0,
+          "bitLength": 10,
+          "type": "enum",
+          "dictionary": "service_identifier"
         }
       ]
     },
-    {
-      "name": "reference_light_output",
-      "address": 9,
-      "operations": [
+    "payloadHeader": {
+      "label": "Payload header",
+      "bitLength": 16,
+      "fields": [
         {
-          "type": "get_current_value",
-          "featureIndex": 1,
-          "variants": {
-            "command": [],
-            "response": [
-              {
-                "name": "light_output_is_in_range",
-                "byte": 2,
-                "startBit": 0,
-                "length": 1,
-                "type": "bool"
-              },
-              {
-                "name": "percentage_of_reference",
-                "byte": 2,
-                "startBit": 1,
-                "length": 8,
-                "type": "uint"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "service_version",
-      "address": 0,
-      "operations": [
+          "name": "attribute_address",
+          "startBit": 1,
+          "bitLength": 7
+        },
         {
-          "type": "get_static_value",
-          "featureIndex": 2,
-          "variants": {
-            "command": [],
-            "response": [
-              {
-                "name": "service_version",
-                "byte": 2,
-                "startBit": 0,
-                "length": 8,
-                "type": "uint",
-                "count": 32,
-                "stride": 1
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "service_sha_256_hash",
-      "address": 1,
-      "operations": [
+          "name": "message_good",
+          "startBit": 0,
+          "bitLength": 1,
+          "type": "bool",
+          "dictionary": "message_good"
+        },
         {
-          "type": "get_static_value",
-          "featureIndex": 2,
-          "variants": {
-            "command": [],
-            "response": [
-              {
-                "name": "sha_hash",
-                "byte": 2,
-                "startBit": 0,
-                "length": 8,
-                "type": "uint",
-                "count": 32,
-                "stride": 1
-              }
-            ]
-          }
+          "name": "instance_index",
+          "startBit": 12,
+          "bitLength": 4,
+          "dictionary": "instance_index"
+        },
+        {
+          "name": "feature_index",
+          "startBit": 8,
+          "bitLength": 4
         }
       ]
     }
+  },
+  "dictionaries": {
+    "service_identifier": {
+      "810": "k2_light_control"
+    },
+    "command_class": {
+      "6": "command/request",
+      "5": "response",
+      "3": "event/notification"
+    },
+    "broadcast": {
+      "0": "unicast",
+      "1": "broadcast"
+    },
+    "start_of_transfer": {
+      "0": "not start",
+      "1": "start"
+    },
+    "end_of_transfer": {
+      "0": "not end",
+      "1": "end"
+    },
+    "message_good": {
+      "0": "bad",
+      "1": "good"
+    },
+    "instance_index": {
+      "0": "FIELD_LED",
+      "1": "SCI_LED",
+      "2": "TWO_DEGREE_LED"
+    },
+    "attribute_address": {
+      "0": "service_version",
+      "1": "service_sha_256_hash",
+      "2": "xyz",
+      "3": "on_off_cycles",
+      "4": "total_ontime_unweighted",
+      "6": "ontime_clusters",
+      "7": "calibration_data",
+      "8": "calibration_status",
+      "9": "reference_light_output"
+    },
+    "feature_index": {
+      "1": "get_current_value",
+      "9": "set_current_value",
+      "2": "get_static_value",
+      "10": "set_static_value"
+    }
+  },
+  "messages": [
+    {
+      "id": "k2_light_control.light_switch.get_current_value.command",
+      "label": "light_switch.get_current_value.command",
+      "description": "k2_light_control.light_switch.get_current_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 0,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.light_switch.get_current_value.response",
+      "label": "light_switch.get_current_value.response",
+      "description": "k2_light_control.light_switch.get_current_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 0,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 17,
+        "fields": [
+          {
+            "name": "enable",
+            "startBit": 16,
+            "bitLength": 1,
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.light_switch.set_current_value.command",
+      "label": "light_switch.set_current_value.command",
+      "description": "k2_light_control.light_switch.set_current_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 0,
+        "feature_index": 9
+      },
+      "payload": {
+        "bitLength": 17,
+        "fields": [
+          {
+            "name": "enable",
+            "startBit": 16,
+            "bitLength": 1,
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.light_switch.set_current_value.response",
+      "label": "light_switch.set_current_value.response",
+      "description": "k2_light_control.light_switch.set_current_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 0,
+        "feature_index": 9
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.brightness.get_current_value.command",
+      "label": "brightness.get_current_value.command",
+      "description": "k2_light_control.brightness.get_current_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 1,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.brightness.get_current_value.response",
+      "label": "brightness.get_current_value.response",
+      "description": "k2_light_control.brightness.get_current_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 1,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 32,
+        "fields": [
+          {
+            "name": "value",
+            "startBit": 16,
+            "bitLength": 16,
+            "type": "uint",
+            "unit": "per mille"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.brightness.set_current_value.command",
+      "label": "brightness.set_current_value.command",
+      "description": "k2_light_control.brightness.set_current_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 1,
+        "feature_index": 9
+      },
+      "payload": {
+        "bitLength": 32,
+        "fields": [
+          {
+            "name": "value",
+            "startBit": 16,
+            "bitLength": 16,
+            "type": "uint",
+            "unit": "per mille"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.brightness.set_current_value.response",
+      "label": "brightness.set_current_value.response",
+      "description": "k2_light_control.brightness.set_current_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 1,
+        "feature_index": 9
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.xyz.get_current_value.command",
+      "label": "xyz.get_current_value.command",
+      "description": "k2_light_control.xyz.get_current_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 2,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.xyz.get_current_value.response",
+      "label": "xyz.get_current_value.response",
+      "description": "k2_light_control.xyz.get_current_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 2,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 64,
+        "fields": [
+          {
+            "name": "value_x",
+            "startBit": 16,
+            "bitLength": 16,
+            "type": "uint"
+          },
+          {
+            "name": "value_y",
+            "startBit": 32,
+            "bitLength": 16,
+            "type": "uint"
+          },
+          {
+            "name": "value_z",
+            "startBit": 48,
+            "bitLength": 16,
+            "type": "uint"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.on_off_cycles.get_current_value.command",
+      "label": "on_off_cycles.get_current_value.command",
+      "description": "k2_light_control.on_off_cycles.get_current_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 3,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.on_off_cycles.get_current_value.response",
+      "label": "on_off_cycles.get_current_value.response",
+      "description": "k2_light_control.on_off_cycles.get_current_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 3,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 48,
+        "fields": [
+          {
+            "name": "on_off_cycles",
+            "startBit": 16,
+            "bitLength": 32,
+            "type": "uint"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.on_off_cycles.set_current_value.command",
+      "label": "on_off_cycles.set_current_value.command",
+      "description": "k2_light_control.on_off_cycles.set_current_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 3,
+        "feature_index": 9
+      },
+      "payload": {
+        "bitLength": 48,
+        "fields": [
+          {
+            "name": "on_off_cycles",
+            "startBit": 16,
+            "bitLength": 32,
+            "type": "uint"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.on_off_cycles.set_current_value.response",
+      "label": "on_off_cycles.set_current_value.response",
+      "description": "k2_light_control.on_off_cycles.set_current_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 3,
+        "feature_index": 9
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.total_ontime_unweighted.get_current_value.command",
+      "label": "total_ontime_unweighted.get_current_value.command",
+      "description": "k2_light_control.total_ontime_unweighted.get_current_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 4,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.total_ontime_unweighted.get_current_value.response",
+      "label": "total_ontime_unweighted.get_current_value.response",
+      "description": "k2_light_control.total_ontime_unweighted.get_current_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 4,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 48,
+        "fields": [
+          {
+            "name": "total_ontime",
+            "startBit": 16,
+            "bitLength": 32,
+            "type": "uint",
+            "unit": "s"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.ontime_clusters.get_current_value.command",
+      "label": "ontime_clusters.get_current_value.command",
+      "description": "k2_light_control.ontime_clusters.get_current_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 6,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.ontime_clusters.get_current_value.response",
+      "label": "ontime_clusters.get_current_value.response",
+      "description": "k2_light_control.ontime_clusters.get_current_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 6,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 48,
+        "fields": [
+          {
+            "name": "ontime_clusters",
+            "startBit": 16,
+            "bitLength": 32,
+            "type": "uint",
+            "unit": "s",
+            "count": 10,
+            "strideBits": 32
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.ontime_clusters.set_current_value.command",
+      "label": "ontime_clusters.set_current_value.command",
+      "description": "k2_light_control.ontime_clusters.set_current_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 6,
+        "feature_index": 9
+      },
+      "payload": {
+        "bitLength": 48,
+        "fields": [
+          {
+            "name": "ontime_clusters",
+            "startBit": 16,
+            "bitLength": 32,
+            "type": "uint",
+            "unit": "s",
+            "count": 10,
+            "strideBits": 32
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.ontime_clusters.set_current_value.response",
+      "label": "ontime_clusters.set_current_value.response",
+      "description": "k2_light_control.ontime_clusters.set_current_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 6,
+        "feature_index": 9
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.calibration_data.get_current_value.command",
+      "label": "calibration_data.get_current_value.command",
+      "description": "k2_light_control.calibration_data.get_current_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 7,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 48,
+        "fields": [
+          {
+            "name": "index",
+            "startBit": 16,
+            "bitLength": 32,
+            "type": "uint"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.calibration_data.get_current_value.response",
+      "label": "calibration_data.get_current_value.response",
+      "description": "k2_light_control.calibration_data.get_current_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 7,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 80,
+        "fields": [
+          {
+            "name": "index",
+            "startBit": 16,
+            "bitLength": 32,
+            "type": "uint"
+          },
+          {
+            "name": "current",
+            "startBit": 48,
+            "bitLength": 16,
+            "type": "uint",
+            "unit": "mA"
+          },
+          {
+            "name": "value_y",
+            "startBit": 64,
+            "bitLength": 16,
+            "type": "uint"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.calibration_data.set_current_value.command",
+      "label": "calibration_data.set_current_value.command",
+      "description": "k2_light_control.calibration_data.set_current_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 7,
+        "feature_index": 9
+      },
+      "payload": {
+        "bitLength": 80,
+        "fields": [
+          {
+            "name": "index",
+            "startBit": 16,
+            "bitLength": 32,
+            "type": "uint"
+          },
+          {
+            "name": "current",
+            "startBit": 48,
+            "bitLength": 16,
+            "type": "uint",
+            "unit": "mA"
+          },
+          {
+            "name": "value_y",
+            "startBit": 64,
+            "bitLength": 16,
+            "type": "uint"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.calibration_data.set_current_value.response",
+      "label": "calibration_data.set_current_value.response",
+      "description": "k2_light_control.calibration_data.set_current_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 7,
+        "feature_index": 9
+      },
+      "payload": {
+        "bitLength": 48,
+        "fields": [
+          {
+            "name": "index",
+            "startBit": 16,
+            "bitLength": 32,
+            "type": "uint"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.calibration_status.get_static_value.command",
+      "label": "calibration_status.get_static_value.command",
+      "description": "k2_light_control.calibration_status.get_static_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 8,
+        "feature_index": 2
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.calibration_status.get_static_value.response",
+      "label": "calibration_status.get_static_value.response",
+      "description": "k2_light_control.calibration_status.get_static_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 8,
+        "feature_index": 2
+      },
+      "payload": {
+        "bitLength": 17,
+        "fields": [
+          {
+            "name": "led_is_calibrated",
+            "startBit": 16,
+            "bitLength": 1,
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.calibration_status.set_static_value.command",
+      "label": "calibration_status.set_static_value.command",
+      "description": "k2_light_control.calibration_status.set_static_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 8,
+        "feature_index": 10
+      },
+      "payload": {
+        "bitLength": 17,
+        "fields": [
+          {
+            "name": "led_is_calibrated",
+            "startBit": 16,
+            "bitLength": 1,
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.calibration_status.set_static_value.response",
+      "label": "calibration_status.set_static_value.response",
+      "description": "k2_light_control.calibration_status.set_static_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 8,
+        "feature_index": 10
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.reference_light_output.get_current_value.command",
+      "label": "reference_light_output.get_current_value.command",
+      "description": "k2_light_control.reference_light_output.get_current_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 9,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.reference_light_output.get_current_value.response",
+      "label": "reference_light_output.get_current_value.response",
+      "description": "k2_light_control.reference_light_output.get_current_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 9,
+        "feature_index": 1
+      },
+      "payload": {
+        "bitLength": 25,
+        "fields": [
+          {
+            "name": "light_output_is_in_range",
+            "startBit": 16,
+            "bitLength": 1,
+            "type": "bool"
+          },
+          {
+            "name": "percentage_of_reference",
+            "startBit": 17,
+            "bitLength": 8,
+            "type": "uint"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.service_version.get_static_value.command",
+      "label": "service_version.get_static_value.command",
+      "description": "k2_light_control.service_version.get_static_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 0,
+        "feature_index": 2
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.service_version.get_static_value.response",
+      "label": "service_version.get_static_value.response",
+      "description": "k2_light_control.service_version.get_static_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 0,
+        "feature_index": 2
+      },
+      "payload": {
+        "bitLength": 24,
+        "fields": [
+          {
+            "name": "service_version",
+            "startBit": 16,
+            "bitLength": 8,
+            "type": "uint",
+            "count": 32,
+            "strideBits": 8
+          }
+        ]
+      }
+    },
+    {
+      "id": "k2_light_control.service_sha_256_hash.get_static_value.command",
+      "label": "service_sha_256_hash.get_static_value.command",
+      "description": "k2_light_control.service_sha_256_hash.get_static_value.command",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 6,
+        "attribute_address": 1,
+        "feature_index": 2
+      },
+      "payload": {
+        "bitLength": 0,
+        "fields": []
+      }
+    },
+    {
+      "id": "k2_light_control.service_sha_256_hash.get_static_value.response",
+      "label": "service_sha_256_hash.get_static_value.response",
+      "description": "k2_light_control.service_sha_256_hash.get_static_value.response",
+      "identifyBy": {
+        "service_identifier": 810,
+        "command_class": 5,
+        "attribute_address": 1,
+        "feature_index": 2
+      },
+      "payload": {
+        "bitLength": 24,
+        "fields": [
+          {
+            "name": "sha_hash",
+            "startBit": 16,
+            "bitLength": 8,
+            "type": "uint",
+            "count": 32,
+            "strideBits": 8
+          }
+        ]
+      }
+    }
   ],
-  "errorStatus": {
-    "field": "message_good",
-    "goodValue": 1,
-    "byteOffset": 2,
-    "byteLength": 4,
-    "byteOrder": "little"
-  }
+  "errors": [
+    {
+      "id": "default_error_status",
+      "when": "message_good != 1",
+      "source": {
+        "startBit": 16,
+        "bitLength": 32,
+        "type": "uint",
+        "byteOrder": "little"
+      },
+      "display": "Error ${raw}: ${text}"
+    }
+  ],
+  "display": {}
 }

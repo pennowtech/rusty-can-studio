@@ -104,5 +104,8 @@ export function getProfileCanIdLayout(profile: CanProfile | null | undefined): C
 }
 
 export function hasProfileMessages(profile: CanProfile | null | undefined) {
+  if (profile && "schemaVersion" in profile) {
+    return Boolean((profile as unknown as { messages?: unknown[] }).messages?.length);
+  }
   return Boolean(getProfileMessageSchema(profile)?.messageDefinitions?.length);
 }

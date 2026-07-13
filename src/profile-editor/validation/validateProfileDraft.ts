@@ -1,4 +1,4 @@
-import { CanProfile } from "../model/profile";
+import { ProfileDocument } from "../model/profile";
 import { validateCanIdLayout } from "./validateCanIdLayout";
 
 export interface ProfileValidationError {
@@ -7,26 +7,37 @@ export interface ProfileValidationError {
   message: string;
 }
 
-export function validateProfileDraft(profile: CanProfile): ProfileValidationError[] {
+export function validateProfileDraft(profile: ProfileDocument): ProfileValidationError[] {
   const errors: ProfileValidationError[] = [];
 
-  // 1️⃣ CAN ID layout overlap validation
+  if ("schemaVersion" in profile) {
+    const canonical = profile as unknown as { layouts: { canId: { label?: string; fields: Array<{ name: string; startBit: number; bitLength: number }> } } };
+    const fields = canonical.layouts.canId.fields.map((field) => ({
+      name: field.name,
+      startBit: field.startBit,
+      length: field.bitLength,
+    }));
+    const overlaps = validateCanIdLayout(fields);
+    for (const overlap of overlaps) {
+      errors.push({
+        scope: "canIdLayout",
+        layoutId: canonical.layouts.canId.label ?? "canId",
+        message: `${canonical.layouts.canId.label ?? "CAN ID"}: ${overlap.fieldA} overlaps ${overlap.fieldB} at bits ${overlap.overlapRange[0]}-${overlap.overlapRange[1]}`,
+      });
+    }
+    return errors;
+  }
+
   for (const layout of Object.values(profile.canIdLayouts)) {
     const overlaps = validateCanIdLayout(layout.fields);
-
-    for (const o of overlaps) {
+    for (const overlap of overlaps) {
       errors.push({
         scope: "canIdLayout",
         layoutId: layout.id,
-        message: `${layout.name}: ${o.fieldA} overlaps ${o.fieldB} at bits ${o.overlapRange[0]}–${o.overlapRange[1]}`,
+        message: `${layout.name}: ${overlap.fieldA} overlaps ${overlap.fieldB} at bits ${overlap.overlapRange[0]}-${overlap.overlapRange[1]}`,
       });
     }
   }
-
-  //  Future:
-  // - signal byte overlap
-  // - derived field references
-  // - column references
 
   return errors;
 }

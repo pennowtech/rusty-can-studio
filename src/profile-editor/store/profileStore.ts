@@ -1,8 +1,10 @@
 import { create } from "zustand";
 
 import { normalizeProfile } from "@/profile-editor/normalizeProfile";
+import { normalizeToCanonicalProfile } from "@/profile-editor/canonical/normalizeToCanonicalProfile";
 import { validateProfile } from "@/profile-editor/validation/validateProfile";
-import { CanProfile, ProfileViewMode } from "@/profile-editor/model/profile";
+import { CanProfile, ProfileDocument, ProfileViewMode } from "@/profile-editor/model/profile";
+import type { CanonicalProfile } from "@/profile-editor/model/canonicalProfile";
 import { ProfileValidationError, validateProfileDraft } from "@/profile-editor/validation/validateProfileDraft";
 import { openJsonFile, saveJsonFile } from "../tauriFileIO";
 import { toast } from "sonner";
@@ -18,33 +20,52 @@ function payloadLength(dataHex: string) {
   return Math.max(1, Math.floor(dataHex.replace(/[^0-9a-fA-F]/g, "").length / 2));
 }
 
-function createEmptyProfile(): CanProfile {
+function createEmptyProfile(): CanonicalProfile {
   return {
+    schemaVersion: "1.0",
     meta: {
+      id: "can_fd_message_profile",
       name: "CAN-FD Message Profile",
       version: "1.0.0",
       description: "Message structures created from live CAN trace frames.",
     },
-    byteOrder: "little",
-    defaultCanIdLayoutId: "can_id",
-    canIdLayouts: {},
-    frames: {},
-    fieldTypes: {},
-    derivedFields: [],
-    columns: [],
+    bus: {
+      type: "can-fd",
+      idFormat: "extended",
+      byteOrder: "little",
+    },
+    layouts: {
+      canId: {
+        label: "CAN ID",
+        bitLength: 29,
+        fields: [{ name: "can_id", label: "CAN ID", startBit: 0, bitLength: 29, type: "uint" }],
+      },
+    },
+    dictionaries: {},
+    messages: [],
+    errors: [],
+    display: {},
   };
 }
 
-function firstFrameKey(profile: CanProfile) {
-  return Object.keys(profile.frames ?? {})[0];
+function canonicalizeProfile(profile: unknown): CanProfile {
+  if (profile && typeof profile === "object" && (profile as { schemaVersion?: unknown }).schemaVersion === "1.0") {
+    return profile as unknown as CanProfile;
+  }
+  return normalizeToCanonicalProfile(normalizeProfile(profile as CanProfile)) as unknown as CanProfile;
 }
 
-function firstMessageDefinitionId(profile: CanProfile) {
-  return getProfileMessageSchema(profile)?.messageDefinitions?.[0]?.id;
+function firstFrameKey(_profile: ProfileDocument) {
+  return undefined;
 }
 
-export function resolveProfileReferences(profile: CanProfile | null, library: CanProfile[]): CanProfile | null {
+function firstMessageDefinitionId(profile: ProfileDocument) {
+  return "messages" in profile ? (profile as unknown as CanonicalProfile).messages[0]?.id : getProfileMessageSchema(profile)?.messageDefinitions?.[0]?.id;
+}
+
+export function resolveProfileReferences(profile: ProfileDocument | null, library: ProfileDocument[]): ProfileDocument | null {
   if (!profile) return null;
+  if ("schemaVersion" in profile) return profile;
 
   const canIdLayoutRef = getProfileCanIdLayoutRef(profile);
   if (!canIdLayoutRef) return profile;
@@ -82,10 +103,10 @@ export function resolveProfileReferences(profile: CanProfile | null, library: Ca
 }
 
 interface ProfileState {
-  profile: CanProfile | null;
-  loadedProfiles: CanProfile[];
+  profile: ProfileDocument | null;
+  loadedProfiles: ProfileDocument[];
   activeProfileIndex: number;
-  draftProfile: CanProfile | null;
+  draftProfile: ProfileDocument | null;
   viewMode: ProfileViewMode;
   selectedFrameKey?: string;
   selectedMessageDefinitionId?: string;
@@ -96,7 +117,7 @@ interface ProfileState {
   hasBlockingErrors: boolean;
 
   setViewMode: (mode: ProfileViewMode) => void;
-  updateDraftProfile: (updater: (draft: CanProfile) => void) => void;
+  updateDraftProfile: (updater: (draft: ProfileDocument) => void) => void;
 
   importJson: () => Promise<void>;
   importJsonText: (jsonText: string) => void;
@@ -167,7 +188,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         return;
       }
 
-      const normalized = normalizeProfile(jsonParsed);
+      const normalized = canonicalizeProfile(jsonParsed);
       const loadedProfiles = [...get().loadedProfiles, normalized];
       if (get().profile && (hasProfileMessages(get().profile) || !hasProfileMessages(normalized))) {
         set({
@@ -198,7 +219,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   },
 
   importJsonTexts: (jsonTexts) => {
-    const imported: CanProfile[] = [];
+    const imported: ProfileDocument[] = [];
     for (const jsonText of jsonTexts) {
       const jsonParsed = JSON.parse(jsonText);
       const errors = validateProfile(jsonParsed);
@@ -207,7 +228,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         logDiagnostic({ level: "error", source: "Profile", message: "Profile validation failed", detail: errors.join("\n") });
         return;
       }
-      imported.push(normalizeProfile(jsonParsed));
+      imported.push(canonicalizeProfile(jsonParsed));
     }
     if (!imported.length) return;
     const previous = get();
@@ -267,7 +288,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         return;
       }
 
-      const normalized = normalizeProfile(jsonParsed);
+      const normalized = canonicalizeProfile(jsonParsed);
       const validationErrors = validateProfileDraft(normalized);
 
       set({
@@ -296,56 +317,42 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
 
   editFrameFromTrace: (frame) => {
     const frameKey = formatFrameKey(frame.id);
-    const current = get().draftProfile ?? get().profile ?? createEmptyProfile();
+    const current = get().draftProfile ?? get().profile ?? (createEmptyProfile() as unknown as CanProfile);
     const next = structuredClone(current);
     const length = payloadLength(frame.data_hex);
 
-    if (!next.frames[frameKey]) {
-      next.frames[frameKey] = {
-        canId: frame.id,
-        payloadLength: length,
-        canIdLayout: next.defaultCanIdLayoutId ?? "can_id",
-        signals: [
-          {
-            name: "RawValue",
-            startByte: 0,
-            startBit: 0,
-            length,
-            bitLength: Math.min(length * 8, 16),
-            signed: false,
-            factor: 1,
-            offset: 0,
-          },
-        ],
-      };
-    } else {
-      next.frames[frameKey].canId = frame.id;
-      next.frames[frameKey].payloadLength = Math.max(next.frames[frameKey].payloadLength ?? 0, length);
+    const canonical = normalizeToCanonicalProfile(next);
+    canonical.bus.idFormat = frame.id > 0x7ff ? "extended" : "standard";
+    canonical.layouts.canId.bitLength = Math.max(canonical.layouts.canId.bitLength, frame.id > 0x7ff ? 29 : 11);
+    if (!canonical.layouts.canId.fields.some((field) => field.name === "can_id")) {
+      canonical.layouts.canId.fields.unshift({ name: "can_id", label: "CAN ID", startBit: 0, bitLength: canonical.layouts.canId.bitLength, type: "uint" });
     }
-
-    const defaultLayoutId = next.defaultCanIdLayoutId ?? "can_id";
-    next.defaultCanIdLayoutId = defaultLayoutId;
-    next.frames[frameKey].canIdLayout = defaultLayoutId;
-
-    if (!next.canIdLayouts[defaultLayoutId]) {
-      next.canIdLayouts[defaultLayoutId] = {
-        id: defaultLayoutId,
-        name: "Universal CAN ID Layout",
-        format: frame.id > 0x7ff ? "extended" : "standard",
-        bitLength: 32,
-        fields: [],
-      };
+    const existing = canonical.messages.find((message) => message.id === frameKey);
+    if (!existing) {
+      canonical.messages.push({
+        id: frameKey,
+        label: frameKey,
+        description: "Created from selected trace frame.",
+        identifyBy: { can_id: frame.id },
+        payload: {
+          bitLength: length * 8,
+          fields: [{ name: "RawValue", startBit: 0, bitLength: Math.min(length * 8, 16), type: "uint" }],
+        },
+      });
+    } else {
+      existing.identifyBy.can_id = frame.id;
+      existing.payload.bitLength = Math.max(existing.payload.bitLength, length * 8);
     }
 
     set({
-      profile: get().profile ?? next,
-      draftProfile: next,
+      profile: get().profile ?? (canonical as unknown as CanProfile),
+      draftProfile: canonical as unknown as CanProfile,
       viewMode: "edit",
-      selectedFrameKey: frameKey,
-      selectedMessageDefinitionId: undefined,
+      selectedFrameKey: undefined,
+      selectedMessageDefinitionId: frameKey,
       selectedFramePayloadHex: frame.data_hex,
-      validationErrors: validateProfileDraft(next),
-      hasBlockingErrors: validateProfileDraft(next).length > 0,
+      validationErrors: validateProfileDraft(canonical as unknown as CanProfile),
+      hasBlockingErrors: validateProfileDraft(canonical as unknown as CanProfile).length > 0,
       jsonError: undefined,
     });
   },

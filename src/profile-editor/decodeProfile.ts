@@ -353,6 +353,7 @@ function decodeCanonical(profile: CanonicalProfile, frame: WsFrame): DecodedFram
   const byteOrder = profile.bus.byteOrder;
   const canIdFields = profile.layouts.canId.fields.map((field) => decodeCanonicalCanIdField(frame.id, field, profile));
   const canValues = valuesByName(canIdFields);
+  canValues.can_id = frame.id;
   const candidateMessages = profile.messages.filter((message) =>
     Object.entries(message.identifyBy ?? {})
       .filter(([field]) => field in canValues || field === "can_id")

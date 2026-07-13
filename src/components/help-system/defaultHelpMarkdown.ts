@@ -310,91 +310,106 @@ Decoded values are only as reliable as the loaded profiles. Confirm profile byte
 
 ## Profile editor
 
-The Profile Editor describes how raw CAN or CAN-FD frames should be decoded. A profile is the contract between the live trace and meaningful engineering values.
+The Profile Editor describes how raw CAN or CAN-FD frames become meaningful decoded values. A profile is a JSON contract: it defines the bus, identifier layout, optional payload header, dictionaries, message identification rules, payload fields, error rules, and display hints.
 
-Use it when you know the message structure and want the monitor to decode payload fields instead of showing only raw bytes. For schema profiles, the source JSON is the compact format with \`service\`, \`payloadHeader\`, \`attributes\`, and \`errorStatus\`.
+The editor now works from one canonical profile shape. If an older or external profile is imported, the app converts it to canonical JSON immediately. JSON view shows the canonical JSON, and saving exports canonical JSON.
+
+### Canonical profile sections
+
+| Section | Purpose |
+| --- | --- |
+| \`meta\` | Profile id, name, version, description, and source |
+| \`bus\` | CAN or CAN-FD, identifier format, and byte order |
+| \`layouts.canId\` | Decoded arbitration ID fields |
+| \`layouts.payloadHeader\` | Optional shared payload fields decoded before message payload |
+| \`dictionaries\` | Numeric-to-text values used by fields |
+| \`messages[]\` | Message identity and payload fields |
+| \`errors[]\` | Error extraction rules such as \`message_good != 1\` |
+| \`display\` | Optional presentation hints |
+
+:::note
+Canonical profiles use absolute \`startBit\` plus \`bitLength\` everywhere. They do not use byte offsets, length-bytes fields, or mixed byte/bit coordinates.
+:::
 
 ### Start from live trace
 
 1. Open CAN Monitor.
-2. Capture traffic from the daemon.
-3. Right click a frame in Live frame trace.
-4. Choose Define Message Structure.
-5. The app opens Profile Editor and selects the closest profile entry for that CAN ID.
-6. Define or adjust fields in the matching attribute, operation, and variant.
+2. Capture traffic from the daemon or open a candump file.
+3. Right click a frame and choose Define Message Structure.
+4. The app opens Profile Editor and selects or creates the matching message entry.
+5. Edit \`identifyBy\` values so the message matches the intended frames.
+6. Define payload fields using absolute bit positions.
 7. Check Decoded preview against the selected payload.
 8. Apply the edit when the layout is correct.
 
 :::tip
-Use a real frame from the trace as the preview source. It makes field boundaries, scaling, and profile byte order mistakes visible immediately.
+Use a real frame from the trace as the preview source. It makes field boundaries, scaling, offsets, dictionaries, and byte order mistakes visible immediately.
 :::
 
-### Editor layout
+### Visual editor layout
 
 The visual editor is split into three work areas:
 
 | Area | Purpose |
 | --- | --- |
-| Profile outline | Navigate CAN ID layout, service, payload header, attributes, operations, and variants from the compact JSON |
-| Definition editor | Edit the selected compact JSON concept directly |
-| Decoded preview | Decode the selected raw payload using the current field definitions |
+| Profile outline | Navigate metadata, bus, layouts, dictionaries, messages, errors, and display |
+| Definition editor | Edit the selected canonical JSON section |
+| Decoded preview | Decode the selected payload using the active draft profile |
 
-Use the profile selector in the toolbar to switch which JSON profile is open for editing. Loading another profile appends it to the profile library and does not replace the current editing context. CAN Monitor decodes against all loaded profiles and uses the first schema that matches each frame.
+Use the profile selector in the toolbar to switch which JSON profile is open for editing. Loading another profile appends it to the profile library and does not replace the current editing context. CAN Monitor decodes against all loaded profiles and uses only profiles whose identification rules match the frame.
 
-Double click a decoded message or decoded payload field in CAN Monitor's Decoded Preview to jump directly to the matching profile entry in Profile Editor.
+Double click a decoded message or decoded payload field in CAN Monitor's Decoded Preview to jump directly to the matching message in Profile Editor.
 
-The bit grid displays the selected payload bit value inside each block. If no payload is selected, every bit block displays zero. The byte.bit location is shown below each block; for example, \`2.3\` means byte 2, bit 3. Numeric values are decoded from the selected payload using the profile byte order plus each field's start bit, bit length, factor, and offset.
-
-:::note
-JSON view preserves the compact profile structure. The app reads that source structure directly and derives the temporary decode model in memory.
+:::warning
+If a frame does not match a loaded profile, it should not borrow value maps, message names, or payload fields from an unrelated profile. Load the correct profile or inspect the raw values.
 :::
 
-### Definition editor
+### Message identification
 
-For compact schema profiles, the Definition editor renders from the JSON shape and edits the source profile fields directly:
+Each message has an \`identifyBy\` object. Keys are decoded field names from the CAN ID layout, payload header layout, or the implicit raw \`can_id\` value. Values are the expected decoded values.
 
-- Service name and service identifier come from \`service\`.
-- Attribute name and address come from \`attributes[]\`.
-- Operation type and feature index come from \`operations[]\`.
-- Variant is derived from the selected \`variants.command\`, \`variants.response\`, or \`variants.event\` entry.
-- Payload fields are edited inside the selected variant.
+Examples:
 
-The Profile outline mirrors the compact JSON structure. The decoder computes matching from the compact JSON: service identifier, attribute address, feature index, and variant direction.
+\`\`\`json
+{
+  "identifyBy": {
+    "can_id": 801
+  }
+}
+\`\`\`
 
-### What to define
+\`\`\`json
+{
+  "identifyBy": {
+    "service_identifier": 810,
+    "command_class": 5,
+    "attribute_address": 3,
+    "feature_index": 1
+  }
+}
+\`\`\`
 
-For each field, define:
+The second example stays generic. Those field names only have meaning because the profile defines them in \`layouts.canId.fields\` and \`layouts.payloadHeader.fields\`.
+
+### Payload fields
+
+For each payload field, define:
 
 - Name: stable field identifier, for example \`speed_rpm\` or \`message_good\`.
-- Start bit: first bit in the payload.
+- Start bit: absolute first bit in the payload.
 - Bit length: number of bits used by the field.
-- Signedness: unsigned or signed.
+- Type: \`uint\`, \`int\`, \`bool\`, \`enum\`, \`bytes\`, or \`string\`.
+- Dictionary: optional value map key from \`dictionaries\`.
 - Factor: multiplier applied to the raw value.
 - Offset: value added after scaling.
 - Unit: optional display unit.
+- Expression: optional simple expression for display value composition.
 
-Set byte order once at the top of the Field layout panel. It applies to all generic fields in the profile.
-
-:::warning
-Do not guess semantic field names from raw payload bytes alone. Use a specification, generated code, XML schema, JSON schema, or protocol document as the source of truth.
+:::danger
+Do not guess safety-critical field names or meanings from raw payload bytes alone. Use a specification, generated code, XML schema, DBC, ARXML, JSON schema, or protocol document as the source of truth.
 :::
 
-### Recommended JSON profile approach
-
-For generic decoding, prefer the compact JSON profile format over importing XML directly into the monitor. XML can still be supported through a converter, but the runtime decoder should consume profile JSON rather than XML.
-
-Recommended workflow:
-
-1. Convert external formats such as Knossos XML, DBC, ARXML, or generated code metadata into compact app profile JSON.
-2. Keep the live decoder independent from the original source format.
-3. Validate the JSON profile before using it for live capture.
-4. Store schema version and source metadata in the profile.
-
-:::note
-This keeps the app generic. The monitor should not need to know whether a compact profile originally came from XML, DBC, hand-authored JSON, or generated code.
-:::
-
-### Convert Knossos XML to JSON
+### Convert XML to canonical JSON
 
 The repository includes a helper script:
 
@@ -402,15 +417,7 @@ The repository includes a helper script:
 scripts/knossos_xml_to_profile_json.py
 \`\`\`
 
-Use it to convert one or more Knossos \`k2_*.xml\` files into the compact JSON profile shape used by the app.
-
-\`\`\`bash
-python scripts/knossos_xml_to_profile_json.py \
-  ../k2_drive.xml ../k2_motion.xml \
-  --output knossos-profile.json
-\`\`\`
-
-For day-to-day editing, prefer split output:
+Use it to convert one or more XML files into canonical profile JSON:
 
 \`\`\`bash
 python scripts/knossos_xml_to_profile_json.py \
@@ -418,12 +425,10 @@ python scripts/knossos_xml_to_profile_json.py \
   --split-dir ./profiles
 \`\`\`
 
-This writes one compact \`*_profile.json\` file per XML plus \`knossos_can_id_layout.json\`. Service profiles refer to the reusable CAN ID layout through \`canIdLayoutRef\`. Load the CAN ID layout profile once when the service profiles do not embed their own \`canIdLayouts\`.
-
-Load one or more generated \`*_profile.json\` files in Profile Editor with Load Profile JSON. Use the profile selector to choose which service profile is active for editing. CAN Monitor can decode frames against all loaded profiles, so loading another service profile should add coverage instead of replacing the previous service definitions.
+This writes one self-contained \`*_profile.json\` file per XML. Each file includes CAN ID layout, payload header layout, dictionaries, messages, payload fields, and error rules when the XML exposes them.
 
 :::note
-The service JSON is the source profile. The layout JSON only supplies reusable CAN ID field definitions such as \`command_class\`, \`source_address\`, and \`service_identifier\`.
+The app runtime consumes JSON profiles, not XML. The converter is a source-schema bridge that keeps the monitor and profile editor independent from the original XML format.
 :::
 
 :::warning
@@ -434,100 +439,73 @@ The converter is intentionally conservative. XML schemas differ in naming and ne
 Keep generated profiles under version control next to the XML files. When the XML changes, regenerate the JSON and compare the diff before using it in a test session.
 :::
 
-### Suggested JSON schema shape
-
-For protocols like Knossos, a service profile should keep the source schema compact: one service, one shared payload header, and attributes with operations. The app derives runtime match rules from this structure without changing the JSON view.
+### Minimal canonical profile
 
 \`\`\`json
 {
+  "schemaVersion": "1.0",
   "meta": {
-    "name": "Knossos CAN-FD Profile",
-    "version": "1.0.0",
-    "source": "converted-from-k2-xml"
+    "id": "motor-generic",
+    "name": "Motor Controller Generic",
+    "version": "1.0.0"
   },
-  "byteOrder": "little",
-  "protocol": "schema",
-  "canIdLayoutRef": "knossos_can_id",
-  "service": {
-    "name": "XYAxisControl",
-    "identifier": 252
+  "bus": {
+    "type": "can-fd",
+    "idFormat": "standard",
+    "byteOrder": "little"
   },
-  "payloadHeader": {
-    "lengthBytes": 2,
-    "fields": [
-      { "name": "attribute_address", "byte": 0, "startBit": 1, "length": 7 },
-      { "name": "message_good", "byte": 0, "startBit": 0, "length": 1, "type": "bool" },
-      {
-        "name": "instance_index",
-        "byte": 1,
-        "startBit": 4,
-        "length": 4,
-        "values": {
-          "1": "Axis 1",
-          "2": "Axis 2"
-        }
-      },
-      { "name": "feature_index", "byte": 1, "startBit": 0, "length": 4 }
-    ]
-  },
-  "attributes": [
-    {
-      "name": "start_reference_drive",
-      "address": 96,
-      "operations": [
-        {
-          "type": "execute",
-          "featureIndex": 1,
-          "variants": {
-            "command": [
-              { "name": "mode", "byte": 2, "startBit": 0, "length": 8, "type": "uint" }
-            ],
-            "response": []
-          }
-        }
+  "layouts": {
+    "canId": {
+      "bitLength": 11,
+      "fields": [
+        { "name": "node_id", "startBit": 0, "bitLength": 7, "type": "uint" },
+        { "name": "message_class", "startBit": 7, "bitLength": 4, "type": "uint" }
       ]
     }
-  ],
-  "errorStatus": {
-    "field": "message_good",
-    "goodValue": 1,
-    "byteOffset": 2,
-    "byteLength": 4,
-    "byteOrder": "little",
-    "codes": {
-      "1": "unknown service",
-      "2": "invalid attribute"
+  },
+  "messages": [
+    {
+      "id": "motor_status",
+      "label": "Motor Status",
+      "identifyBy": { "can_id": 801 },
+      "payload": {
+        "bitLength": 32,
+        "fields": [
+          { "name": "rpm", "startBit": 0, "bitLength": 16, "type": "uint", "factor": 0.25, "unit": "rpm" }
+        ]
+      }
     }
-  }
+  ]
 }
 \`\`\`
-
-The app derives exact match rules from this JSON. \`service.identifier\` maps to the CAN ID \`service_identifier\`, each attribute \`address\` maps to \`attribute_address\`, each operation \`featureIndex\` maps to \`feature_index\`, and variant names map to command class: \`command\` = 6, \`response\` = 5, \`event\` = 3. Decoded Preview and CAN Monitor use the JSON names for display while keeping raw numeric values available for filtering and export.
-
-:::tip
-Keep the compact profile as the source format. The loader derives the runtime decode model internally, but users should not need to hand-maintain a long generated message list.
-:::
-
-For repeated instances, use a value map on the shared payload header field instead of duplicating every attribute for every instance. For arrays, a field can define \`count\` and \`stride\`; the loader expands that into indexed decoded fields.
 
 ### Error status decoding
 
-Use profile-level \`errorStatus\` for protocol error handling. Do not model protocol errors as normal payload expression fields.
+Use canonical \`errors[]\` rules for protocol error handling. Do not model protocol errors as normal payload expression fields.
 
 \`\`\`json
-"errorStatus": {
-  "field": "message_good",
-  "goodValue": 1,
-  "byteOffset": 2,
-  "byteLength": 4,
-  "byteOrder": "little",
-  "codes": {
+"dictionaries": {
+  "error_status": {
     "12": "ERROR_AXIS_POSITION_NOT_REACHED"
   }
-}
+},
+"errors": [
+  {
+    "id": "default_error_status",
+    "when": "message_good != 1",
+    "source": {
+      "startBit": 16,
+      "bitLength": 32,
+      "type": "uint",
+      "byteOrder": "little"
+    },
+    "dictionary": "error_status",
+    "display": "Error \${raw}: \${text}"
+  }
+]
 \`\`\`
 
-The decoder reads \`errorStatus.field\` from the decoded payload header. If the value does not match \`goodValue\`, it reads the error code from \`byteOffset\` and \`byteLength\`, then resolves the display text from \`codes\`.
+The decoder evaluates \`when\` against decoded CAN ID and payload header values. If the condition is true, it reads the error code from \`source.startBit\` and \`source.bitLength\`, then resolves the display text through the named dictionary.
 
 The decoded frame exposes:
 
@@ -547,37 +525,32 @@ message_good == bad
 \`\`\`
 
 :::tip
-Use expressions for simple value formatting, such as \`raw == 1 ? "On" : "Off"\`. Use \`errorStatus\` for dictionary-based protocol errors because it keeps error handling declarative and profile-driven.
+Use field display expressions for simple value formatting, such as \`raw == 1 ? "On" : "Off"\`. Use \`errors[]\` for dictionary-based protocol errors because it keeps error handling declarative and profile-driven.
 :::
 
-### Knossos decoding expectations
+### Generic decoding order
 
-For a Knossos CAN-FD profile, decoding should follow this order:
+For any canonical CAN-FD profile, decoding follows this order:
 
-1. Decode the 29-bit arbitration ID into command class, broadcast flag, source, destination, transfer flags, toggle, and service identifier.
-2. Decode payload byte 0 into attribute address and message_good.
-3. Decode payload byte 1 into instance index and feature index.
-4. Match service identifier against the profile services.
-5. Match instance index against the service instances.
-6. Match attribute address against methods, events, or properties.
-7. Match feature index against execute, get, set, value, or another feature name.
-8. Decode bytes after the two-byte header using the selected payload field definition.
-9. If message_good is false, decode bytes 2 through 5 as a little-endian uint32 error code unless the profile says otherwise.
-10. Map error codes through the profile error dictionary.
+1. Decode the arbitration ID through \`layouts.canId.fields\`.
+2. Decode \`layouts.payloadHeader.fields\` if the profile defines a payload header.
+3. Match \`messages[].identifyBy\` against decoded values.
+4. Decode the matching message's \`payload.fields\`.
+5. Evaluate \`errors[]\` rules.
+6. Render display values from dictionaries, scaling, offsets, units, and expressions.
 
 :::danger
-Unknown service identifiers should not be decoded by guessing. Show the raw CAN ID fields and mark the frame as requiring another schema.
+Unknown messages should not be decoded by guessing. Show the raw CAN ID fields and mark the frame as requiring another profile or schema.
 :::
 
 ### Timing analysis
 
 Timing analysis should group repeated messages by:
 
-- service_identifier
-- instance_index
-- attribute_address
-- feature_index
-- command_class or direction when relevant
+- message id or message label
+- selected CAN ID fields
+- selected payload header fields
+- direction when relevant
 
 For each group, calculate interval statistics such as last interval, minimum interval, maximum interval, average interval, and missed-period warnings.
 
