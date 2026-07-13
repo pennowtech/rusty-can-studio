@@ -51,7 +51,7 @@
 - [x] Accessibility testing to ensure compliance with standards.
 - [x] Cross-browser compatibility testing.
 **Documentation:**
-- Detailed user guide for end-users.
+- [x] Detailed user guide for end-users.
 - Developer documentation with API reference.
 - Tutorials and examples for common scenarios.
 - FAQ and troubleshooting section.

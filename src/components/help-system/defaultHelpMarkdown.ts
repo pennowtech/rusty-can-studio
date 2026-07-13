@@ -119,6 +119,52 @@ Keep the transmit composer for quick manual sends. Use CAN Simulator when a work
 Review exported traces, settings, diagnostics, and profile JSON before sharing. They can contain host names, CAN identifiers, decoded names, and timing data.
 :::
 
+## End-user guide
+
+Use the end-user guide as the task-oriented reference for normal operation. It covers the main workspaces and the decisions users make during a real session.
+
+### Daily workflow map
+
+| Task | Where to go |
+| --- | --- |
+| Inspect loaded logs | CAN Monitor |
+| Capture live traffic | CAN Monitor and Connect |
+| Decode raw frames | Profile Editor plus CAN Monitor |
+| Filter and sort rows | Display filter and column header menus |
+| Send one frame | Transmit Composer |
+| Send repeated frames | Cyclic TX |
+| Run chained workflows | CAN Simulator |
+| Save evidence | Export candump, export CSV, or Historical traces |
+| Change appearance | Settings |
+
+### Typical offline workflow
+
+1. Load profile JSON files.
+2. Open a candump log.
+3. Filter to a service, CAN ID, payload value, or error state.
+4. Inspect Decoded Preview.
+5. Export decoded CSV or raw candump when needed.
+
+### Typical live workflow
+
+1. Start the daemon where the SocketCAN interface exists.
+2. Connect from CAN Monitor.
+3. Load matching profiles.
+4. Apply a narrow display filter if the bus is busy.
+5. Capture the event.
+6. Save a historical trace or export evidence.
+
+### Typical transmit workflow
+
+1. Right click a known monitor row and stage it into Transmit Composer.
+2. Adjust CAN ID, payload, DLC, CAN-FD, or BRS if needed.
+3. Send once and inspect \`TX:pending\`, \`TX:sent\`, or \`TX:failed\`.
+4. Use Wait for CAN response or CAN Simulator when the next action depends on a received frame.
+
+:::warning
+Do not transmit on a physical bus unless you understand the target system. Incorrect frames can disturb diagnostics, flashing, or control traffic.
+:::
+
 ## Remote daemon connection
 
 To monitor CAN or CAN-FD traffic from WSL, run can-bridge-daemon in the WSL environment where the SocketCAN interfaces exist. The daemon forwards packets from interfaces such as \`vcan0\` or \`can0\` to this UI over WebSocket JSON.
