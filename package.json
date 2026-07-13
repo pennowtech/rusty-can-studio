@@ -11,6 +11,7 @@
     "test": "vitest run",
     "benchmark": "vitest bench --run --config vitest.benchmark.config.ts",
     "accessibility:check": "powershell -ExecutionPolicy Bypass -File scripts/accessibility-check.ps1",
+    "browser:check": "powershell -ExecutionPolicy Bypass -File scripts/browser-compat-check.ps1",
     "audit": "npm audit --audit-level=moderate",
     "security:audit": "powershell -ExecutionPolicy Bypass -File scripts/security-audit.ps1",
     "quality:check": "powershell -ExecutionPolicy Bypass -File scripts/quality-check.ps1"
@@ -81,6 +82,19 @@
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
     "vitest": "^4.1.10"
+  },
+  "browserslist": {
+    "production": [
+      "Chrome >= 120",
+      "Edge >= 120",
+      "Firefox >= 121",
+      "Safari >= 17"
+    ],
+    "development": [
+      "last 1 Chrome version",
+      "last 1 Firefox version",
+      "last 1 Safari version"
+    ]
   },
   "overrides": {
     "dompurify": "3.4.12"

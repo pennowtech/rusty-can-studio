@@ -41,6 +41,10 @@ jobs:
         shell: pwsh
         run: npm run accessibility:check
 
+      - name: Browser compatibility baseline
+        shell: pwsh
+        run: npm run browser:check
+
       - name: Rust check
         working-directory: src-tauri
         run: cargo check

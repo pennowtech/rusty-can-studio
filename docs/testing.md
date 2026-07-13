@@ -25,6 +25,7 @@ This runs:
 - TypeScript unit tests
 - production frontend build
 - accessibility baseline checks
+- browser compatibility baseline checks
 - npm dependency audit
 - `cargo check` for the Tauri Rust crate
 
@@ -50,6 +51,7 @@ It checks:
 - Vitest unit tests
 - production build
 - accessibility baseline checks
+- browser compatibility baseline checks
 - Rust `cargo check`
 
 The separate `Security` workflow handles dependency audits and Rust vulnerability checks.
@@ -101,6 +103,39 @@ This is not a full WCAG audit. It is a repeatable guard for common regressions. 
 - zoom at 200 percent
 - compact and dense layouts
 
+## Browser Compatibility Baseline
+
+Run after a production build:
+
+```powershell
+npm run browser:check
+```
+
+The baseline checks:
+
+- explicit production browser targets in `package.json`
+- responsive viewport metadata
+- install/PWA manifest metadata
+- no direct user-agent browser sniffing in source files
+- generated production module script output
+- generated web manifest display mode
+
+Production browser targets are:
+
+- Chrome 120 and newer
+- Edge 120 and newer
+- Firefox 121 and newer
+- Safari 17 and newer
+
+For UI-heavy changes, also do a manual smoke test in Chromium/WebView2, Firefox, and Safari when available:
+
+- open the built app with `npm run preview`
+- load a candump file
+- use display filters
+- open Help
+- open Profile Editor
+- verify scrolling, sticky headers, dialogs, and theme/density controls
+
 ## Current Limits
 
-The automated baseline is intentionally practical. It does not yet include browser-based visual regression, accessibility scanning, or large-trace performance budgets. Those are tracked separately in the TODO list.
+The automated baseline is intentionally practical. It does not yet include browser-based visual regression, full accessibility scanning, or large-trace performance budgets.

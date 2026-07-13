@@ -232,6 +232,7 @@ npm run build
 npm run test
 npm run benchmark
 npm run accessibility:check
+npm run browser:check
 npm run quality:check
 npm run tauri dev
 npm run tauri build -- --bundles msi
@@ -253,7 +254,7 @@ When changing monitor behavior, keep performance in mind. Live capture can produ
 
 When changing decoding behavior, keep protocol knowledge in JSON profiles. The app should know how to apply a profile, but it should not know one specific protocol's field meanings in code.
 
-For a fuller local quality pass, run `npm run quality:check`. It runs unit tests, production build, accessibility baseline checks, dependency audit, and Rust `cargo check`. Use `npm run benchmark` when changing trace parsing, filtering, decoding, or other performance-sensitive paths. The CI quality workflow runs the core compile/test checks on pull requests and pushes to `main`. More detail is in `docs/testing.md`.
+For a fuller local quality pass, run `npm run quality:check`. It runs unit tests, production build, accessibility baseline checks, browser compatibility baseline checks, dependency audit, and Rust `cargo check`. Use `npm run benchmark` when changing trace parsing, filtering, decoding, or other performance-sensitive paths. The CI quality workflow runs the core compile/test checks on pull requests and pushes to `main`. More detail is in `docs/testing.md`.
 
 ## Security Checks
 

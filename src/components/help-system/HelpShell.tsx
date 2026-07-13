@@ -39,9 +39,10 @@ export function HelpShell() {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      const isMac = /Mac|iPhone|iPod|iPad/.test(navigator.userAgent);
+      const platform = navigator.platform || "";
+      const isAppleKeyboard = /Mac|iPhone|iPod|iPad/.test(platform);
 
-      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "f") {
+      if ((isAppleKeyboard ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "f") {
         e.preventDefault();
         searchRef.current?.focus();
         searchRef.current?.select();

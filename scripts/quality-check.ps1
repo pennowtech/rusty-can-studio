@@ -31,6 +31,10 @@ Invoke-Step "Accessibility baseline" {
   npm run accessibility:check
 }
 
+Invoke-Step "Browser compatibility baseline" {
+  npm run browser:check
+}
+
 if (-not $SkipAudit) {
   Invoke-Step "npm dependency audit" {
     npm run audit

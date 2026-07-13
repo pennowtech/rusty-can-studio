@@ -849,7 +849,7 @@ Run the fuller local quality check on Windows:
 npm run quality:check
 \`\`\`
 
-The full local check runs Vitest unit tests, a production frontend build, accessibility baseline checks, npm dependency audit, and Rust \`cargo check\` for the Tauri crate.
+The full local check runs Vitest unit tests, a production frontend build, accessibility baseline checks, browser compatibility baseline checks, npm dependency audit, and Rust \`cargo check\` for the Tauri crate.
 
 Useful variants:
 
@@ -866,6 +866,14 @@ npm run accessibility:check
 
 The accessibility baseline checks document language, viewport, document title, icon button accessible-name fallback, screen-reader-only text, alert roles, helpful title text, and raw button \`type\` attributes.
 
+Run the browser compatibility baseline after a production build:
+
+\`\`\`powershell
+npm run browser:check
+\`\`\`
+
+The browser baseline checks production browser targets, responsive viewport metadata, PWA manifest metadata, generated module output, built manifest display mode, and direct user-agent browser sniffing.
+
 :::tip
 Use the fast test command while editing logic, then run the full quality check before pushing a larger feature.
 :::
@@ -876,6 +884,10 @@ The CI quality workflow runs install, tests, production build, and Rust compile 
 
 :::warning
 Automated accessibility checks are a baseline, not a full WCAG audit. For major UI changes, also verify keyboard navigation, visible focus, screen-reader names, contrast in each theme, 200 percent zoom, and compact/dense layouts manually.
+:::
+
+:::tip
+For UI-heavy changes, preview the production build in Chromium/WebView2, Firefox, and Safari when available. Check candump loading, display filters, Help, Profile Editor, sticky headers, dialogs, scrolling, themes, and density settings.
 :::
 
 ### Performance benchmarks
