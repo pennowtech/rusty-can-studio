@@ -33,6 +33,7 @@ import { displayShortcut, formatShortcutFromEvent, shortcutConflicts, useShortcu
 import { useTheme } from "@/components/ThemeProvider";
 import type { Theme, ThemeDensity, ThemePalette } from "@/components/ThemeProvider";
 import { HelpShell } from "@/components/help-system/HelpShell";
+import { openJsonFile, saveJsonFile } from "@/profile-editor/tauriFileIO";
 import { useAppStore } from "@/store/appShellStore";
 import { useConnectionStore } from "@/store/connectionStore";
 import { ProfileMainShell } from "@/profile-editor/ProfileMainShell";
@@ -49,6 +50,57 @@ function SettingsView() {
 
   function saveTraceLimit() {
     setTraceFrameLimit(Number(draftLimit));
+  }
+
+  const backupKeys = [
+    "can-app-theme",
+    "can-connection-profiles",
+    "cansim.trace.settings.v1",
+    "cansim.monitor.preferences.v1",
+    "cansim.shortcuts.v1",
+    "cansim.help.customMarkdown",
+    "can-simulator-sequences:v1",
+    "can-simulator-sequences:selected-sequence",
+    "can-simulator-sequences:selected-step",
+    "can-simulator-sequences:run-log",
+    "can-simulator-sequences:run-state",
+  ];
+
+  async function exportSettingsBackup() {
+    const settings = Object.fromEntries(backupKeys.map((key) => [key, localStorage.getItem(key)]).filter(([, value]) => value != null));
+    await saveJsonFile(
+      JSON.stringify(
+        {
+          meta: {
+            app: "rusty-can-studio",
+            version: "0.2.0",
+            exportedAt: new Date().toISOString(),
+          },
+          settings,
+        },
+        null,
+        2,
+      ),
+      "rusty-can-studio-settings.json",
+    );
+  }
+
+  async function importSettingsBackup() {
+    const text = await openJsonFile();
+    if (!text) return;
+    const parsed = JSON.parse(text) as { settings?: Record<string, string | null> };
+    if (!parsed.settings || typeof parsed.settings !== "object") {
+      window.alert("This file does not look like a Rusty CAN Studio settings backup.");
+      return;
+    }
+    const shouldImport = window.confirm("Importing this backup will replace local settings and reload the app. Continue?");
+    if (!shouldImport) return;
+    for (const key of backupKeys) {
+      const value = parsed.settings[key];
+      if (typeof value === "string") localStorage.setItem(key, value);
+      if (value === null) localStorage.removeItem(key);
+    }
+    window.location.reload();
   }
 
   const densityDescription = {
@@ -203,6 +255,21 @@ function SettingsView() {
             </div>
             <div className="text-xs text-muted-foreground">
               Current trace: {frames.length} rows. Saved limit: {traceFrameLimit} rows.
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <CardTitle className="text-sm">Backup and restore</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Export local app settings to a JSON file, or restore them on another installation. This includes appearance, shortcuts,
+              monitor preferences, connection profiles, trace retention, custom help text, and CAN Simulator sequences.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => void exportSettingsBackup()}>Export settings</Button>
+              <Button variant="outline" onClick={() => void importSettingsBackup()}>Import settings</Button>
             </div>
           </CardContent>
         </Card>

@@ -56,8 +56,8 @@
 - Tutorials and examples for common scenarios.
 - FAQ and troubleshooting section.
 **Backup and restore:**
-- Option to export user settings to a file.
-- Option to import user settings from a file.
+- [x] Option to export user settings to a file.
+- [x] Option to import user settings from a file.
 **Advanced filtering:**
 - Save and load filter presets.
 **Advanced sorting:**
