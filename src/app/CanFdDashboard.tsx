@@ -29,6 +29,7 @@ import type { TableComponents, TableVirtuosoHandle } from "react-virtuoso";
 import type { WsFrame } from "@/can-bridge/ws/types";
 import type { CanProfile } from "@/profile-editor/model/profile";
 import { getProfileMessageSchema } from "@/profile-editor/profileAdapter";
+import { toast } from "sonner";
 
 function formatCanId(id: number) {
   return id.toString(16).toUpperCase().padStart(id > 0x7ff ? 8 : 3, "0");
@@ -397,7 +398,15 @@ type DisplayFilterPreset = {
   expression: string;
 };
 
+type MonitorAlertRule = {
+  id: string;
+  name: string;
+  expression: string;
+  enabled: boolean;
+};
+
 const DISPLAY_FILTER_PRESETS_KEY = "cansim.monitor.filterPresets.v1";
+const MONITOR_ALERT_RULES_KEY = "cansim.monitor.alertRules.v1";
 
 function loadDisplayFilterPresets(): DisplayFilterPreset[] {
   try {
@@ -410,6 +419,19 @@ function loadDisplayFilterPresets(): DisplayFilterPreset[] {
 
 function saveDisplayFilterPresets(presets: DisplayFilterPreset[]) {
   localStorage.setItem(DISPLAY_FILTER_PRESETS_KEY, JSON.stringify(presets));
+}
+
+function loadMonitorAlertRules(): MonitorAlertRule[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MONITOR_ALERT_RULES_KEY) ?? "[]") as MonitorAlertRule[];
+    return Array.isArray(parsed) ? parsed.filter((rule) => rule.name && rule.expression) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMonitorAlertRules(rules: MonitorAlertRule[]) {
+  localStorage.setItem(MONITOR_ALERT_RULES_KEY, JSON.stringify(rules));
 }
 
 function filterFieldForColumn(column: TraceColumn) {
@@ -565,6 +587,7 @@ export function CanFdDashboard() {
   const tableVirtuosoRef = useRef<TableVirtuosoHandle>(null);
   const cyclicTimerRef = useRef<number | null>(null);
   const cyclicRunningRef = useRef(false);
+  const lastAlertedLineRef = useRef(0);
   const [draftSearch, setDraftSearch] = useState(search);
   const [txId, setTxId] = useState("18DA10F1");
   const [txPayload, setTxPayload] = useState("02 10 03 00 00 00 00 00");
@@ -581,6 +604,7 @@ export function CanFdDashboard() {
   const [headerContextMenu, setHeaderContextMenu] = useState<HeaderContextMenu | null>(null);
   const [filterPresets, setFilterPresets] = useState<DisplayFilterPreset[]>(loadDisplayFilterPresets);
   const [selectedFilterPresetId, setSelectedFilterPresetId] = useState("");
+  const [alertRules, setAlertRules] = useState<MonitorAlertRule[]>(loadMonitorAlertRules);
 
   useEffect(() => {
     setDraftSearch(search);
@@ -692,6 +716,28 @@ export function CanFdDashboard() {
   useEffect(() => {
     setDynamicMonitorColumns([...dynamicCanIdColumns, ...dynamicPayloadColumns].map((column) => column.id));
   }, [dynamicCanIdColumns, dynamicPayloadColumns, setDynamicMonitorColumns]);
+
+  useEffect(() => {
+    const enabledRules = alertRules.filter((rule) => rule.enabled);
+    if (!enabledRules.length || !traceRows.length) {
+      lastAlertedLineRef.current = Math.max(lastAlertedLineRef.current, traceRows[traceRows.length - 1]?.frame.line_no ?? 0);
+      return;
+    }
+
+    const newRows = traceRows.filter((row) => (row.frame.line_no ?? 0) > lastAlertedLineRef.current);
+    if (!newRows.length) return;
+
+    for (const row of newRows) {
+      for (const rule of enabledRules) {
+        const parsed = parseFilter(rule.expression);
+        if (!parsed.valid || !rowMatchesFilter(row, parsed)) continue;
+        toast.warning(rule.name, {
+          description: `${formatCanId(row.frame.id)} ${formatPayloadBytes(row.frame.data_hex)}`.trim(),
+        });
+      }
+    }
+    lastAlertedLineRef.current = Math.max(lastAlertedLineRef.current, newRows[newRows.length - 1]?.frame.line_no ?? lastAlertedLineRef.current);
+  }, [alertRules, traceRows]);
 
   const selectedFrame = useMemo(() => {
     const selected = selectedFrameKey ? filteredRows.find((row) => row.key === selectedFrameKey)?.frame : undefined;
@@ -1056,6 +1102,43 @@ export function CanFdDashboard() {
     if (!window.confirm(`Delete filter preset "${preset.name}"?`)) return;
     updateFilterPresets(filterPresets.filter((item) => item.id !== selectedFilterPresetId));
     setSelectedFilterPresetId("");
+  }
+
+  function updateAlertRules(next: MonitorAlertRule[]) {
+    setAlertRules(next);
+    saveMonitorAlertRules(next);
+  }
+
+  function addAlertRuleFromCurrentFilter() {
+    const expression = draftSearch.trim();
+    if (!expression) return;
+    const parsed = parseFilter(expression);
+    if (!parsed.valid) {
+      window.alert(parsed.error || "The current display filter is not valid.");
+      return;
+    }
+    const name = window.prompt("Alert rule name", "CAN alert");
+    if (!name?.trim()) return;
+    updateAlertRules([
+      ...alertRules,
+      {
+        id: `alert_${Date.now()}`,
+        name: name.trim(),
+        expression,
+        enabled: true,
+      },
+    ]);
+  }
+
+  function toggleAlertRule(id: string) {
+    updateAlertRules(alertRules.map((rule) => (rule.id === id ? { ...rule, enabled: !rule.enabled } : rule)));
+  }
+
+  function deleteAlertRule(id: string) {
+    const rule = alertRules.find((item) => item.id === id);
+    if (!rule) return;
+    if (!window.confirm(`Delete alert rule "${rule.name}"?`)) return;
+    updateAlertRules(alertRules.filter((item) => item.id !== id));
   }
 
   function filterTextActive() {
@@ -1518,6 +1601,37 @@ export function CanFdDashboard() {
                     })}
                   </div>
                 )}
+                <div className="mt-2 flex flex-wrap items-center gap-2 border-t pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={!draftSearch.trim()}
+                    title="Create an alert rule from the current display filter"
+                    onClick={addAlertRuleFromCurrentFilter}
+                  >
+                    Add alert from filter
+                  </Button>
+                  {alertRules.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">No alert rules</span>
+                  ) : (
+                    alertRules.map((rule) => (
+                      <span key={rule.id} className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs">
+                        <button
+                          type="button"
+                          className={rule.enabled ? "font-medium text-amber-600 dark:text-amber-300" : "text-muted-foreground"}
+                          title={rule.expression}
+                          onClick={() => toggleAlertRule(rule.id)}
+                        >
+                          {rule.enabled ? "On" : "Off"}: {rule.name}
+                        </button>
+                        <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => deleteAlertRule(rule.id)} title="Delete alert">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
               </div>
               <CardContent className="min-h-0 min-w-0 flex-1 p-0">
                 <TableVirtuoso

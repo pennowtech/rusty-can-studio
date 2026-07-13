@@ -11,7 +11,7 @@
 - [] Localization and internationalization support
 - [] Mobile app for remote CAN monitoring
 - [x] Data visualization tools (graphs, charts)
-- [] Alerting system for specific CAN events
+- [x] Alerting system for specific CAN events
 - [] Historical data storage and retrieval
 - [] User-friendly installation scripts and guides
 - [] Security audits and vulnerability assessments
