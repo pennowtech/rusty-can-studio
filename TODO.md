@@ -61,6 +61,6 @@
 **Advanced filtering:**
 - [x] Save and load filter presets.
 **Advanced sorting:**
-- Multi-level sorting with drag-and-drop priority.
-- Custom sort functions for specific columns.
-- Save and load sort presets.
+- [x] Multi-level sorting with drag-and-drop priority.
+- [x] Custom sort functions for specific columns.
+- [x] Save and load sort presets.
