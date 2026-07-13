@@ -1,3 +1,14 @@
+import examplesMarkdown from "../../../docs/examples.md?raw";
+
+const examplesHelpMarkdown = examplesMarkdown
+  .split(/\r?\n/)
+  .map((line, index) => {
+    if (index === 0 && line.startsWith("# ")) return "## Examples guide";
+    if (line.startsWith("## ")) return `### ${line.slice(3).trim()}`;
+    return line;
+  })
+  .join("\n");
+
 export const defaultHelpMarkdown = `# CAN-FD Workbench Help
 
 This help system explains how to use the CAN-FD workbench, how the documentation is structured, and how to edit this content safely.
@@ -193,7 +204,7 @@ Extension rules:
 Use \`docs/developer-guide.md\` for the fuller API reference, including WebSocket message types, frame fields, connection store actions, and profile model notes.
 :::
 
-## Examples
+## Examples overview
 
 Use the examples guide when you need copyable filters, sample candump rows, or sequence JSON.
 
@@ -223,6 +234,8 @@ Equivalent expression:
 :::tip
 Use \`docs/examples.md\` for the complete example workflows and copyable sequence JSON.
 :::
+
+${examplesHelpMarkdown}
 
 ## Remote daemon connection
 
