@@ -1,4 +1,3 @@
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { HelpTOC } from "./HelpTOC";
 import { HelpEditor } from "./HelpEditor";
@@ -6,11 +5,9 @@ import { HelpPreview } from "./HelpPreview";
 import { HelpDiff } from "./HelpDiff";
 import { useEffect, useRef, useState } from "react";
 import { useHelpStore } from "@/components/help-system/store/helpStore";
-import { HelpToolbar } from "./HelpToolbar";
+import { HelpToolbar, type HelpMode } from "./HelpToolbar";
 import { useHelpContentStore } from "./store/helpContentStore";
 import { HelpChapterList } from "./HelpChapterList";
-
-type HelpMode = "view" | "edit" | "diff";
 
 export function HelpShell() {
   const [mode, setMode] = useState<HelpMode>("view");
@@ -73,15 +70,7 @@ export function HelpShell() {
         <p className="text-sm text-muted-foreground">CAN-FD workflow guidance, editable markdown, search, and table of contents.</p>
       </header>
 
-      <HelpToolbar ref={searchRef} />
-
-      <Tabs value={mode} onValueChange={(value) => setMode(value as HelpMode)} className="border-b px-2 py-2">
-        <TabsList className="grid w-full grid-cols-3 sm:w-auto">
-          <TabsTrigger value="view">View</TabsTrigger>
-          <TabsTrigger value="edit">Edit</TabsTrigger>
-          <TabsTrigger value="diff">Diff</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <HelpToolbar ref={searchRef} mode={mode} onModeChange={setMode} />
 
       <Separator />
 

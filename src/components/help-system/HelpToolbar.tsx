@@ -1,16 +1,19 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Eye, EyeOff, RotateCcw, Save, Undo2 } from "lucide-react";
-import { useHelpStore } from "@/components/help-system/store/helpStore";
+import { Eye, FileDiff, Pencil, RotateCcw, Save, Undo2 } from "lucide-react";
 import { HelpSearchInput } from "@/components/help-system/HelpSearchInput";
 import { useHelpContentStore } from "./store/helpContentStore";
 import { HelpSearchResults } from "./HelpSearchResults";
 import { forwardRef } from "react";
 
-export const HelpToolbar = forwardRef<HTMLInputElement>(function HelpToolbar(_, searchRef) {
-  const previewEnabled = useHelpStore((s) => s.showPreview);
-  const togglePreview = useHelpStore((s) => s.togglePreview);
+export type HelpMode = "view" | "edit" | "diff";
 
+type HelpToolbarProps = {
+  mode: HelpMode;
+  onModeChange: (mode: HelpMode) => void;
+};
+
+export const HelpToolbar = forwardRef<HTMLInputElement, HelpToolbarProps>(function HelpToolbar({ mode, onModeChange }, searchRef) {
   const isDirty = useHelpContentStore((s) => s.isDirty);
   const isSaving = useHelpContentStore((s) => s.isSaving);
   const save = useHelpContentStore((s) => s.saveCustomMarkdown);
@@ -33,6 +36,10 @@ export const HelpToolbar = forwardRef<HTMLInputElement>(function HelpToolbar(_, 
     await reset();
   }
 
+  function modeButtonClass(value: HelpMode) {
+    return mode === value ? "bg-muted text-foreground" : "text-muted-foreground";
+  }
+
   return (
     <div className="flex flex-col border-b">
       <div className="flex min-h-11 flex-wrap items-center gap-2 px-2 py-2">
@@ -40,9 +47,19 @@ export const HelpToolbar = forwardRef<HTMLInputElement>(function HelpToolbar(_, 
 
         <Separator orientation="vertical" className="mx-1 hidden h-6 sm:block" />
 
-        <Button variant="ghost" size="icon" onClick={togglePreview} title={previewEnabled ? "Hide Preview" : "Show Preview"}>
-          {previewEnabled ? <EyeOff size={16} /> : <Eye size={16} />}
+        <Button variant="ghost" size="icon" className={modeButtonClass("view")} onClick={() => onModeChange("view")} title="View rendered help">
+          <Eye size={16} />
         </Button>
+
+        <Button variant="ghost" size="icon" className={modeButtonClass("edit")} onClick={() => onModeChange("edit")} title="Edit help markdown">
+          <Pencil size={16} />
+        </Button>
+
+        <Button variant="ghost" size="icon" className={modeButtonClass("diff")} onClick={() => onModeChange("diff")} title="Compare current help with default">
+          <FileDiff size={16} />
+        </Button>
+
+        <Separator orientation="vertical" className="mx-1 hidden h-6 sm:block" />
 
         <Button variant="ghost" size="icon" onClick={confirmSave} disabled={!isDirty || isSaving} title="Save chapter">
           <Save size={16} />
@@ -61,4 +78,3 @@ export const HelpToolbar = forwardRef<HTMLInputElement>(function HelpToolbar(_, 
     </div>
   );
 });
-

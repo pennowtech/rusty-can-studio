@@ -12,18 +12,12 @@ interface HelpState {
   setActiveIndex(index: number): void;
   moveActive(delta: number): void;
   clearSearch(): void;
-
-  showPreview: boolean;
-  togglePreview(): void;
 }
 
 export const useHelpStore = create<HelpState>((set) => ({
-  showPreview: true,
   searchQuery: "",
   searchResults: [],
   activeIndex: -1,
-
-  togglePreview: () => set((s) => ({ showPreview: !s.showPreview })),
 
   setSearchQuery: (q) => set({ searchQuery: q }),
 
