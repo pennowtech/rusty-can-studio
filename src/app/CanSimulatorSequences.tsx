@@ -16,6 +16,7 @@ import type { CanProfile } from "@/profile-editor/model/profile";
 import { CheckCircle2, Clock, Copy, GitBranch, Link2, Pause, Play, Plus, RadioTower, RotateCcw, Send, Trash2, Workflow, XCircle } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { getProfileMessageSchema } from "@/profile-editor/profileAdapter";
+import { openJsonFile, saveJsonFile } from "@/profile-editor/tauriFileIO";
 
 type StepType = "send" | "wait" | "cyclic" | "delay" | "branch";
 type StepStatus = "idle" | "running" | "sent" | "matched" | "timeout" | "failed" | "skipped" | "complete";
@@ -65,6 +66,10 @@ type RunLogEntry = {
 type StepRunState = Record<string, { status: StepStatus; detail?: string; sent?: number; matched?: number }>;
 
 const STORAGE_KEY = "can-simulator-sequences:v1";
+const SELECTED_SEQUENCE_KEY = "can-simulator-sequences:selected-sequence";
+const SELECTED_STEP_KEY = "can-simulator-sequences:selected-step";
+const RUN_LOG_KEY = "can-simulator-sequences:run-log";
+const RUN_STATE_KEY = "can-simulator-sequences:run-state";
 
 function uid(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -130,6 +135,32 @@ function loadSequences() {
 
 function saveSequences(sequences: SequenceDefinition[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sequences, null, 2));
+}
+
+function loadRunLog() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RUN_LOG_KEY) ?? "[]") as RunLogEntry[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadRunState() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RUN_STATE_KEY) ?? "{}") as StepRunState;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveRunLog(entries: RunLogEntry[]) {
+  localStorage.setItem(RUN_LOG_KEY, JSON.stringify(entries));
+}
+
+function saveRunState(state: StepRunState) {
+  localStorage.setItem(RUN_STATE_KEY, JSON.stringify(state));
 }
 
 function formatCanId(id: number) {
@@ -206,6 +237,13 @@ function matchesExpected(decoded: DecodedFrame | null, frame: WsFrame, expected?
   return [decoded?.frameName, decoded?.meaning, decoded?.serviceName, decoded?.attributeName, decoded?.featureName].some((item) => item === value);
 }
 
+function describeFrame(frame: WsFrame, decoded: DecodedFrame | null) {
+  const message = decoded?.frameName || decoded?.meaning || decoded?.attributeName || "unknown message";
+  const good = decoded?.messageGood == null ? "" : ` message_good=${Number(decoded.messageGood)}`;
+  const error = decoded?.errorText ? ` error=${decoded.errorText}` : "";
+  return `${formatCanId(frame.id)} ${message}${good}${error}`;
+}
+
 function stepIcon(type: StepType) {
   if (type === "send") return Send;
   if (type === "wait") return Clock;
@@ -233,10 +271,10 @@ export function CanSimulatorSequences() {
   );
 
   const [sequences, setSequences] = useState<SequenceDefinition[]>(loadSequences);
-  const [selectedId, setSelectedId] = useState(sequences[0]?.id ?? "");
-  const [selectedStepId, setSelectedStepId] = useState(sequences[0]?.steps[0]?.id ?? "");
-  const [runState, setRunState] = useState<StepRunState>({});
-  const [runLog, setRunLog] = useState<RunLogEntry[]>([]);
+  const [selectedId, setSelectedIdState] = useState(localStorage.getItem(SELECTED_SEQUENCE_KEY) || sequences[0]?.id || "");
+  const [selectedStepId, setSelectedStepIdState] = useState(localStorage.getItem(SELECTED_STEP_KEY) || sequences[0]?.steps[0]?.id || "");
+  const [runState, setRunStateState] = useState<StepRunState>(loadRunState);
+  const [runLog, setRunLogState] = useState<RunLogEntry[]>(loadRunLog);
   const [jsonDraft, setJsonDraft] = useState("");
   const [jsonError, setJsonError] = useState<string | undefined>();
   const runningRef = useRef(false);
@@ -270,6 +308,32 @@ export function CanSimulatorSequences() {
     }
     return Array.from(options.entries()).map(([id, label]) => ({ id, label }));
   }, [profilesForDecode]);
+
+  function setSelectedId(id: string) {
+    setSelectedIdState(id);
+    localStorage.setItem(SELECTED_SEQUENCE_KEY, id);
+  }
+
+  function setSelectedStepId(id: string) {
+    setSelectedStepIdState(id);
+    localStorage.setItem(SELECTED_STEP_KEY, id);
+  }
+
+  function setRunState(next: StepRunState | ((state: StepRunState) => StepRunState)) {
+    setRunStateState((state) => {
+      const resolved = typeof next === "function" ? next(state) : next;
+      saveRunState(resolved);
+      return resolved;
+    });
+  }
+
+  function setRunLog(next: RunLogEntry[] | ((entries: RunLogEntry[]) => RunLogEntry[])) {
+    setRunLogState((entries) => {
+      const resolved = typeof next === "function" ? next(entries) : next;
+      saveRunLog(resolved);
+      return resolved;
+    });
+  }
 
   function updateSequences(next: SequenceDefinition[]) {
     setSequences(next);
@@ -308,6 +372,30 @@ export function CanSimulatorSequences() {
     setRunState(next);
   }
 
+  function summarizeReceivedDuringWait(step: SequenceStep, startedAt: number, stopWhen = step.stopWhen) {
+    const received = useConnectionStore
+      .getState()
+      .frames
+      .filter((frame) => frame.dir === "rx" && frame.ts_ms >= startedAt && frame.iface === activeIface)
+      .slice(-5);
+    if (!received.length) return "No RX frame was received on the active interface during the wait window.";
+
+    const expected = stopWhen?.expect ?? step.expect;
+    const condition = stopWhen?.condition ?? step.condition;
+    const details = received.map((frame) => {
+      const decoded = decodeFrameWithProfiles(profilesForDecode, frame);
+      const expectedMatched = matchesExpected(decoded, frame, expected);
+      const conditionMatched = evaluateCondition(condition, decodedContext(decoded, frame));
+      const reason = expectedMatched
+        ? conditionMatched
+          ? "matched"
+          : "message matched, condition failed"
+        : "different message";
+      return `${describeFrame(frame, decoded)} (${reason})`;
+    });
+    return `Received during wait: ${details.join("; ")}`;
+  }
+
   function matchFrame(step: SequenceStep, frame: WsFrame, stopWhen = step.stopWhen) {
     if (frame.dir !== "rx") return false;
     const decoded = decodeFrameWithProfiles(profilesForDecode, frame);
@@ -317,7 +405,14 @@ export function CanSimulatorSequences() {
   }
 
   async function waitForMatchingFrame(step: SequenceStep, timeoutMs: number, stopWhen = step.stopWhen) {
-    const frame = await waitForFrame((candidate) => matchFrame(step, candidate, stopWhen), timeoutMs);
+    const startedAt = Date.now();
+    let frame: WsFrame;
+    try {
+      frame = await waitForFrame((candidate) => matchFrame(step, candidate, stopWhen), timeoutMs);
+    } catch (error) {
+      const detail = summarizeReceivedDuringWait(step, startedAt, stopWhen);
+      throw new Error(`${error instanceof Error ? error.message : "Timed out waiting for CAN response"}. ${detail}`);
+    }
     annotateFrame(
       (candidate) => candidate.line_no === frame.line_no && candidate.ts_ms === frame.ts_ms && candidate.id === frame.id,
       { scenario_name: selectedSequence?.name, scenario_step: step.name, scenario_status: "rx-match" },
@@ -525,6 +620,33 @@ export function CanSimulatorSequences() {
     setJsonError(undefined);
   }
 
+  async function saveSelectedSequenceJson() {
+    if (!selectedSequence) return;
+    await saveJsonFile(JSON.stringify(selectedSequence, null, 2), `${selectedSequence.name.replace(/[^a-z0-9_-]+/gi, "_")}.sequence.json`);
+  }
+
+  async function saveAllSequencesJson() {
+    await saveJsonFile(JSON.stringify(sequences, null, 2), "can-simulator-sequences.json");
+  }
+
+  async function loadSequenceJson() {
+    const text = await openJsonFile();
+    if (!text) return;
+    const parsed = JSON.parse(text) as SequenceDefinition | SequenceDefinition[];
+    const imported = (Array.isArray(parsed) ? parsed : [parsed]).filter((item) => item?.name && Array.isArray(item.steps));
+    if (!imported.length) throw new Error("Sequence JSON must contain a sequence or an array of sequences.");
+    const normalized = imported.map((sequence) => ({
+      ...sequence,
+      id: sequence.id || uid("seq"),
+      steps: sequence.steps.map((step) => ({ ...step, id: step.id || uid("step") })),
+    }));
+    const next = [...sequences, ...normalized];
+    updateSequences(next);
+    setSelectedId(normalized[0].id);
+    setSelectedStepId(normalized[0].steps[0]?.id ?? "");
+    log("success", `Loaded ${normalized.length} sequence JSON ${normalized.length === 1 ? "file" : "entries"}`);
+  }
+
   function applyJson() {
     try {
       const parsed = JSON.parse(jsonDraft) as SequenceDefinition;
@@ -598,6 +720,8 @@ export function CanSimulatorSequences() {
               </Button>
             )}
             <Button variant="outline" onClick={openConnectionManager}>Connections</Button>
+            <Button variant="outline" onClick={() => void loadSequenceJson()}>Load JSON</Button>
+            <Button variant="outline" onClick={() => void saveSelectedSequenceJson()}>Save JSON</Button>
             <Button variant="outline" onClick={duplicateSequence}><Copy className="h-4 w-4" /> Duplicate</Button>
             <Button variant="outline" onClick={deleteSequence} disabled={sequences.length === 1}><Trash2 className="h-4 w-4" /> Delete</Button>
             <Button variant="outline" onClick={() => resetRunState()}><RotateCcw className="h-4 w-4" /> Reset</Button>
@@ -623,6 +747,10 @@ export function CanSimulatorSequences() {
           </CardHeader>
           <CardContent>
             <Input value={selectedSequence?.description ?? ""} placeholder="Description" onChange={(event) => updateSelectedSequence((sequence) => ({ ...sequence, description: event.target.value }))} />
+            <div className="mt-3 flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => void saveAllSequencesJson()}>Save all sequences</Button>
+              <Button variant="outline" size="sm" onClick={() => void loadSequenceJson()}>Load sequence JSON</Button>
+            </div>
           </CardContent>
         </Card>
 
