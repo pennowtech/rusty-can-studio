@@ -1265,7 +1265,7 @@ npm run security:audit
 | Performance | User loads 50k frame candump | Trace loads and remains filterable | Benchmark + manual test |
 | Reliability | Daemon disconnects during live capture | Connection state changes to error/disconnected | Manual daemon stop test |
 | Security | Repo contains accidental token pattern | Security script fails | `npm run security:audit` |
-| Usability | New user loads first trace | User guide/tutorial enables workflow without developer help | User walkthrough |
+| Usability | New user loads first trace | User guide and examples enable workflow without developer help | User walkthrough |
 | Maintainability | New daemon message is added | Type added in `types.ts`, client method added, Help/docs updated | Code review |
 | Accessibility | Icon-only button added | Accessible name exists | `npm run accessibility:check` |
 

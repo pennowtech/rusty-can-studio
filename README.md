@@ -90,7 +90,7 @@ npm run tauri build -- --bundles msi
 
 ## Using The App
 
-For day-to-day usage, start with `docs/user-guide.md`. For a step-by-step onboarding path, use `docs/tutorials.md`. For copyable filters, candump samples, and sequence JSON, see `docs/examples.md`, the `examples/` folder, and the generic profile fixtures under `profiles/test/`.
+For day-to-day usage, start with `docs/user-guide.md`. For step-by-step workflows, copyable filters, profile editor examples, candump samples, and sequence JSON, see `docs/examples.md`, the `examples/` folder, and the generic profile fixtures under `profiles/test/`.
 
 ### Open A Candump Log
 
