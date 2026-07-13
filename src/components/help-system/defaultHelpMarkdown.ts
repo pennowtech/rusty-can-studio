@@ -712,6 +712,28 @@ Use this for short-term investigation workflows, for example saving a failing li
 Historical traces are stored locally in browser/Tauri storage and are capped to the newest saved entries. For long-term evidence, export the trace as a candump log and store it in your normal project or test-result location.
 :::
 
+## Security checks
+
+The repository includes a repeatable security baseline for dependency and accidental-secret checks.
+
+Run the web dependency audit:
+
+\`\`\`bash
+npm run audit
+\`\`\`
+
+Run the fuller local helper on Windows:
+
+\`\`\`powershell
+npm run security:audit
+\`\`\`
+
+The helper runs npm audit, tries cargo audit for Tauri dependencies when available, and scans repository files for common secret patterns. The CI workflow also runs audit, tests, build, and Rust dependency audit on pull requests and pushes to main.
+
+:::warning
+Security checks do not sanitize engineering data. Review diagnostics exports, trace archives, candump logs, settings backups, and profile JSON before sharing them.
+:::
+
 ## Transmit composer
 
 Use the transmit composer to prepare a single CAN-FD frame or a cyclic transmission.

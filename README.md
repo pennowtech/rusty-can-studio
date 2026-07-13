@@ -248,6 +248,22 @@ When changing monitor behavior, keep performance in mind. Live capture can produ
 
 When changing decoding behavior, keep protocol knowledge in JSON profiles. The app should know how to apply a profile, but it should not know one specific protocol's field meanings in code.
 
+## Security Checks
+
+Run the local security baseline before sharing changes:
+
+```bash
+npm run audit
+```
+
+On Windows, the fuller helper is:
+
+```powershell
+npm run security:audit
+```
+
+The detailed checklist is in `docs/security-audit.md`. It covers dependency audits, accidental-secret checks, trace/profile review, and remote daemon exposure notes.
+
 ## Release
 
 The app version is stored in:
