@@ -230,8 +230,7 @@ export function ProfileMessageEditor() {
   function renderOutlineButton(node: ProfileNode, title: string, detail?: string, icon?: React.ReactNode) {
     const active = nodeKey(selectedNode) === nodeKey(node);
     return (
-      <button
-        type="button"
+      <button type="button"
         className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted ${active ? "bg-primary/10 text-primary" : ""}`}
         onClick={() => setSelectedNode(node)}
       >
@@ -249,8 +248,7 @@ export function ProfileMessageEditor() {
     return (
       <div>
         <div className="flex items-center gap-1 px-1 py-1">
-          <button
-            type="button"
+          <button type="button"
             className="flex h-7 min-w-0 flex-1 items-center gap-1 rounded px-1 text-left text-xs font-medium uppercase text-muted-foreground hover:bg-muted"
             onClick={() => setExpanded((state) => ({ ...state, [id]: !open }))}
           >
