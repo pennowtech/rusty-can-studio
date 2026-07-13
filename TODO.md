@@ -53,7 +53,7 @@
 **Documentation:**
 - [x] Detailed user guide for end-users.
 - [x] Developer documentation with API reference.
-- Tutorials and examples for common scenarios.
+- [x] Tutorials and examples for common scenarios.
 - FAQ and troubleshooting section.
 **Backup and restore:**
 - [x] Option to export user settings to a file.

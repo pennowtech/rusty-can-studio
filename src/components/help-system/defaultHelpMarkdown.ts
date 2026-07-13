@@ -194,6 +194,37 @@ Extension rules:
 Use \`docs/developer-guide.md\` for the fuller API reference, including WebSocket message types, frame fields, connection store actions, and profile model notes.
 :::
 
+## Examples
+
+Use the examples guide when you need copyable filters, sample candump rows, or sequence JSON.
+
+Common examples:
+
+| Scenario | Starting point |
+| --- | --- |
+| Load a small candump | \`examples/sample-candump.log\` |
+| Filter by service bits | \`service_identifier == 810\` or raw ID/mask |
+| Find bad responses | \`error\`, \`hasError == true\`, \`errorText contains POSITION\` |
+| Stage TX from monitor | Right click row, Use in Transmit Composer |
+| Run a sequence | \`examples/start-then-poll.sequence.json\` |
+
+Daemon-side filter example for a service identifier in CAN ID bits \`9:0\`:
+
+\`\`\`text
+CAN ID: 0000032A
+Mask:   000003FF
+\`\`\`
+
+Equivalent expression:
+
+\`\`\`text
+(frame.id & 0x000003FF) == (0x0000032A & 0x000003FF)
+\`\`\`
+
+:::tip
+Use \`docs/examples.md\` for the complete example workflows and copyable sequence JSON.
+:::
+
 ## Remote daemon connection
 
 To monitor CAN or CAN-FD traffic from WSL, run can-bridge-daemon in the WSL environment where the SocketCAN interfaces exist. The daemon forwards packets from interfaces such as \`vcan0\` or \`can0\` to this UI over WebSocket JSON.
