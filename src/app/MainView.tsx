@@ -221,7 +221,7 @@ function AboutView() {
         <section className="overflow-hidden rounded-xl border bg-background shadow-sm">
           <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="p-8">
-              <Badge variant="outline" className="mb-4">Version 0.1.0</Badge>
+              <Badge variant="outline" className="mb-4">Version 0.2.0</Badge>
               <h1 className="text-3xl font-semibold tracking-tight">Rusty CAN Studio</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
                 A desktop workbench for CAN-FD capture, profile-driven decoding, loaded trace inspection, display filtering, and transmit preparation.
