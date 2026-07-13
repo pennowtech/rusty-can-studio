@@ -20,6 +20,105 @@ Use the left navigation to switch between the monitor, simulator, profile editor
 Start with a narrow CAN ID filter when the bus is busy. It keeps the trace readable and makes search results more useful.
 :::
 
+## New user tutorials
+
+Use these short exercises as a first training path. They build from offline inspection to live capture, decoding, transmit, and simulator workflows.
+
+### Tutorial 1: inspect a candump log
+
+1. Open CAN Monitor.
+2. Select Open candump.
+3. Choose a \`.log\`, \`.txt\`, or \`.candump\` file.
+4. Select a row and inspect Decoded Preview.
+5. Try a display filter such as \`canId == 0x18203C01\` or \`payload contains "01 01"\`.
+
+:::note
+Loaded logs keep the original file order and source line numbers. Display filters hide rows visually but do not renumber the source log.
+:::
+
+### Tutorial 2: load profiles and decode frames
+
+1. Open Profile Editor.
+2. Load the profile JSON files for the messages you want to decode.
+3. Load a shared CAN ID layout profile if your service profiles reference one.
+4. Return to CAN Monitor.
+5. Select a frame and confirm that Decoded Preview shows CAN ID fields, payload header fields, message name, payload values, and error status.
+
+:::warning
+If a frame belongs to a service or message that is not covered by a loaded profile, it should not borrow names or value maps from unrelated profiles. Load the correct profile or inspect the raw values.
+:::
+
+### Tutorial 3: connect to the remote daemon
+
+1. Start \`can_bridge_daemon\` where the SocketCAN interface exists.
+2. Open Connect.
+3. Choose Remote Daemon.
+4. Enter the WebSocket host and port.
+5. Use Discover to list interfaces.
+6. Select the interface and connect.
+
+\`\`\`bash
+cargo run -- --tcp-bind 0.0.0.0:9500 --ws-bind 0.0.0.0:9501 --grpc-bind 0.0.0.0:9502
+\`\`\`
+
+:::tip
+For WSL testing, create \`vcan0\` first with \`sudo modprobe vcan\`, \`sudo ip link add dev vcan0 type vcan\`, and \`sudo ip link set up vcan0\`.
+:::
+
+### Tutorial 4: send one frame
+
+1. Connect to a remote daemon.
+2. Open the transmit composer.
+3. Enter CAN ID, DLC, payload, CAN-FD, and BRS settings.
+4. Select Send Frame.
+5. Watch CAN Monitor for \`TX:pending\`, \`TX:sent\`, or \`TX:failed\`.
+
+:::note
+\`TX:sent\` means the daemon accepted the send call for the selected interface. It does not mean the target device sent an application-level response.
+:::
+
+### Tutorial 5: build a cyclic request
+
+1. Load or capture a known request frame.
+2. Right click the row and choose Use in Transmit Composer.
+3. Open Cyclic TX settings.
+4. Set the period, for example \`500 ms\`.
+5. Set Send mode to Wait for CAN response.
+6. Choose an expected response from loaded profiles.
+7. Start cyclic TX and inspect matching RX rows.
+
+### Tutorial 6: create a simulator sequence
+
+1. Open CAN Simulator.
+2. Add a sequence.
+3. Add Send Once, Wait For Response, and Send Cyclic steps.
+4. Define the success condition, response timeout, and stop policy.
+5. Run the sequence and inspect the run log.
+
+Example flow:
+
+\`\`\`text
+1. Send start command once.
+2. Wait for start response with message_good == 1.
+3. Send status request cyclically every 100 ms.
+4. Stop when the expected status response arrives.
+\`\`\`
+
+:::tip
+Keep the transmit composer for quick manual sends. Use CAN Simulator when a workflow needs multiple dependent steps.
+:::
+
+### Tutorial 7: save work for later
+
+1. Export raw candump logs for replayable evidence.
+2. Export decoded CSV for spreadsheet analysis.
+3. Save display filter and sort presets for repeated investigations.
+4. Export settings when moving the same setup to another installation.
+
+:::warning
+Review exported traces, settings, diagnostics, and profile JSON before sharing. They can contain host names, CAN identifiers, decoded names, and timing data.
+:::
+
 ## Remote daemon connection
 
 To monitor CAN or CAN-FD traffic from WSL, run can-bridge-daemon in the WSL environment where the SocketCAN interfaces exist. The daemon forwards packets from interfaces such as \`vcan0\` or \`can0\` to this UI over WebSocket JSON.

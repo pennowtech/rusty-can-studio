@@ -90,6 +90,8 @@ npm run tauri build -- --bundles msi
 
 ## Using The App
 
+For a step-by-step onboarding path, start with `docs/tutorials.md`. It walks through loading a candump log, connecting to the daemon, loading profiles, filtering, transmitting, cyclic TX, simulator sequences, and exporting work.
+
 ### Open A Candump Log
 
 1. Open CAN Monitor.
