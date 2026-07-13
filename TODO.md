@@ -4,7 +4,7 @@
 - [] Real-time display of CAN messages in terminal
 - [] Graceful shutdown and cleanup of CAN interfaces
 - [x] GUI for visualizing CAN data
-- [] Unit tests for core functionalities
+- [x] Unit tests for core functionalities
 - [] Integration with popular CAN hardware interfaces
 - [] Error handling and logging improvements
 - [x] Configuration management (e.g., saving/loading settings)
@@ -46,7 +46,7 @@
 - Horizontal scrolling for wide tables on small screens.
 - Touch-friendly interactions for mobile devices.
 **Testing:**
-- Comprehensive unit and integration tests.
+- [x] Comprehensive unit and integration tests.
 - Performance benchmarks to ensure responsiveness.
 - Accessibility testing to ensure compliance with standards.
 - Cross-browser compatibility testing.
