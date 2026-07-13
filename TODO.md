@@ -1,7 +1,7 @@
 # TODO List
 
 - [x] Support for different CAN bitrates
-- [] Real-time display of CAN messages in terminal
+- [x] Real-time display of CAN messages in terminal
 - [x] Graceful shutdown and cleanup of CAN interfaces
 - [x] GUI for visualizing CAN data
 - [x] Unit tests for core functionalities

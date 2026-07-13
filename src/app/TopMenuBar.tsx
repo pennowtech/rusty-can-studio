@@ -56,6 +56,7 @@ export function TopMenuBar() {
             <MenubarSeparator />
             <MenubarItem onClick={() => setView("profile-editor")}>Profile Editor</MenubarItem>
             <MenubarItem onClick={() => setView("monitor")}>CAN Monitor</MenubarItem>
+            <MenubarItem onClick={() => setView("terminal")}>Terminal Trace</MenubarItem>
             <MenubarItem onClick={() => setView("simulator")}>CAN Simulator</MenubarItem>
             <MenubarSeparator />
             <MenubarItem onClick={() => setTheme("light")}>Appearance: Light</MenubarItem>

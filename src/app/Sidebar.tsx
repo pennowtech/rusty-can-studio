@@ -29,6 +29,7 @@ import { SidebarButton } from "@/components/SidebarButton";
 import { useAppStore } from "@/store/appShellStore";
 import {
   Activity,
+  Terminal,
   Sliders,
   Edit3,
   Settings,
@@ -43,6 +44,7 @@ export function Sidebar() {
   const collapsed = sidebarMode === "icon";
   const primaryItems = [
     { icon: Activity, label: "CAN Monitor", view: "monitor" as const },
+    { icon: Terminal, label: "Terminal Trace", view: "terminal" as const },
     { icon: Sliders, label: "Simulator", view: "simulator" as const },
   ];
   const profileItems = [

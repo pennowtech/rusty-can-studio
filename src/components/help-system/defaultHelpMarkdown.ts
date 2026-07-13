@@ -520,6 +520,28 @@ When focus is on CAN Monitor and not inside an input field, the table supports k
 
 For loaded traces, keyboard navigation follows the current page. For live capture, it follows the current filtered and sorted stream.
 
+## Terminal Trace
+
+Terminal Trace is a candump-style text view for the same frame buffer used by CAN Monitor. Open it from the sidebar, the View menu, or the command panel.
+
+Use it when you want a fast, plain text view of live traffic or a loaded log:
+
+- each line is formatted like candump output
+- live capture follows the newest frame when Follow is enabled
+- loaded candump files are shown in source order
+- the line limit can show the newest 250, 500, 1000, 5000, or all frames
+- Wrap controls whether long payload lines stay horizontal or wrap inside the panel
+- Copy places the visible terminal text on the clipboard
+- Save writes the visible terminal text as a candump log file
+
+:::note
+Terminal Trace is a presentation view. It does not replace CAN Monitor filtering, decoded preview, sorting, or pagination. Use CAN Monitor for structured analysis and Terminal Trace when plain candump-style text is easier to inspect or copy.
+:::
+
+:::tip
+For very busy live buses, keep the terminal line limit at 1000 or below and leave Follow enabled. This keeps the text stream responsive while still showing the newest traffic.
+:::
+
 Field layout expressions can control how a payload value is displayed. Expressions are intentionally small: arithmetic, comparisons, ternary conditions, and quoted display strings are supported. Statements, loops, imports, global objects, and full JavaScript programs are not allowed.
 
 \`\`\`text
@@ -558,6 +580,7 @@ Default shortcuts:
 - Ctrl+Shift+P: open the command panel.
 - Ctrl+1: open CAN Monitor.
 - Ctrl+2: open Profile Editor.
+- Ctrl+3: open Terminal Trace.
 - Ctrl+,: open Settings.
 - Ctrl+/: open Keyboard Shortcuts.
 - F1: open Help.

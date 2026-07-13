@@ -50,6 +50,14 @@ export const commandRegistry: AppCommand[] = [
     handler: ({ setView }) => setView("simulator"),
   },
   {
+    id: "view.terminalTrace",
+    title: "View: Terminal Trace",
+    description: "Show live or loaded CAN frames as candump-style terminal lines.",
+    category: "View",
+    keywords: ["terminal", "trace", "candump", "log"],
+    handler: ({ setView }) => setView("terminal"),
+  },
+  {
     id: "view.profileEditor",
     title: "View: Profile Editor",
     description: "Edit message profile JSON through the visual profile editor.",

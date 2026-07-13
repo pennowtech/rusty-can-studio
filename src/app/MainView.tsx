@@ -23,6 +23,7 @@
 
 import { CanFdDashboard } from "@/app/CanFdDashboard";
 import { CanSimulatorSequences } from "@/app/CanSimulatorSequences";
+import { TerminalTraceView } from "@/app/TerminalTraceView";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -473,6 +474,9 @@ export function MainView() {
 
     case "monitor":
       return <CanFdDashboard />;
+
+    case "terminal":
+      return <TerminalTraceView />;
 
     case "simulator":
       return <CanSimulatorSequences />;
