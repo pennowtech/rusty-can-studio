@@ -8,7 +8,7 @@
 - [x] Integration with popular CAN hardware interfaces
 - [x] Error handling and logging improvements
 - [x] Configuration management (e.g., saving/loading settings)
-- [] Localization and internationalization support
+- [x] Localization and internationalization support
 - [] Mobile app for remote CAN monitoring
 - [x] Data visualization tools (graphs, charts)
 - [x] Alerting system for specific CAN events
@@ -38,9 +38,9 @@
 - [x] Memoization of row rendering to improve responsiveness.
 - [x] Lazy loading of large datasets when applicable.
 **Internationalization:**
-- Support for multiple languages in UI text.
-- Date and number formatting based on locale.
-- Right-to-left (RTL) layout support.
+- [x] Support for multiple languages in UI text.
+- [x] Date and number formatting based on locale.
+- [x] Right-to-left (RTL) layout support.
 **Responsive design:**
 - Table layout adapts to different screen sizes.
 - Horizontal scrolling for wide tables on small screens.

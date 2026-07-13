@@ -599,6 +599,34 @@ Open Help > About to view application information, current appearance settings, 
 
 Open Settings to change how the whole application looks and feels. Appearance changes apply immediately and are saved for the next session.
 
+## Localization settings
+
+Open Settings > Localization to choose the application locale. The current implementation provides a localization foundation for selected app chrome and settings surfaces, plus locale-aware formatting.
+
+Available locale choices:
+
+- English
+- Deutsch
+- Francais
+- Arabic
+
+Changing the locale updates:
+
+- selected navigation and menu labels
+- selected Settings labels
+- date and time formatting
+- number formatting
+- document language
+- document direction for right-to-left locales
+
+:::note
+Profile names, decoded field names, CAN payload values, daemon messages, and imported JSON content are shown exactly as provided by profiles, traces, and the daemon. They are protocol data, not translated UI strings.
+:::
+
+:::tip
+Use the preview cards in Localization to verify number and date formatting immediately after changing language.
+:::
+
 Available mode options:
 
 - System: follow the operating system light or dark preference.

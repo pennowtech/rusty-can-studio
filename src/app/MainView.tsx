@@ -34,6 +34,7 @@ import { displayShortcut, formatShortcutFromEvent, shortcutConflicts, useShortcu
 import { useTheme } from "@/components/ThemeProvider";
 import type { Theme, ThemeDensity, ThemePalette } from "@/components/ThemeProvider";
 import { HelpShell } from "@/components/help-system/HelpShell";
+import { localeOptions, useI18nStore } from "@/i18n/i18nStore";
 import { openJsonFile, saveJsonFile } from "@/profile-editor/tauriFileIO";
 import { useAppStore } from "@/store/appShellStore";
 import { useConnectionStore } from "@/store/connectionStore";
@@ -49,6 +50,11 @@ function SettingsView() {
   const setTraceFrameLimit = useConnectionStore((s) => s.setTraceFrameLimit);
   const diagnostics = useDiagnosticsStore((s) => s.entries);
   const clearDiagnostics = useDiagnosticsStore((s) => s.clear);
+  const locale = useI18nStore((s) => s.locale);
+  const setLocale = useI18nStore((s) => s.setLocale);
+  const formatDateTime = useI18nStore((s) => s.formatDateTime);
+  const formatNumber = useI18nStore((s) => s.formatNumber);
+  const t = useI18nStore((s) => s.t);
   const { theme, palette, density, setTheme, setPalette, setDensity } = useTheme();
   const [draftLimit, setDraftLimit] = useState(String(traceFrameLimit));
 
@@ -58,6 +64,7 @@ function SettingsView() {
 
   const backupKeys = [
     "can-app-theme",
+    "cansim.locale.v1",
     "can-connection-profiles",
     "cansim.trace.settings.v1",
     "cansim.monitor.preferences.v1",
@@ -178,12 +185,45 @@ App version: 0.2.0
     <div className="h-full overflow-auto p-6">
       <div className="max-w-3xl space-y-4">
         <div>
-          <h1 className="text-lg font-semibold">Settings</h1>
-          <p className="text-sm text-muted-foreground">Configure appearance, monitor retention, and CAN-FD defaults.</p>
+          <h1 className="text-lg font-semibold">{t("settings.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("settings.subtitle")}</p>
         </div>
         <Card className="rounded-lg">
           <CardHeader>
-            <CardTitle className="text-sm">Appearance</CardTitle>
+            <CardTitle className="text-sm">{t("settings.localization")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              <label className="space-y-1 text-xs font-medium">
+                {t("settings.language")}
+                <Select value={locale} onValueChange={(value) => setLocale(value as typeof locale)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {localeOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+              <div className="rounded-md border bg-muted/20 p-3">
+                <div className="text-[11px] uppercase text-muted-foreground">Number</div>
+                <div className="mt-1 font-mono text-sm">{formatNumber(1234567.89)}</div>
+              </div>
+              <div className="rounded-md border bg-muted/20 p-3">
+                <div className="text-[11px] uppercase text-muted-foreground">Date and time</div>
+                <div className="mt-1 font-mono text-sm">{formatDateTime(Date.now())}</div>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">{t("settings.localizationDescription")}</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <CardTitle className="text-sm">{t("settings.appearance")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 md:grid-cols-3">
@@ -319,7 +359,7 @@ App version: 0.2.0
         </Card>
         <Card className="rounded-lg">
           <CardHeader>
-            <CardTitle className="text-sm">Backup and restore</CardTitle>
+              <CardTitle className="text-sm">{t("settings.backup")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -335,8 +375,8 @@ App version: 0.2.0
         <Card className="rounded-lg">
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
-              <CardTitle className="text-sm">Diagnostics log</CardTitle>
-              <Badge variant="outline">{diagnostics.length} entries</Badge>
+              <CardTitle className="text-sm">{t("settings.diagnostics")}</CardTitle>
+              <Badge variant="outline">{formatNumber(diagnostics.length)} entries</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -352,7 +392,7 @@ App version: 0.2.0
                 diagnostics.slice().reverse().map((entry) => (
                   <div key={entry.id} className="border-b p-3 last:border-0">
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="font-mono text-muted-foreground">{new Date(entry.time).toLocaleString()}</span>
+                      <span className="font-mono text-muted-foreground">{formatDateTime(entry.time)}</span>
                       <span className={`font-semibold uppercase ${diagnosticLevelClass(entry.level)}`}>{entry.level}</span>
                       <span className="rounded border bg-background px-1.5 py-0.5 font-medium">{entry.source}</span>
                     </div>
