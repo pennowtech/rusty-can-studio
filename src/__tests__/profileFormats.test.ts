@@ -210,4 +210,113 @@ describe("canonical profile decoding across unrelated CAN-FD formats", () => {
       position: "100 deg",
     });
   });
+
+  it("honors identifyWhen when equality keys are not enough", () => {
+    const profile: CanonicalProfile = {
+      schemaVersion: "1.0",
+      meta: { id: "conditional", name: "Conditional messages", version: "1.0.0" },
+      bus: { type: "can-fd", idFormat: "standard", byteOrder: "little" },
+      layouts: {
+        canId: {
+          bitLength: 11,
+          fields: [{ name: "can_id", startBit: 0, bitLength: 11, type: "uint" }],
+        },
+        payloadHeader: {
+          bitLength: 8,
+          fields: [{ name: "mode", startBit: 0, bitLength: 8, type: "uint" }],
+        },
+      },
+      messages: [
+        {
+          id: "conditional.low",
+          label: "Low mode",
+          identifyBy: { can_id: 0x123 },
+          identifyWhen: "mode < 10",
+          payload: { bitLength: 16, fields: [{ name: "low_value", startBit: 8, bitLength: 8, type: "uint" }] },
+        },
+        {
+          id: "conditional.high",
+          label: "High mode",
+          identifyBy: { can_id: 0x123 },
+          identifyWhen: "mode >= 10",
+          payload: { bitLength: 16, fields: [{ name: "high_value", startBit: 8, bitLength: 8, type: "uint" }] },
+        },
+      ],
+    };
+    const [frame] = parseCandump("(000.000000) can0 123 [02] 0A 2A");
+    const decoded = decodeFrameWithProfiles([profile], frame);
+
+    expect(decoded?.frameName).toBe("conditional.high");
+    expect(decodedMap(decoded!)).toMatchObject({ mode: "10", high_value: "42" });
+  });
+
+  it("sign-extends canonical int fields before scaling", () => {
+    const profile: CanonicalProfile = {
+      schemaVersion: "1.0",
+      meta: { id: "signed", name: "Signed fields", version: "1.0.0" },
+      bus: { type: "can", idFormat: "standard", byteOrder: "little" },
+      layouts: {
+        canId: {
+          bitLength: 11,
+          fields: [{ name: "can_id", startBit: 0, bitLength: 11, type: "uint" }],
+        },
+      },
+      messages: [
+        {
+          id: "signed.sample",
+          label: "Signed sample",
+          identifyBy: { can_id: 0x222 },
+          payload: {
+            bitLength: 16,
+            fields: [
+              { name: "delta", startBit: 0, bitLength: 8, type: "int" },
+              { name: "scaled_delta", startBit: 8, bitLength: 8, type: "int", factor: 0.5, unit: "step" },
+            ],
+          },
+        },
+      ],
+    };
+    const [frame] = parseCandump("(000.000000) can0 222 [02] FF FE");
+    const decoded = decodeFrameWithProfiles([profile], frame);
+
+    expect(decodedMap(decoded!)).toMatchObject({
+      delta: "-1",
+      scaled_delta: "-1 step",
+    });
+    expect(decoded?.fields.find((field) => field.name === "delta")?.raw).toBe(-1);
+  });
+
+  it("expands repeated fields using count and strideBits", () => {
+    const profile: CanonicalProfile = {
+      schemaVersion: "1.0",
+      meta: { id: "array", name: "Array fields", version: "1.0.0" },
+      bus: { type: "can-fd", idFormat: "standard", byteOrder: "little" },
+      layouts: {
+        canId: {
+          bitLength: 11,
+          fields: [{ name: "can_id", startBit: 0, bitLength: 11, type: "uint" }],
+        },
+      },
+      messages: [
+        {
+          id: "array.samples",
+          label: "Array samples",
+          identifyBy: { can_id: 0x333 },
+          payload: {
+            bitLength: 32,
+            fields: [{ name: "sample", startBit: 0, bitLength: 8, type: "uint", count: 4, strideBits: 8 }],
+          },
+        },
+      ],
+    };
+    const [frame] = parseCandump("(000.000000) can0 333 [04] 01 02 03 04");
+    const decoded = decodeFrameWithProfiles([profile], frame);
+
+    expect(decodedMap(decoded!)).toMatchObject({
+      "sample[0]": "1",
+      "sample[1]": "2",
+      "sample[2]": "3",
+      "sample[3]": "4",
+    });
+  });
 });

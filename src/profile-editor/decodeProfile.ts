@@ -69,6 +69,12 @@ function extractFromCanId(id: number, field: CanonicalField) {
   return Math.floor(id / 2 ** field.startBit) & bitMaskFor(field.bitLength);
 }
 
+function signedValue(raw: number, bitLength: number) {
+  if (bitLength <= 0) return raw;
+  const signBit = 2 ** (bitLength - 1);
+  return raw >= signBit ? raw - 2 ** bitLength : raw;
+}
+
 function extractFromBytes(bytes: number[], field: { startBit: number; bitLength: number }, byteOrder: "little" | "big") {
   let raw = 0;
   if (byteOrder === "little") {
@@ -104,8 +110,13 @@ function evaluateExpression(expression: string | undefined, context: Record<stri
   }
 }
 
+function fieldNumericValue(raw: number, field: CanonicalField | { type?: string; bitLength: number }) {
+  return field.type === "int" ? signedValue(raw, field.bitLength) : raw;
+}
+
 function decodeCanIdField(id: number, field: CanonicalField, profile: CanonicalProfile): DecodedField {
-  const raw = extractFromCanId(id, field);
+  const extracted = extractFromCanId(id, field);
+  const raw = fieldNumericValue(extracted, field);
   const dictionaryId = field.dictionary ?? field.name;
   const meaning = profile.dictionaries?.[dictionaryId]?.[String(raw)];
   return {
@@ -120,25 +131,53 @@ function decodeCanIdField(id: number, field: CanonicalField, profile: CanonicalP
   };
 }
 
-function decodePayloadField(bytes: number[], field: CanonicalField, byteOrder: "little" | "big", profile: CanonicalProfile, context: Record<string, number>): DecodedField {
-  const raw = extractFromBytes(bytes, field, byteOrder);
+function decodePayloadField(
+  bytes: number[],
+  field: CanonicalField,
+  byteOrder: "little" | "big",
+  profile: CanonicalProfile,
+  context: Record<string, number>,
+  index?: number,
+): DecodedField {
+  const fieldAtIndex = {
+    ...field,
+    startBit: field.startBit + (index ?? 0) * (field.strideBits ?? field.bitLength),
+  };
+  const extracted = extractFromBytes(bytes, fieldAtIndex, byteOrder);
+  const raw = fieldNumericValue(extracted, fieldAtIndex);
   const scaled = raw * (field.factor ?? 1) + (field.offset ?? 0);
   const expressionValue = evaluateExpression(field.display?.expression, { ...context, raw, value: scaled });
   const physical = typeof expressionValue === "number" ? expressionValue : scaled;
   const dictionaryId = field.dictionary ?? field.name;
   const meaning = profile.dictionaries?.[dictionaryId]?.[String(raw)];
   const displayValue = typeof expressionValue === "string" ? expressionValue : decodedDisplay(physical, field.unit, meaning);
+  const name = index == null ? field.name : `${field.name}[${index}]`;
   return {
-    name: field.name,
+    name,
     raw,
     physical,
     displayValue,
     unit: field.unit,
-    startBit: field.startBit,
+    startBit: fieldAtIndex.startBit,
     length: field.bitLength,
     source: "payload",
     meaning,
   };
+}
+
+function decodePayloadFields(bytes: number[], field: CanonicalField, byteOrder: "little" | "big", profile: CanonicalProfile, context: Record<string, number>) {
+  const count = Math.max(1, Math.floor(field.count ?? 1));
+  return Array.from({ length: count }, (_, index) => decodePayloadField(bytes, field, byteOrder, profile, context, count > 1 ? index : undefined));
+}
+
+function putDecodedValue(context: Record<string, number>, field: DecodedField) {
+  context[field.name] = field.physical;
+  const indexed = field.name.match(/^(.+)\[(\d+)]$/);
+  if (indexed) {
+    const [, baseName, index] = indexed;
+    context[`${baseName}_${index}`] = field.physical;
+    if (index === "0") context[baseName] = field.physical;
+  }
 }
 
 function valuesByName(fields: DecodedField[]) {
@@ -154,7 +193,10 @@ function matchesExpected(actual: number | undefined, expected: number | string |
 }
 
 function messageMatches(message: CanonicalProfile["messages"][number], values: Record<string, number>) {
-  return Object.entries(message.identifyBy ?? {}).every(([field, expected]) => matchesExpected(values[field], expected));
+  const identifyByMatches = Object.entries(message.identifyBy ?? {}).every(([field, expected]) => matchesExpected(values[field], expected));
+  if (!identifyByMatches) return false;
+  if (!message.identifyWhen?.trim()) return true;
+  return Boolean(evaluateExpression(message.identifyWhen, values));
 }
 
 function expressionErrorState(expression: string, values: Record<string, number>) {
@@ -202,12 +244,13 @@ function decodeCanonical(profile: CanonicalProfile, frame: WsFrame): DecodedFram
   const context: Record<string, number> = { ...canValues };
   const headerFields: DecodedField[] = [];
   for (const field of profile.layouts.payloadHeader?.fields ?? []) {
-    const decoded = decodePayloadField(bytes, field, byteOrder, profile, context);
-    headerFields.push(decoded);
-    context[decoded.name] = decoded.physical;
+    for (const decoded of decodePayloadFields(bytes, field, byteOrder, profile, context)) {
+      headerFields.push(decoded);
+      putDecodedValue(context, decoded);
+    }
   }
 
-  const headerValues = valuesByName(headerFields);
+  const headerValues = { ...valuesByName(headerFields), ...context };
   const allIdentificationValues = { ...canValues, ...headerValues };
   const message = candidateMessages.find((item) => messageMatches(item, allIdentificationValues));
 
@@ -228,17 +271,19 @@ function decodeCanonical(profile: CanonicalProfile, frame: WsFrame): DecodedFram
   const payloadValues: Record<string, number> = {};
   const messageFields: DecodedField[] = [];
   for (const field of message.payload.fields ?? []) {
-    const decoded = decodePayloadField(bytes, field, byteOrder, profile, context);
-    messageFields.push(decoded);
-    context[decoded.name] = decoded.physical;
-    payloadValues[decoded.name] = decoded.physical;
+    for (const decoded of decodePayloadFields(bytes, field, byteOrder, profile, context)) {
+      messageFields.push(decoded);
+      putDecodedValue(context, decoded);
+      payloadValues[decoded.name] = decoded.physical;
+    }
   }
 
   const payloadDecodedFields = [...headerFields, ...messageFields];
   const fields = [...canIdFields, ...payloadDecodedFields];
-  const allValues = { ...allIdentificationValues, ...payloadValues };
+  const allValues = { ...allIdentificationValues, ...context, ...payloadValues };
   const errorRule = profile.errors?.find((rule) => expressionErrorState(rule.when, allValues));
-  const errorCode = errorRule ? extractFromBytes(bytes, errorRule.source, errorRule.source.byteOrder ?? byteOrder) : undefined;
+  const extractedErrorCode = errorRule ? extractFromBytes(bytes, errorRule.source, errorRule.source.byteOrder ?? byteOrder) : undefined;
+  const errorCode = errorRule && extractedErrorCode != null ? fieldNumericValue(extractedErrorCode, errorRule.source) : undefined;
   const errorText = errorRule?.dictionary && errorCode != null ? profile.dictionaries?.[errorRule.dictionary]?.[String(errorCode)] : undefined;
   const messageGoodField = fields.find((field) => field.name === "message_good");
 
