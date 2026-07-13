@@ -20,6 +20,7 @@
 export type TransportProtocol = "ws-json" | "ws-binary" | "tcp-jsonl" | "tcp-binary" | "grpc";
 
 export type ConnectionMode = "local" | "remote";
+export type CanHardwareAdapter = "socketcan" | "vcan" | "peak-pcan" | "kvaser" | "vector" | "canable-slcan" | "other";
 
 export type RawCanFrameFilter = {
   iface?: string;
@@ -38,6 +39,7 @@ export type ConnectionProfile = {
 
   // Local
   iface?: string; // e.g. can0
+  adapter?: CanHardwareAdapter;
   nominalBitrate?: number;
   dataBitrate?: number;
   fdEnabled?: boolean;

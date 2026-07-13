@@ -776,6 +776,26 @@ These values are saved with the profile and shown in the Connection Profiles dia
 The bitrate fields document the expected interface timing. The current desktop app and WebSocket JSON daemon path do not reconfigure SocketCAN timing. Bring the interface up with matching \`ip link\` settings on the daemon host before connecting.
 :::
 
+### Hardware adapters
+
+The app integrates with common CAN hardware through the Linux SocketCAN interface exposed by the daemon host. Connection profiles can record the adapter family so profiles remain understandable when you switch between virtual CAN, lab hardware, and vehicle adapters.
+
+Supported adapter profile labels include:
+
+- Generic SocketCAN
+- Virtual CAN
+- PEAK PCAN
+- Kvaser
+- Vector
+- CANable / SLCAN
+- Other SocketCAN adapter
+
+This label does not change the wire protocol used by the desktop app. The daemon still subscribes to Linux CAN interfaces such as \`vcan0\`, \`can0\`, or \`can1\`. Vendor drivers, \`slcand\`, candlelight firmware, or other setup tools must expose the adapter as SocketCAN before the app can use it.
+
+:::tip
+Use one connection profile per physical bus setup. For example, keep separate profiles for \`vcan0\` simulation, PEAK PCAN at 500000/2000000 bit/s, and CANable/SLCAN at classic 500000 bit/s.
+:::
+
 ## CAN bridge daemon
 
 The CAN bridge daemon is a separate Linux/WSL service that exposes SocketCAN interfaces to this desktop app. Run it where the CAN interfaces exist. For WSL workflows, the daemon runs inside WSL and the desktop app connects to it from Windows.
