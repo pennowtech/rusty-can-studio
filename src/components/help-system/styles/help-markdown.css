@@ -9,7 +9,7 @@
     --tw-prose-quotes: hsl(var(--foreground));
     --tw-prose-quote-borders: hsl(var(--border));
     --tw-prose-captions: hsl(var(--muted-foreground));
-    font-family: Bookerly, Besley, Charter, Georgia, "Times New Roman", serif;
+    font-family: "Bookerly Regular", Bookerly, Besley, Charter, Georgia, "Times New Roman", serif;
     font-size: 0.94rem;
     line-height: 1.62;
 }
