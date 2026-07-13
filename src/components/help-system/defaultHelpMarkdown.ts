@@ -39,10 +39,9 @@ Loaded logs keep the original file order and source line numbers. Display filter
 ### Tutorial 2: load profiles and decode frames
 
 1. Open Profile Editor.
-2. Load the profile JSON files for the messages you want to decode.
-3. Load a shared CAN ID layout profile if your service profiles reference one.
-4. Return to CAN Monitor.
-5. Select a frame and confirm that Decoded Preview shows CAN ID fields, payload header fields, message name, payload values, and error status.
+2. Load the canonical profile JSON files for the messages you want to decode.
+3. Return to CAN Monitor.
+4. Select a frame and confirm that Decoded Preview shows CAN ID fields, payload header fields, message name, payload values, and error status.
 
 :::warning
 If a frame belongs to a service or message that is not covered by a loaded profile, it should not borrow names or value maps from unrelated profiles. Load the correct profile or inspect the raw values.
@@ -312,7 +311,7 @@ Decoded values are only as reliable as the loaded profiles. Confirm profile byte
 
 The Profile Editor describes how raw CAN or CAN-FD frames become meaningful decoded values. A profile is a JSON contract: it defines the bus, identifier layout, optional payload header, dictionaries, message identification rules, payload fields, error rules, and display hints.
 
-The editor now works from one canonical profile shape. If an older or external profile is imported, the app converts it to canonical JSON immediately. JSON view shows the canonical JSON, and saving exports canonical JSON.
+The editor works from one canonical profile shape. JSON view shows the same canonical JSON that the runtime decodes. Older or external source formats should be converted before importing them into the app.
 
 ### Canonical profile sections
 
@@ -437,6 +436,10 @@ The converter is intentionally conservative. XML schemas differ in naming and ne
 
 :::tip
 Keep generated profiles under version control next to the XML files. When the XML changes, regenerate the JSON and compare the diff before using it in a test session.
+:::
+
+:::note
+Generic canonical fixtures are committed under \`profiles/test/\`. Use those profile and candump pairs to validate editor and decoder behavior without relying on local working profiles.
 :::
 
 ### Minimal canonical profile

@@ -102,10 +102,9 @@ Profiles are JSON files that explain how raw CAN IDs, payload headers, payload v
 ### Load profiles
 
 1. Open Profile Editor.
-2. Load one or more JSON profile files.
-3. Load a shared CAN ID layout profile if the service profiles reference one.
-4. Return to CAN Monitor.
-5. Select a matching frame and inspect Decoded Preview.
+2. Load one or more canonical JSON profile files.
+3. Return to CAN Monitor.
+4. Select a matching frame and inspect Decoded Preview.
 
 The decoder is conservative. If a frame does not match a loaded profile, the monitor should not borrow field names or value dictionaries from unrelated profiles.
 
@@ -124,6 +123,8 @@ Common edits:
 - error rules
 
 Use Decoded Preview while editing to check the selected frame against the current profile definition.
+
+The repository includes generic sample profiles and candump snippets under `profiles/test/`. They are useful for learning the editor because each profile is self-contained and uses the same canonical JSON contract as the app runtime.
 
 ## Transmit Composer
 

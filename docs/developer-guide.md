@@ -17,7 +17,7 @@ src/
   store/               Zustand state stores
 src-tauri/
   src/                 Tauri application entry points
-profiles/             Example JSON profiles
+profiles/             Shared profile JSON files and generic test fixtures
 scripts/              Local setup, quality, audit, and conversion scripts
 docs/                 User and developer documentation
 ```
@@ -29,7 +29,7 @@ The canonical profile contract is documented in:
 - `docs/canonical-profile-guide.md`
 - `docs/canonical-profile.schema.json`
 
-New profile-editor work should target that canonical shape. Importers can support older or external formats, but the visual editor should render the canonical schema instead of branching on protocol-specific profile structures.
+New profile-editor work should target that canonical shape. The runtime, visual editor, JSON view, decoder, display filter, transmit helpers, and simulator matching should consume canonical profiles only. External source formats should be converted before import.
 
 ## Core Runtime Flow
 
@@ -204,6 +204,8 @@ type CanonicalProfile = {
 
 Profile Editor Visual, JSON view, CAN Monitor decoding, display filters, transmit helpers, and simulator matching consume the canonical profile shape.
 
+Generic canonical fixtures live under `profiles/test/`. They are intentionally protocol-varied so decoder and editor changes can be checked without relying on private working profiles.
+
 ### Profile decoding
 
 Files:
@@ -305,4 +307,4 @@ Recommended sequence:
 - The desktop app relies on the daemon for live Linux SocketCAN access.
 - Browser compatibility checks are baseline checks, not full visual regression tests.
 - Accessibility checks are baseline checks, not a full WCAG audit.
-- Some app modules still contain older generic profile support alongside the compact schema profile model.
+- The app intentionally does not include compatibility branches for older profile JSON layouts.

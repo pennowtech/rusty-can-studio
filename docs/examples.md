@@ -2,6 +2,8 @@
 
 This page collects common Rusty CAN Studio scenarios with copyable filters, sample frames, and simulator sequence JSON.
 
+Generic canonical profile fixtures and matching candump snippets are committed under `profiles/test/`. Use those files when you want quick, shareable examples that do not depend on local working profiles.
+
 ## Example 1: Load A Small Candump Log
 
 Sample candump lines:

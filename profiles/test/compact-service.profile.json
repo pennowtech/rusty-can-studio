@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "id": "compact-service",
+    "name": "Compact Service Example",
+    "version": "1.0.0"
+  },
+  "bus": {
+    "type": "can-fd",
+    "idFormat": "extended",
+    "byteOrder": "little"
+  },
+  "layouts": {
+    "canId": {
+      "label": "Service 29-bit ID",
+      "bitLength": 29,
+      "fields": [
+        { "name": "service_identifier", "startBit": 0, "bitLength": 10, "type": "enum", "dictionary": "service_identifier" },
+        { "name": "source_address", "startBit": 13, "bitLength": 6, "type": "uint" },
+        { "name": "destination_address", "startBit": 19, "bitLength": 6, "type": "uint" },
+        { "name": "command_class", "startBit": 26, "bitLength": 4, "type": "enum", "dictionary": "command_class" }
+      ]
+    },
+    "payloadHeader": {
+      "label": "Payload header",
+      "bitLength": 16,
+      "fields": [
+        { "name": "attribute_address", "startBit": 1, "bitLength": 7, "type": "uint" },
+        { "name": "message_good", "startBit": 0, "bitLength": 1, "type": "enum", "dictionary": "message_good" },
+        { "name": "feature_index", "startBit": 8, "bitLength": 4, "type": "uint" }
+      ]
+    }
+  },
+  "dictionaries": {
+    "service_identifier": { "801": "compact_light" },
+    "command_class": { "6": "command", "5": "response", "3": "event" },
+    "message_good": { "0": "bad", "1": "good" },
+    "attribute_address": { "5": "brightness" },
+    "feature_index": { "2": "set_current_value" }
+  },
+  "messages": [
+    {
+      "id": "compact_light.brightness.set_current_value.command",
+      "label": "brightness.set_current_value.command",
+      "identifyBy": {
+        "service_identifier": 801,
+        "command_class": 6,
+        "attribute_address": 5,
+        "feature_index": 2
+      },
+      "payload": {
+        "bitLength": 32,
+        "fields": [
+          { "name": "brightness_raw", "startBit": 16, "bitLength": 16, "type": "uint", "unit": "permille" }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "id": "default_error_status",
+      "when": "message_good != 1",
+      "source": {
+        "startBit": 16,
+        "bitLength": 32,
+        "type": "uint",
+        "byteOrder": "little"
+      },
+      "display": "Error ${raw}: ${text}"
+    }
+  ],
+  "display": {}
+}

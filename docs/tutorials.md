@@ -29,13 +29,14 @@ Expected result: the table keeps the original file order and source line numbers
 Use this when the monitor shows raw frames but decoded names or fields are missing.
 
 1. Open Profile Editor.
-2. Load one or more profile JSON files.
-3. If your service profiles reference a shared CAN ID layout, load that layout profile too.
-4. Return to CAN Monitor.
-5. Select a frame that belongs to one of the loaded profiles.
-6. Check Decoded Preview for CAN ID fields, payload header fields, message name, payload values, and error status.
+2. Load one or more canonical profile JSON files.
+3. Return to CAN Monitor.
+4. Select a frame that belongs to one of the loaded profiles.
+5. Check Decoded Preview for CAN ID fields, payload header fields, message name, payload values, and error status.
 
 If a frame belongs to a service or message that is not covered by a loaded profile, it should not borrow names or value maps from unrelated profiles. Load the correct profile or inspect the raw CAN ID and payload values.
+
+Generic profile and candump pairs are committed under `profiles/test/`. Use them for quick editor and decoder checks when you do not want to load local working profiles.
 
 ## Tutorial 3: Connect To A Remote Daemon
 

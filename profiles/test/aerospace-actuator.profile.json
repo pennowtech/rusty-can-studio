@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "id": "aerospace-actuator",
+    "name": "Aerospace Actuator Bus",
+    "version": "1.0.0"
+  },
+  "bus": {
+    "type": "can-fd",
+    "idFormat": "extended",
+    "byteOrder": "little"
+  },
+  "layouts": {
+    "canId": {
+      "label": "Actuator 29-bit ID",
+      "bitLength": 29,
+      "fields": [
+        { "name": "bus_id", "startBit": 24, "bitLength": 5, "type": "uint" },
+        { "name": "message_type", "startBit": 16, "bitLength": 8, "type": "enum", "dictionary": "message_type" },
+        { "name": "node_id", "startBit": 0, "bitLength": 8, "type": "uint" }
+      ]
+    },
+    "payloadHeader": {
+      "label": "Payload header",
+      "bitLength": 16,
+      "fields": [
+        { "name": "packet_kind", "startBit": 0, "bitLength": 4, "type": "enum", "dictionary": "packet_kind" },
+        { "name": "channel", "startBit": 4, "bitLength": 4, "type": "uint" },
+        { "name": "sequence", "startBit": 8, "bitLength": 8, "type": "uint" }
+      ]
+    }
+  },
+  "dictionaries": {
+    "message_type": { "90": "ActuatorStatus" },
+    "packet_kind": { "10": "status" }
+  },
+  "messages": [
+    {
+      "id": "actuator.status",
+      "label": "Actuator Status",
+      "identifyBy": { "message_type": 90, "packet_kind": 10 },
+      "payload": {
+        "bitLength": 48,
+        "fields": [
+          { "name": "position", "startBit": 16, "bitLength": 16, "type": "uint", "factor": 0.01, "unit": "deg" },
+          { "name": "current", "startBit": 32, "bitLength": 16, "type": "uint", "factor": 0.001, "unit": "A" }
+        ]
+      }
+    }
+  ],
+  "errors": [],
+  "display": {}
+}

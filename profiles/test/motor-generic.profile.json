@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "id": "motor-generic",
+    "name": "Motor Controller Generic",
+    "version": "1.0.0"
+  },
+  "bus": {
+    "type": "can-fd",
+    "idFormat": "standard",
+    "byteOrder": "little"
+  },
+  "layouts": {
+    "canId": {
+      "label": "Standard 11-bit ID",
+      "bitLength": 11,
+      "fields": [
+        { "name": "node_id", "startBit": 0, "bitLength": 7, "type": "uint" },
+        { "name": "message_class", "startBit": 7, "bitLength": 4, "type": "uint" }
+      ]
+    }
+  },
+  "dictionaries": {},
+  "messages": [
+    {
+      "id": "motor_status",
+      "label": "Motor Status",
+      "identifyBy": { "can_id": 801 },
+      "payload": {
+        "bitLength": 32,
+        "fields": [
+          { "name": "rpm", "startBit": 0, "bitLength": 16, "type": "uint", "factor": 0.25, "unit": "rpm" },
+          { "name": "temperature", "startBit": 16, "bitLength": 8, "type": "uint", "offset": -40, "unit": "degC" },
+          { "name": "enabled", "startBit": 24, "bitLength": 1, "type": "bool" }
+        ]
+      }
+    }
+  ],
+  "errors": [],
+  "display": {}
+}
