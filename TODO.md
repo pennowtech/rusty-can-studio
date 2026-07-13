@@ -34,9 +34,9 @@
 - [x] Enter → expand/collapse row details.
 
 **Performance optimizations:**
-- Debounced filtering and sorting to prevent excessive re-renders.
-- Memoization of row rendering to improve responsiveness.
-- Lazy loading of large datasets when applicable.
+- [x] Debounced filtering and sorting to prevent excessive re-renders.
+- [x] Memoization of row rendering to improve responsiveness.
+- [x] Lazy loading of large datasets when applicable.
 **Internationalization:**
 - Support for multiple languages in UI text.
 - Date and number formatting based on locale.
