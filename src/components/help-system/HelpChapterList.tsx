@@ -34,8 +34,7 @@ export function HelpChapterList() {
       </div>
       <nav className="flex gap-2 overflow-x-auto p-3 lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-y-auto">
         {visibleChapters.map((chapter) => (
-          <button
-            type="button"
+          <button type="button"
             key={chapter.id}
             onClick={() => selectChapter(chapter.id)}
             className={clsx(
