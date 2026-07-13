@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Convert Knossos k2_*.xml schema files into the CAN-FD workbench JSON profile shape.
+Convert k2_*.xml files into the canonical CAN/CAN-FD profile JSON shape.
 
-The converter is intentionally conservative: it extracts service, instance,
-attribute, feature, field, and error metadata when the XML exposes recognizable
-names or attributes. Review the generated JSON before using it for live decode.
+The script is deliberately source-format agnostic at the output boundary: it
+extracts XML metadata, then writes schemaVersion 1.0 profiles with layouts,
+dictionaries, messages, error rules, and display hints.
 """
 
 from __future__ import annotations
@@ -23,9 +23,9 @@ def local_name(tag: str) -> str:
 
 
 def attr_value(node: ET.Element, *names: str) -> str | None:
-    attributes = {key.lower(): value for key, value in node.attrib.items()}
+    attrs = {key.lower(): value for key, value in node.attrib.items()}
     for name in names:
-        value = attributes.get(name.lower())
+        value = attrs.get(name.lower())
         if value is not None:
             return value
     return None
@@ -34,61 +34,69 @@ def attr_value(node: ET.Element, *names: str) -> str | None:
 def parse_int(value: str | None) -> int | None:
     if value is None or value == "":
         return None
-    text = value.strip()
     try:
-        return int(text, 0)
+        return int(value.strip(), 0)
     except ValueError:
-        match = re.search(r"0x[0-9a-fA-F]+|\d+", text)
+        match = re.search(r"0x[0-9a-fA-F]+|\d+", value)
         return int(match.group(0), 0) if match else None
 
 
-def node_name(node: ET.Element, fallback: str) -> str:
-    return attr_value(
-        node,
-        "name",
-        "identifier",
-        "short_name",
-        "shortName",
-        "service_name",
-        "instance_name",
-        "attribute_name",
-        "feature_name",
-        "value_name",
-        "enum_name",
-        "error_name",
-        "id",
-    ) or fallback
+def slugify(value: str | None, fallback: str) -> str:
+    text = re.sub(r"[^A-Za-z0-9_.-]+", "_", value or "").strip("_")
+    return text or fallback
 
 
-def find_children(node: ET.Element, *name_parts: str) -> list[ET.Element]:
-    parts = tuple(part.lower() for part in name_parts)
-    return [child for child in list(node) if any(part in local_name(child.tag) for part in parts)]
+def named(node: ET.Element, fallback: str) -> str:
+    return (
+        attr_value(
+            node,
+            "name",
+            "identifier",
+            "short_name",
+            "shortName",
+            "service_name",
+            "instance_name",
+            "attribute_name",
+            "feature_name",
+            "value_name",
+            "enum_name",
+            "error_name",
+            "id",
+        )
+        or fallback
+    )
 
 
-def first_child(node: ET.Element, *name_parts: str) -> ET.Element | None:
-    children = find_children(node, *name_parts)
-    return children[0] if children else None
+def child_with_name(node: ET.Element, *parts: str) -> ET.Element | None:
+    names = tuple(part.lower() for part in parts)
+    for child in list(node):
+        if any(part in local_name(child.tag) for part in names):
+            return child
+    return None
 
 
-def type_bit_length(type_name: str, maximum_size: int | None = None) -> int:
+def children_with_name(node: ET.Element, *parts: str) -> list[ET.Element]:
+    names = tuple(part.lower() for part in parts)
+    return [child for child in list(node) if any(part in local_name(child.tag) for part in names)]
+
+
+def type_bits(type_name: str, maximum_size: int | None = None) -> int:
     lower = type_name.lower()
     if lower in {"null", "void"}:
         return 0
     if lower in {"bool", "boolean"}:
         return 1
-    if lower in {"char"}:
-        return 8 * (maximum_size or 1)
     match = re.search(r"(?:u?int)(\d+)_t|(?:u?int)(\d+)", lower)
     if match:
         return int(next(group for group in match.groups() if group))
-    if "float" in lower:
-        return 32
     if "double" in lower:
         return 64
+    if "float" in lower:
+        return 32
     return 8 * (maximum_size or 1)
 
 
-def field_type(type_name: str) -> str:
+def value_type(type_name: str) -> str:
     lower = type_name.lower()
     if "enum" in lower:
         return "enum"
@@ -99,8 +107,8 @@ def field_type(type_name: str) -> str:
     return "uint"
 
 
-def extract_enums(root: ET.Element) -> dict[str, dict[str, str]]:
-    enums: dict[str, dict[str, str]] = {}
+def enum_dictionaries(root: ET.Element) -> dict[str, dict[str, str]]:
+    dictionaries: dict[str, dict[str, str]] = {}
     for enum in root.iter():
         if local_name(enum.tag) != "enum":
             continue
@@ -111,657 +119,196 @@ def extract_enums(root: ET.Element) -> dict[str, dict[str, str]]:
         for constant in enum.iter():
             if local_name(constant.tag) != "enum_constants":
                 continue
-            value = parse_int(attr_value(constant, "value", "id"))
-            name = attr_value(constant, "enum_constant_name", "name")
-            if value is not None and name:
-                values[str(value)] = name
-        enums[enum_name] = values
-    return enums
+            code = parse_int(attr_value(constant, "value", "id"))
+            label = attr_value(constant, "enum_constant_name", "name")
+            if code is not None and label:
+                values[str(code)] = label
+        if values:
+            dictionaries[enum_name] = values
+    return dictionaries
 
 
-def payload_fields_from_payload(payload: ET.Element | None, enums: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
+def payload_values(payload: ET.Element | None, dictionaries: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
     if payload is None:
         return []
-
     fields: list[dict[str, Any]] = []
     bit_offset = 16
     for index, node in enumerate(list(payload), start=1):
         tag = local_name(node.tag)
         if tag not in {"value", "value_enum", "value_array"}:
             continue
-
-        if tag == "value_enum":
-            enum_name = attr_value(node, "enum_name_from_dictionary", "enum_name", "value_type") or "enum"
-            name = attr_value(node, "value_name") or enum_name
-            length = type_bit_length(attr_value(node, "value_type") or "uint8_t")
-            values = enums.get(enum_name)
-            kind = "enum"
-        else:
-            type_name = attr_value(node, "value_type") or "uint8_t"
-            name = attr_value(node, "value_name") or f"field_{index}"
-            maximum_size = parse_int(attr_value(node, "maximum_size", "size"))
-            length = type_bit_length(type_name)
-            values = None
-            kind = field_type(type_name)
-
-        if name == "null" or length == 0:
+        xml_type = attr_value(node, "value_type") or "uint8_t"
+        maximum_size = parse_int(attr_value(node, "maximum_size", "size"))
+        bits = type_bits(xml_type, maximum_size)
+        if bits <= 0:
             continue
-
-        if tag == "value_array":
-            maximum_size = parse_int(attr_value(node, "maximum_size", "size")) or 1
-            unit = attr_value(node, "value_unit", "unit")
-            field: dict[str, Any] = {
-                "name": name,
-                "byte": bit_offset // 8,
-                "startBit": bit_offset % 8,
-                "length": length,
-                "type": kind,
-                "count": maximum_size,
-                "stride": max(1, length // 8),
-            }
-            if unit:
-                field["unit"] = unit
-            if values:
-                field["values"] = values
-            fields.append(field)
-            bit_offset += length * maximum_size
+        enum_name = attr_value(node, "enum_name_from_dictionary", "enum_name")
+        field_name = attr_value(node, "value_name") or enum_name or f"field_{index}"
+        if field_name == "null":
             continue
-
         field: dict[str, Any] = {
-            "name": name,
-            "byte": bit_offset // 8,
-            "startBit": bit_offset % 8,
-            "length": length,
-            "type": kind,
+            "name": field_name,
+            "startBit": bit_offset,
+            "bitLength": bits,
+            "type": "enum" if enum_name else value_type(xml_type),
         }
+        if enum_name and enum_name in dictionaries:
+            field["dictionary"] = enum_name
         unit = attr_value(node, "value_unit", "unit")
         if unit:
             field["unit"] = unit
-        if values:
-            field["values"] = values
+        if tag == "value_array":
+            count = maximum_size or 1
+            field["count"] = count
+            field["strideBits"] = bits
+            bit_offset += bits * count
+        else:
+            bit_offset += bits
         fields.append(field)
-        bit_offset += length
     return fields
-
-
-def payload_field_from_node(node: ET.Element, index: int) -> dict[str, Any]:
-    name = node_name(node, f"field_{index}")
-    start_bit = parse_int(attr_value(node, "startBit", "start_bit", "bitOffset", "bit_offset")) or 0
-    length = parse_int(attr_value(node, "length", "bitLength", "bit_length", "size", "bits")) or 8
-    byte = parse_int(attr_value(node, "byte", "byteOffset", "byte_offset"))
-    type_name = attr_value(node, "type", "dataType", "datatype", "kind") or "uint"
-    factor = attr_value(node, "factor", "scale")
-    offset = attr_value(node, "offset")
-    unit = attr_value(node, "unit")
-
-    field: dict[str, Any] = {
-        "name": name,
-        "startBit": start_bit,
-        "length": length,
-        "type": "int" if "int" in type_name.lower() and "uint" not in type_name.lower() else "uint",
-    }
-    if byte is not None:
-        field["byte"] = byte
-    if factor is not None:
-        field["factor"] = float(factor)
-    if offset is not None:
-        field["offset"] = float(offset)
-    if unit:
-        field["unit"] = unit
-    return field
-
-
-def feature_from_node(node: ET.Element, index: int) -> dict[str, Any]:
-    feature_index = parse_int(attr_value(node, "feature_index", "featureIndex", "index", "id", "value"))
-    fields = [
-        payload_field_from_node(field, idx)
-        for idx, field in enumerate(find_children(node, "field", "parameter", "payload", "argument"), start=1)
-    ]
-    return {
-        "name": node_name(node, f"feature_{feature_index if feature_index is not None else index}"),
-        "index": feature_index if feature_index is not None else index,
-        "payloadOffsetBytes": parse_int(attr_value(node, "payloadOffsetBytes", "payload_offset_bytes")) or 2,
-        "fields": fields,
-    }
-
-
-def attribute_from_node(node: ET.Element, index: int) -> dict[str, Any] | None:
-    address = parse_int(attr_value(node, "attribute_address", "attributeAddress", "address", "id"))
-    if address is None:
-        return None
-
-    tag = local_name(node.tag)
-    if "event" in tag:
-        kind = "event"
-    elif "property" in tag:
-        kind = "property"
-    else:
-        kind = "method"
-
-    feature_nodes = find_children(node, "feature", "execute", "get", "set", "value")
-    features = [feature_from_node(feature, idx) for idx, feature in enumerate(feature_nodes, start=1)]
-    if not features:
-        features = [{"name": "value", "index": 0, "payloadOffsetBytes": 2, "fields": []}]
-
-    return {
-        "name": node_name(node, f"attribute_{address}"),
-        "attributeAddress": address,
-        "kind": kind,
-        "features": features,
-    }
-
-
-def instance_from_node(node: ET.Element, index: int) -> dict[str, Any]:
-    instance_index = parse_int(attr_value(node, "instance_index", "instanceIndex", "index", "id")) or index
-    attribute_nodes = find_children(node, "method", "event", "property", "attribute")
-    attributes = [
-        attribute
-        for idx, candidate in enumerate(attribute_nodes, start=1)
-        if (attribute := attribute_from_node(candidate, idx)) is not None
-    ]
-    return {
-        "name": node_name(node, f"instance_{instance_index}"),
-        "index": instance_index,
-        "attributes": attributes,
-    }
-
-
-def service_from_node(node: ET.Element, source: Path) -> dict[str, Any] | None:
-    service_identifier = parse_int(attr_value(node, "service_identifier", "serviceIdentifier", "service_id", "serviceId", "id"))
-    if service_identifier is None:
-        return None
-
-    instance_nodes = find_children(node, "instance")
-    instances = [instance_from_node(instance, idx) for idx, instance in enumerate(instance_nodes, start=1)]
-    if not instances:
-        instances = [instance_from_node(node, 0)]
-
-    return {
-        "name": node_name(node, source.stem),
-        "serviceIdentifier": service_identifier,
-        "instances": instances,
-    }
-
-
-def extract_services(root: ET.Element, source: Path) -> list[dict[str, Any]]:
-    services: list[dict[str, Any]] = []
-    for node in root.iter():
-        service = service_from_node(node, source)
-        if service is not None:
-            services.append(service)
-    return services
-
-
-def extract_instances(root: ET.Element) -> list[dict[str, Any]]:
-    instances: dict[int, dict[str, Any]] = {}
-    for node in root.iter():
-        if local_name(node.tag) != "instance":
-            continue
-        index = parse_int(attr_value(node, "instance_index", "index", "id"))
-        if index is None:
-            continue
-        instances[index] = {
-            "name": attr_value(node, "instance_name", "name") or f"instance_{index}",
-            "index": index,
-        }
-    return [instances[index] for index in sorted(instances)] or [{"name": "instance_0", "index": 0}]
-
-
-def is_attribute_node(node: ET.Element) -> bool:
-    return local_name(node.tag) in {"property", "method", "event"}
-
-
-def feature_nodes_for_attribute(attribute: ET.Element) -> list[ET.Element]:
-    return [
-        child
-        for child in list(attribute)
-        if parse_int(attr_value(child, "feature_index", "featureIndex", "index")) is not None
-    ]
-
-
-def fields_for_feature(feature: ET.Element, direction: str, enums: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
-    direction_node = first_child(feature, direction)
-    return payload_fields_from_payload(first_child(direction_node, "payload") if direction_node is not None else None, enums)
-
-
-def apply_payload_header_values(profile: dict[str, Any], instances: list[dict[str, Any]]) -> None:
-    instance_values = {
-        str(instance["index"]): instance["name"]
-        for instance in instances
-        if instance.get("index") is not None and instance.get("name")
-    }
-    if not instance_values:
-        return
-
-    for field in profile["messageSchema"]["payloadHeader"]["fields"]:
-        if field.get("name") == "instance_index":
-            field["values"] = instance_values
-            return
-
-
-def message_definition_for_feature(
-    service: dict[str, Any],
-    attribute: ET.Element,
-    feature: ET.Element,
-    direction: str,
-    command_class: int,
-    fields: list[dict[str, Any]],
-) -> dict[str, Any]:
-    attribute_name = attr_value(attribute, "attribute_name", "name") or local_name(attribute.tag)
-    attribute_address = parse_int(attr_value(attribute, "attribute_address", "address", "id")) or 0
-    feature_index = parse_int(attr_value(feature, "feature_index", "featureIndex", "index")) or 0
-    feature_name = attr_value(feature, "feature_name", "name") or local_name(feature.tag)
-    definition_id = f"{service['name']}.{attribute_name}.{feature_name}.{direction}"
-    return {
-        "id": definition_id,
-        "label": f"{attribute_name}.{feature_name}.{direction}",
-        "serviceName": service["name"],
-        "attributeName": attribute_name,
-        "featureName": f"{feature_name}.{direction}",
-        "meaning": definition_id,
-        "match": {
-            "canId": {
-                "service_identifier": service["serviceIdentifier"],
-                "command_class": command_class,
-            },
-            "payloadHeader": {
-                "attribute_address": attribute_address,
-                "feature_index": feature_index,
-            },
-        },
-        "payloadFields": fields,
-    }
-
-
-def schema_message_definitions_from_xml(root: ET.Element, source: Path) -> list[dict[str, Any]]:
-    service_identifier = parse_int(attr_value(root, "service_identifier", "serviceIdentifier", "service_id", "serviceId", "id"))
-    if service_identifier is None:
-        return []
-
-    service = {
-        "name": attr_value(root, "service_name", "name") or source.stem,
-        "serviceIdentifier": service_identifier,
-    }
-    enums = extract_enums(root)
-    message_definitions: list[dict[str, Any]] = []
-
-    for attribute in root.iter():
-        if not is_attribute_node(attribute):
-            continue
-
-        for feature in feature_nodes_for_attribute(attribute):
-            command_fields = fields_for_feature(feature, "command", enums)
-            response_fields = fields_for_feature(feature, "response", enums)
-            event_fields = fields_for_feature(feature, "event", enums) or response_fields or command_fields
-
-            message_definitions.append(message_definition_for_feature(service, attribute, feature, "command", 6, command_fields))
-            message_definitions.append(message_definition_for_feature(service, attribute, feature, "response", 5, response_fields))
-            if local_name(attribute.tag) == "event":
-                message_definitions.append(message_definition_for_feature(service, attribute, feature, "event", 3, event_fields))
-
-    return message_definitions
 
 
 def extract_errors(root: ET.Element) -> dict[str, str]:
     errors: dict[str, str] = {}
     for node in root.iter():
-        tag = local_name(node.tag)
-        if "error" not in tag:
+        if "error" not in local_name(node.tag):
             continue
         code = parse_int(attr_value(node, "code", "value", "id"))
-        if code is None:
-            continue
-        errors[str(code)] = node_name(node, f"error_{code}")
+        if code is not None:
+            errors[str(code)] = named(node, f"error_{code}")
     return errors
 
 
-CAN_ID_LAYOUT_ID = "knossos_can_id"
+def extract_instances(root: ET.Element) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for node in root.iter():
+        if local_name(node.tag) != "instance":
+            continue
+        index = parse_int(attr_value(node, "instance_index", "index", "id"))
+        if index is not None:
+            values[str(index)] = attr_value(node, "instance_name", "name") or f"instance_{index}"
+    return values
 
 
-def base_profile(source_files: list[Path], embed_can_id_layout: bool = True) -> dict[str, Any]:
-    can_id_fields = [
-        {"name": "command_class", "startBit": 26, "length": 4, "values": {"6": "command/request", "5": "response", "3": "event/notification"}},
-        {"name": "broadcast", "startBit": 25, "length": 1, "values": {"0": "unicast", "1": "broadcast"}},
-        {"name": "destination_address", "startBit": 19, "length": 6},
-        {"name": "source_address", "startBit": 13, "length": 6},
-        {"name": "start_of_transfer", "startBit": 12, "length": 1, "values": {"0": "not start", "1": "start"}},
-        {"name": "end_of_transfer", "startBit": 11, "length": 1, "values": {"0": "not end", "1": "end"}},
-        {"name": "toggle", "startBit": 10, "length": 1},
-        {"name": "service_identifier", "startBit": 0, "length": 10},
-    ]
-    payload_header_fields = [
-        {"name": "attribute_address", "byte": 0, "startBit": 1, "length": 7},
-        {"name": "message_good", "byte": 0, "startBit": 0, "length": 1, "type": "bool", "values": {"0": "bad", "1": "good"}},
-        {"name": "instance_index", "byte": 1, "startBit": 4, "length": 4},
-        {"name": "feature_index", "byte": 1, "startBit": 0, "length": 4},
-    ]
+def can_id_layout() -> dict[str, Any]:
     return {
-        "meta": {
-            "name": "Generic CAN-FD Schema Profile",
-            "version": "1.0.0",
-            "source": ", ".join(path.name for path in source_files),
-        },
-        "byteOrder": "little",
-        "protocol": "schema",
-        "defaultCanIdLayoutId": CAN_ID_LAYOUT_ID,
-        "canIdLayouts": {
-            CAN_ID_LAYOUT_ID: {
-                "id": CAN_ID_LAYOUT_ID,
-                "name": "Universal CAN ID Layout",
-                "format": "extended",
-                "bitLength": 29,
-                "fields": can_id_fields,
-            }
-        } if embed_can_id_layout else {},
-        "messageSchema": {
-            "canIdLayoutRef": CAN_ID_LAYOUT_ID,
-            **({
-            "canIdLayout": {
-                "bitLength": 29,
-                "fields": can_id_fields,
-                "enums": {
-                    "command_class": {
-                        "6": "command/request",
-                        "5": "response",
-                        "3": "event/notification",
-                    }
-                },
-            }} if embed_can_id_layout else {}),
-            "payloadHeader": {
-                "lengthBytes": 2,
-                "fields": payload_header_fields,
-            },
-            "messageDefinitions": [],
-            "errors": {},
-            "error": {
-                "field": "message_good",
-                "goodValue": 1,
-                "byteOffset": 2,
-                "byteLength": 4,
-                "byteOrder": "little",
-                "values": {},
-            },
-        },
-        "frames": {},
-        "fieldTypes": {},
-        "derivedFields": [],
-        "columns": [],
+        "label": "Universal CAN ID Layout",
+        "bitLength": 29,
+        "fields": [
+            {"name": "command_class", "startBit": 26, "bitLength": 4, "type": "enum", "dictionary": "command_class"},
+            {"name": "broadcast", "startBit": 25, "bitLength": 1, "type": "enum", "dictionary": "broadcast"},
+            {"name": "destination_address", "startBit": 19, "bitLength": 6, "type": "uint"},
+            {"name": "source_address", "startBit": 13, "bitLength": 6, "type": "uint"},
+            {"name": "start_of_transfer", "startBit": 12, "bitLength": 1, "type": "enum", "dictionary": "start_of_transfer"},
+            {"name": "end_of_transfer", "startBit": 11, "bitLength": 1, "type": "enum", "dictionary": "end_of_transfer"},
+            {"name": "toggle", "startBit": 10, "bitLength": 1, "type": "uint"},
+            {"name": "service_identifier", "startBit": 0, "bitLength": 10, "type": "enum", "dictionary": "service_identifier"},
+        ],
     }
 
 
-def message_definitions_from_services(services: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    message_definitions: list[dict[str, Any]] = []
-    for service in services:
-        for instance in service.get("instances", []):
-            for attribute in instance.get("attributes", []):
-                for feature in attribute.get("features", []):
-                    definition_id = f"{service['name']}.{instance['name']}.{attribute['name']}.{feature['name']}"
-                    message_definitions.append(
-                        {
-                            "id": definition_id,
-                            "label": feature["name"],
-                            "serviceName": service["name"],
-                            "instanceName": instance["name"],
-                            "attributeName": attribute["name"],
-                            "featureName": feature["name"],
-                            "meaning": definition_id,
-                            "match": {
-                                "canId": {"service_identifier": service["serviceIdentifier"]},
-                                "payloadHeader": {
-                                    "instance_index": instance["index"],
-                                    "attribute_address": attribute["attributeAddress"],
-                                    "feature_index": feature["index"],
-                                },
-                            },
-                            "payloadFields": feature.get("fields", []),
-                        }
-                    )
-    return message_definitions
-
-
-def convert(paths: list[Path]) -> dict[str, Any]:
-    profile = base_profile(paths)
-    message_definitions: list[dict[str, Any]] = []
-    errors: dict[str, str] = {}
-    instances_by_index: dict[int, dict[str, Any]] = {}
-
-    for path in paths:
-        root = ET.parse(path).getroot()
-        message_definitions.extend(schema_message_definitions_from_xml(root, path))
-        errors.update(extract_errors(root))
-        for instance in extract_instances(root):
-            instances_by_index[instance["index"]] = instance
-
-    profile["messageSchema"]["messageDefinitions"] = message_definitions
-    profile["messageSchema"]["errors"] = errors
-    profile["messageSchema"]["error"]["values"] = errors
-    apply_payload_header_values(profile, [instances_by_index[index] for index in sorted(instances_by_index)])
-    return profile
-
-
-def profile_name_for(path: Path) -> str:
-    if path.stem == "k2_light_control":
-        return "k2_light_control CAN-FD Schema Profile v2"
-    return f"{path.stem} CAN-FD Schema Profile"
-
-
-def compact_profile_from_expanded(profile: dict[str, Any]) -> dict[str, Any]:
-    schema = profile["messageSchema"]
-    definitions = schema.get("messageDefinitions", [])
-    first_definition = definitions[0] if definitions else {}
-    service_identifier = first_definition.get("match", {}).get("canId", {}).get("service_identifier")
-    service_name = first_definition.get("serviceName") or profile["meta"]["source"].removesuffix(".xml")
-    attributes_by_key: dict[tuple[int, str], dict[str, Any]] = {}
-
-    for definition in definitions:
-        match = definition.get("match", {})
-        header_match = match.get("payloadHeader", {})
-        can_match = match.get("canId", {})
-        attribute_address = header_match.get("attribute_address")
-        feature_index = header_match.get("feature_index")
-        command_class = can_match.get("command_class")
-        if attribute_address is None or feature_index is None or command_class is None:
-            continue
-
-        variant = {6: "command", 5: "response", 3: "event"}.get(command_class)
-        if variant is None:
-            continue
-
-        attribute_name = definition.get("attributeName") or f"attribute_{attribute_address}"
-        feature_name = definition.get("featureName") or definition.get("label") or f"feature_{feature_index}.{variant}"
-        suffix = f".{variant}"
-        operation_type = feature_name[: -len(suffix)] if feature_name.endswith(suffix) else feature_name
-        attribute_key = (attribute_address, attribute_name)
-        attribute = attributes_by_key.setdefault(
-            attribute_key,
-            {
-                "name": attribute_name,
-                "address": attribute_address,
-                "operations": [],
-            },
-        )
-        operations = attribute["operations"]
-        operation = next((item for item in operations if item.get("type") == operation_type and item.get("featureIndex") == feature_index), None)
-        if operation is None:
-            operation = {
-                "type": operation_type,
-                "featureIndex": feature_index,
-                "variants": {},
-            }
-            operations.append(operation)
-        operation["variants"][variant] = definition.get("payloadFields", [])
-
-    compact: dict[str, Any] = {
-        "meta": profile["meta"],
-        "byteOrder": profile.get("byteOrder", "little"),
-        "protocol": profile.get("protocol", "schema"),
-        "canIdLayoutRef": profile.get("defaultCanIdLayoutId", CAN_ID_LAYOUT_ID),
-        "service": {
-            "name": service_name,
-            "identifier": service_identifier,
-        },
-        "payloadHeader": schema.get("payloadHeader", {"lengthBytes": 2, "fields": []}),
-        "attributes": list(attributes_by_key.values()),
-    }
-
-    error_config = schema.get("error") or {}
-    error_codes = schema.get("errors") or error_config.get("values") or {}
-    compact["errorStatus"] = {
-        "field": error_config.get("field", "message_good"),
-        "goodValue": error_config.get("goodValue", 1),
-        "byteOffset": error_config.get("byteOffset", 2),
-        "byteLength": error_config.get("byteLength", 4),
-        "byteOrder": error_config.get("byteOrder", "little"),
-    }
-    if error_codes:
-        compact["errorStatus"]["codes"] = error_codes
-
-    return compact
-
-
-def slugify(value: str, fallback: str) -> str:
-    text = re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("_")
-    return text or fallback
-
-
-def absolute_start_bit(field: dict[str, Any]) -> int:
-    return int(field.get("startBit", 0)) + int(field.get("byte", 0)) * 8
-
-
-def canonical_field(field: dict[str, Any], dictionaries: dict[str, dict[str, str]]) -> dict[str, Any]:
-    values = field.get("values")
-    if values:
-        dictionaries[field["name"]] = {str(key): str(value) for key, value in values.items()}
-
-    result: dict[str, Any] = {
-        "name": field["name"],
-        "startBit": absolute_start_bit(field),
-        "bitLength": int(field.get("bitLength", field.get("length", 1))),
-    }
-    if field.get("type"):
-        result["type"] = field["type"]
-    if values:
-        result["dictionary"] = field["name"]
-    for key in ("factor", "offset", "unit", "count"):
-        if key in field:
-            result[key] = field[key]
-    if "stride" in field:
-        result["strideBits"] = int(field["stride"]) * 8
-    if field.get("expression"):
-        result["display"] = {"expression": field["expression"]}
-    return result
-
-
-def canonical_payload_bit_length(fields: list[dict[str, Any]]) -> int:
-    if not fields:
-        return 0
-    return max(absolute_start_bit(field) + int(field.get("bitLength", field.get("length", 1))) for field in fields)
-
-
-def canonical_from_compact(profile: dict[str, Any]) -> dict[str, Any]:
-    dictionaries: dict[str, dict[str, str]] = {}
-    service = profile.get("service", {})
-    payload_header = profile.get("payloadHeader", {"fields": [], "lengthBytes": 0})
-    dictionaries["service_identifier"] = {str(service.get("identifier", 0)): str(service.get("name", "service"))}
-
-    can_id_fields = [
-        {"name": "command_class", "startBit": 26, "bitLength": 4, "type": "enum", "dictionary": "command_class"},
-        {"name": "broadcast", "startBit": 25, "bitLength": 1, "type": "enum", "dictionary": "broadcast"},
-        {"name": "destination_address", "startBit": 19, "bitLength": 6, "type": "uint"},
-        {"name": "source_address", "startBit": 13, "bitLength": 6, "type": "uint"},
-        {"name": "start_of_transfer", "startBit": 12, "bitLength": 1, "type": "enum", "dictionary": "start_of_transfer"},
-        {"name": "end_of_transfer", "startBit": 11, "bitLength": 1, "type": "enum", "dictionary": "end_of_transfer"},
-        {"name": "toggle", "startBit": 10, "bitLength": 1, "type": "uint"},
-        {"name": "service_identifier", "startBit": 0, "bitLength": 10, "type": "enum", "dictionary": "service_identifier"},
+def payload_header_layout(instance_values: dict[str, str]) -> dict[str, Any]:
+    fields: list[dict[str, Any]] = [
+        {"name": "attribute_address", "startBit": 1, "bitLength": 7, "type": "enum", "dictionary": "attribute_address"},
+        {"name": "message_good", "startBit": 0, "bitLength": 1, "type": "enum", "dictionary": "message_good"},
+        {"name": "instance_index", "startBit": 12, "bitLength": 4, "type": "enum", "dictionary": "instance_index"},
+        {"name": "feature_index", "startBit": 8, "bitLength": 4, "type": "enum", "dictionary": "feature_index"},
     ]
+    if not instance_values:
+        fields = [field for field in fields if field["name"] != "instance_index"]
+    return {"label": "Payload header", "bitLength": 16, "fields": fields}
+
+
+def message_definitions(root: ET.Element, source: Path, dictionaries: dict[str, dict[str, str]]) -> tuple[str, int, list[dict[str, Any]]]:
+    service_identifier = parse_int(attr_value(root, "service_identifier", "serviceIdentifier", "service_id", "serviceId", "id")) or 0
+    service_name = attr_value(root, "service_name", "name") or source.stem
+    messages: list[dict[str, Any]] = []
+
+    for attribute in root.iter():
+      tag = local_name(attribute.tag)
+      if tag not in {"property", "method", "event"}:
+          continue
+      attribute_address = parse_int(attr_value(attribute, "attribute_address", "address", "id"))
+      if attribute_address is None:
+          continue
+      attribute_name = attr_value(attribute, "attribute_name", "name") or tag
+      dictionaries.setdefault("attribute_address", {})[str(attribute_address)] = attribute_name
+
+      for feature in children_with_name(attribute, "feature", "execute", "get", "set", "value"):
+          feature_index = parse_int(attr_value(feature, "feature_index", "featureIndex", "index"))
+          if feature_index is None:
+              continue
+          feature_name = attr_value(feature, "feature_name", "name") or local_name(feature.tag)
+          dictionaries.setdefault("feature_index", {})[str(feature_index)] = feature_name
+          for direction, command_class in (("command", 6), ("response", 5), ("event", 3)):
+              if direction == "event" and tag != "event":
+                  continue
+              direction_node = child_with_name(feature, direction)
+              payload_node = child_with_name(direction_node, "payload") if direction_node is not None else None
+              fields = payload_values(payload_node, dictionaries)
+              message_id = slugify(f"{service_name}.{attribute_name}.{feature_name}.{direction}", "message")
+              messages.append(
+                  {
+                      "id": message_id,
+                      "label": f"{attribute_name}.{feature_name}.{direction}",
+                      "description": f"{service_name}.{attribute_name}.{feature_name}.{direction}",
+                      "identifyBy": {
+                          "service_identifier": service_identifier,
+                          "command_class": command_class,
+                          "attribute_address": attribute_address,
+                          "feature_index": feature_index,
+                      },
+                      "payload": {
+                          "bitLength": max((field["startBit"] + field["bitLength"] * int(field.get("count", 1)) for field in fields), default=16),
+                          "fields": fields,
+                      },
+                  }
+              )
+    return service_name, service_identifier, messages
+
+
+def canonical_profile(path: Path) -> dict[str, Any]:
+    root = ET.parse(path).getroot()
+    dictionaries = enum_dictionaries(root)
+    instance_values = extract_instances(root)
+    service_name, service_identifier, messages = message_definitions(root, path, dictionaries)
     dictionaries.update(
         {
             "command_class": {"6": "command/request", "5": "response", "3": "event/notification"},
             "broadcast": {"0": "unicast", "1": "broadcast"},
             "start_of_transfer": {"0": "not start", "1": "start"},
             "end_of_transfer": {"0": "not end", "1": "end"},
+            "message_good": {"0": "bad", "1": "good"},
+            "service_identifier": {str(service_identifier): service_name},
+            **({"instance_index": instance_values} if instance_values else {}),
         }
     )
-
-    payload_header_fields = [canonical_field(field, dictionaries) for field in payload_header.get("fields", [])]
-    messages: list[dict[str, Any]] = []
-    for attribute in profile.get("attributes", []):
-        dictionaries.setdefault("attribute_address", {})[str(attribute.get("address", 0))] = str(attribute.get("name", "attribute"))
-        for operation in attribute.get("operations", []):
-            feature_index = operation.get("featureIndex", 0)
-            dictionaries.setdefault("feature_index", {})[str(feature_index)] = str(operation.get("type", "operation"))
-            for variant, fields in operation.get("variants", {}).items():
-                command_class = {"command": 6, "response": 5, "event": 3}.get(variant)
-                if command_class is None:
-                    continue
-                message_id = f"{service.get('name', 'service')}.{attribute.get('name', 'attribute')}.{operation.get('type', 'operation')}.{variant}"
-                canonical_fields = [canonical_field(field, dictionaries) for field in fields]
-                messages.append(
-                    {
-                        "id": slugify(message_id, "message"),
-                        "label": f"{attribute.get('name', 'attribute')}.{operation.get('type', 'operation')}.{variant}",
-                        "description": message_id,
-                        "identifyBy": {
-                            "service_identifier": service.get("identifier", 0),
-                            "command_class": command_class,
-                            "attribute_address": attribute.get("address", 0),
-                            "feature_index": feature_index,
-                        },
-                        "payload": {
-                            "bitLength": canonical_payload_bit_length(fields),
-                            "fields": canonical_fields,
-                        },
-                    }
-                )
-
-    errors: list[dict[str, Any]] = []
-    error_status = profile.get("errorStatus")
-    if error_status:
-        codes = error_status.get("codes") or {}
-        if codes:
-            dictionaries["error_status"] = {str(key): str(value) for key, value in codes.items()}
-        errors.append(
+    error_values = extract_errors(root)
+    if error_values:
+        dictionaries["error_status"] = error_values
+    errors = (
+        [
             {
                 "id": "default_error_status",
-                "when": f"{error_status.get('field', 'message_good')} != {json.dumps(error_status.get('goodValue', 1))}",
-                "source": {
-                    "startBit": int(error_status.get("byteOffset", 2)) * 8,
-                    "bitLength": int(error_status.get("byteLength", 4)) * 8,
-                    "type": "uint",
-                    "byteOrder": error_status.get("byteOrder", "little"),
-                },
-                "dictionary": "error_status" if codes else None,
+                "when": "message_good != 1",
+                "source": {"startBit": 16, "bitLength": 32, "type": "uint", "byteOrder": "little"},
+                "dictionary": "error_status",
                 "display": "Error ${raw}: ${text}",
             }
-        )
-        errors = [{key: value for key, value in error.items() if value is not None} for error in errors]
-
+        ]
+        if error_values
+        else []
+    )
     return {
         "schemaVersion": "1.0",
         "meta": {
-            "id": slugify(profile.get("meta", {}).get("source", profile.get("meta", {}).get("name", "profile")).removesuffix(".xml"), "profile"),
-            "name": profile.get("meta", {}).get("name", "CAN-FD Schema Profile"),
-            "version": profile.get("meta", {}).get("version", "1.0.0"),
-            **({"description": profile.get("meta", {}).get("description")} if profile.get("meta", {}).get("description") else {}),
-            **({"source": profile.get("meta", {}).get("source")} if profile.get("meta", {}).get("source") else {}),
+            "id": slugify(path.stem, "profile"),
+            "name": f"{path.stem} CAN-FD Schema Profile v2" if path.stem == "k2_light_control" else f"{path.stem} CAN-FD Schema Profile",
+            "version": "1.0.0",
+            "source": path.name,
         },
-        "bus": {
-            "type": "can-fd",
-            "idFormat": "extended",
-            "byteOrder": profile.get("byteOrder", "little"),
-        },
-        "layouts": {
-            "canId": {
-                "label": "Universal CAN ID Layout",
-                "bitLength": 29,
-                "fields": can_id_fields,
-            },
-            "payloadHeader": {
-                "label": "Payload header",
-                "bitLength": int(payload_header.get("bitLength", int(payload_header.get("lengthBytes", 0)) * 8)),
-                "fields": payload_header_fields,
-            },
-        },
+        "bus": {"type": "can-fd", "idFormat": "extended", "byteOrder": "little"},
+        "layouts": {"canId": can_id_layout(), "payloadHeader": payload_header_layout(instance_values)},
         "dictionaries": {key: value for key, value in dictionaries.items() if value},
         "messages": messages,
         "errors": errors,
@@ -769,82 +316,62 @@ def canonical_from_compact(profile: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def convert_one(path: Path) -> dict[str, Any]:
-    profile = base_profile([path], embed_can_id_layout=True)
-    root = ET.parse(path).getroot()
-    errors = extract_errors(root)
-    profile["messageSchema"]["messageDefinitions"] = schema_message_definitions_from_xml(root, path)
-    profile["messageSchema"]["errors"] = errors
-    profile["messageSchema"]["error"]["values"] = errors
-    apply_payload_header_values(profile, extract_instances(root))
-    profile["meta"]["name"] = profile_name_for(path)
-    profile["meta"]["source"] = path.name
-    return canonical_from_compact(compact_profile_from_expanded(profile))
-
-
-def can_id_fragment() -> dict[str, Any]:
-    profile = canonical_from_compact(
-        {
-            "meta": {
-                "name": "Universal CAN ID Layout",
-                "version": "1.0.0",
-                "description": "Reusable 29-bit arbitration ID layout fragment.",
-            },
-            "byteOrder": "little",
-            "payloadHeader": {"lengthBytes": 0, "fields": []},
-            "service": {"name": "layout", "identifier": 0},
-            "attributes": [],
-        }
-    )
+def can_id_profile() -> dict[str, Any]:
     return {
-        **profile,
+        "schemaVersion": "1.0",
+        "meta": {
+            "id": "universal_can_id_layout",
+            "name": "Universal CAN ID Layout",
+            "version": "1.0.0",
+            "description": "Reusable 29-bit arbitration ID layout profile.",
+        },
+        "bus": {"type": "can-fd", "idFormat": "extended", "byteOrder": "little"},
+        "layouts": {"canId": can_id_layout()},
+        "dictionaries": {
+            "command_class": {"6": "command/request", "5": "response", "3": "event/notification"},
+            "broadcast": {"0": "unicast", "1": "broadcast"},
+            "start_of_transfer": {"0": "not start", "1": "start"},
+            "end_of_transfer": {"0": "not end", "1": "end"},
+        },
         "messages": [],
         "errors": [],
+        "display": {},
     }
 
 
 def write_split_profiles(paths: list[Path], output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    can_id_path = output_dir / "knossos_can_id_layout.json"
-    can_id_path.write_text(json.dumps(can_id_fragment(), indent=2), encoding="utf-8")
-    print(f"Wrote {can_id_path}")
-
+    layout_path = output_dir / "knossos_can_id_layout.json"
+    layout_path.write_text(json.dumps(can_id_profile(), indent=2), encoding="utf-8")
+    print(f"Wrote {layout_path}")
     for path in paths:
-        profile = convert_one(path)
+        profile = canonical_profile(path)
         output_path = output_dir / f"{path.stem}_profile.json"
         output_path.write_text(json.dumps(profile, indent=2), encoding="utf-8")
-        print(
-            f"Wrote {output_path} "
-            f"({len(profile.get('messages', []))} messages, "
-            f"{len(profile.get('dictionaries', {}).get('error_status', {}))} errors)"
-        )
+        print(f"Wrote {output_path} ({len(profile['messages'])} messages)")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Convert Knossos XML files to CAN-FD workbench profile JSON.")
-    parser.add_argument("xml", nargs="+", type=Path, help="Input k2_*.xml files")
+    parser = argparse.ArgumentParser(description="Convert XML files to canonical CAN-FD profile JSON.")
+    parser.add_argument("xml", nargs="+", type=Path, help="Input XML files")
     parser.add_argument("-o", "--output", type=Path, help="Output combined JSON profile path")
-    parser.add_argument("--split-dir", type=Path, help="Write one self-contained profile per XML plus an optional reusable CAN ID layout JSON")
+    parser.add_argument("--split-dir", type=Path, help="Write one profile per XML plus a reusable CAN ID layout JSON")
     args = parser.parse_args()
 
     missing = [path for path in args.xml if not path.exists()]
     if missing:
         print(f"Missing XML files: {', '.join(str(path) for path in missing)}", file=sys.stderr)
         return 2
-
     if args.split_dir:
-      write_split_profiles(args.xml, args.split_dir)
-      return 0
-
+        write_split_profiles(args.xml, args.split_dir)
+        return 0
     if not args.output:
         print("Either --output or --split-dir is required.", file=sys.stderr)
         return 2
-
-    profile = canonical_from_compact(compact_profile_from_expanded(convert(args.xml)))
+    profile = canonical_profile(args.xml[0])
     args.output.write_text(json.dumps(profile, indent=2), encoding="utf-8")
     print(f"Wrote {args.output}")
     print(f"Messages: {len(profile['messages'])}")
-    print(f"Errors: {len(profile.get('dictionaries', {}).get('error_status', {}))}")
     return 0
 
 

@@ -202,18 +202,16 @@ type CanonicalProfile = {
 }
 ```
 
-Profile Editor Visual, JSON view, CAN Monitor decoding, display filters, transmit helpers, and simulator matching should consume the canonical profile shape. Older or external formats belong at import/conversion boundaries only.
+Profile Editor Visual, JSON view, CAN Monitor decoding, display filters, transmit helpers, and simulator matching consume the canonical profile shape.
 
 ### Profile decoding
 
 Files:
 
 - `src/profile-editor/decodeProfile.ts`
-- `src/profile-editor/canonical/normalizeToCanonicalProfile.ts`
 
 Decoder rules:
 
-- convert older inputs to canonical before decode when needed
 - decode CAN ID fields from `layouts.canId.fields`
 - decode payload header fields before message matching
 - match only profiles whose `messages[].identifyBy` criteria apply
@@ -276,12 +274,10 @@ Recommended sequence:
 
 ## Adding A Profile Field
 
-For compact schema profiles:
-
-1. Add or edit the field under the correct attribute operation variant.
-2. Use `byte`, `startBit`, and `length` for bit layout.
-3. Add `type`, `factor`, `offset`, `unit`, `values`, `count`, or `stride` only when needed.
-4. Use profile-level `errorStatus` for error-code handling.
+1. Add or edit the field under the correct `messages[].payload.fields` entry.
+2. Use absolute `startBit` and `bitLength` for bit layout.
+3. Add `type`, `factor`, `offset`, `unit`, `dictionary`, `count`, or `strideBits` only when needed.
+4. Use `errors[]` for error-code handling.
 5. Validate with Decoded Preview and a known frame.
 
 ## Adding A Daemon Message

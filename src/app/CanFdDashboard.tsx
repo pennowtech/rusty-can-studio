@@ -27,8 +27,7 @@ import type { HTMLAttributes, KeyboardEvent, MouseEvent } from "react";
 import { TableVirtuoso } from "react-virtuoso";
 import type { TableComponents, TableVirtuosoHandle } from "react-virtuoso";
 import type { WsFrame } from "@/can-bridge/ws/types";
-import type { CanProfile } from "@/profile-editor/model/profile";
-import { getProfileMessageSchema } from "@/profile-editor/profileAdapter";
+import type { ProfileDocument } from "@/profile-editor/model/profile";
 import { toast } from "sonner";
 
 function formatCanId(id: number) {
@@ -83,44 +82,25 @@ type TraceRow = {
   haystack: string;
 };
 
-function uniqueProfiles(profiles: Array<CanProfile | null>) {
-  const seen = new Set<CanProfile>();
-  return profiles.filter((profile): profile is CanProfile => {
+function uniqueProfiles(profiles: Array<ProfileDocument | null>) {
+  const seen = new Set<ProfileDocument>();
+  return profiles.filter((profile): profile is ProfileDocument => {
     if (!profile || seen.has(profile)) return false;
     seen.add(profile);
     return true;
   });
 }
 
-function profileCanIdColumns(profile: CanProfile) {
-  const defaultLayout = profile.defaultCanIdLayoutId
-    ? profile.canIdLayouts?.[profile.defaultCanIdLayoutId]
-    : Object.values(profile.canIdLayouts ?? {})[0];
-  const schema = getProfileMessageSchema(profile);
-  const fields = schema
-    ? (schema.canIdLayout?.fields ?? defaultLayout?.fields ?? [])
-    : profile.knossos
-      ? profile.knossos.canIdLayout.fields
-      : defaultLayout?.fields ?? [];
-
-  return fields.map((field) => ({
+function profileCanIdColumns(profile: ProfileDocument) {
+  return profile.layouts.canId.fields.map((field) => ({
     id: `canId:${field.name}`,
     label: field.name,
   }));
 }
 
-function profilePayloadColumns(profile: CanProfile) {
+function profilePayloadColumns(profile: ProfileDocument) {
   const names = new Set<string>();
-  const schema = getProfileMessageSchema(profile);
-  if (schema) {
-    for (const field of schema.payloadHeader?.fields ?? []) names.add(field.name);
-  } else if (profile.knossos) {
-    for (const field of profile.knossos.payloadHeader.fields) names.add(field.name);
-  } else {
-    for (const frame of Object.values(profile.frames)) {
-      for (const signal of frame.signals) names.add(signal.name);
-    }
-  }
+  for (const field of profile.layouts.payloadHeader?.fields ?? []) names.add(field.name);
 
   return Array.from(names).map((name) => ({
     id: `payload:${name}`,
@@ -150,15 +130,15 @@ function formatDecodedValue(field: DecodedField) {
 }
 
 function formatPayloadCell(frame: WsFrame, decoded: DecodedFrame | null | undefined) {
-  if (!decoded?.payloadFields.length) return frame.data_hex;
-  return decoded.payloadFields.map((field) => `${field.name}=${formatDecodedValue(field)}`).join(", ");
+  if (!decoded?.payloadDecodedFields.length) return frame.data_hex;
+  return decoded.payloadDecodedFields.map((field) => `${field.name}=${formatDecodedValue(field)}`).join(", ");
 }
 
 function formatPayloadValuesCell(frame: WsFrame, decoded: DecodedFrame | null | undefined, headerNames: Set<string>) {
   if (decoded?.errorCode != null || decoded?.messageGood === false) {
     return `Error${decoded.errorCode != null ? ` ${decoded.errorCode}` : ""}: ${decoded.errorText ?? "Unknown error"}`;
   }
-  const fields = (decoded?.payloadFields ?? []).filter((field) => !headerNames.has(field.name));
+  const fields = (decoded?.payloadDecodedFields ?? []).filter((field) => !headerNames.has(field.name));
   if (!fields.length) return frame.data_hex;
   return fields.map((field) => `${field.name}=${formatDecodedValue(field)}`).join(", ");
 }
@@ -336,7 +316,7 @@ function buildTraceRow(frame: WsFrame, index: number, decoded: DecodedFrame | nu
     numericValues[field.name] = field.physical;
     numericValues[`canId:${field.name}`] = field.physical;
   }
-  for (const field of decoded?.payloadFields ?? []) {
+  for (const field of decoded?.payloadDecodedFields ?? []) {
     values[field.name] = field.displayValue;
     values[`payload:${field.name}`] = field.displayValue;
     numericValues[field.name] = field.physical;
@@ -630,10 +610,7 @@ export function CanFdDashboard() {
   const rawProfileForDecode = useProfileStore((s) => s.draftProfile ?? s.profile);
   const loadedProfileLibrary = useProfileStore((s) => s.loadedProfiles);
   const profilesForDecode = useMemo(
-    () =>
-      uniqueProfiles([rawProfileForDecode, ...loadedProfileLibrary]).map((profile) =>
-        resolveProfileReferences(profile, loadedProfileLibrary) ?? profile,
-      ),
+    () => uniqueProfiles([rawProfileForDecode, ...loadedProfileLibrary]).map((profile) => resolveProfileReferences(profile) ?? profile),
     [loadedProfileLibrary, rawProfileForDecode],
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -797,15 +774,13 @@ export function CanFdDashboard() {
   const expectedResponseOptions = useMemo(() => {
     const byId = new Map<string, string>();
     for (const profile of profilesForDecode) {
-      const schema = getProfileMessageSchema(profile);
-      for (const definition of schema?.messageDefinitions ?? []) {
-        const commandClass = definition.match?.canId?.command_class;
-        if (commandClass != null && !["3", "5", "response", "event", "event/notification"].includes(String(commandClass))) {
+      for (const message of profile.messages) {
+        const commandClass = message.identifyBy.command_class;
+        const messageText = `${message.id} ${message.label}`.toLowerCase();
+        if (commandClass != null && !["3", "5", "response", "event", "event/notification"].includes(String(commandClass)) && !messageText.includes("response") && !messageText.includes("event")) {
           continue;
         }
-        const id = definition.id ?? definition.name ?? definition.label;
-        if (!id) continue;
-        byId.set(id, definition.label ?? definition.name ?? definition.meaning ?? id);
+        byId.set(message.id, message.label ?? message.id);
       }
     }
     return Array.from(byId.entries()).map(([id, label]) => ({ id, label }));
@@ -1134,9 +1109,7 @@ export function CanFdDashboard() {
     if (!frame) return;
     setProfileViewMode("edit");
     if (decoded?.frameName) {
-      const ownerIndex = loadedProfileLibrary.findIndex((profile) =>
-        getProfileMessageSchema(profile)?.messageDefinitions?.some((definition) => (definition.id ?? "") === decoded.frameName || definition.name === decoded.frameName),
-      );
+      const ownerIndex = loadedProfileLibrary.findIndex((profile) => profile.messages.some((message) => message.id === decoded.frameName));
       if (ownerIndex >= 0) selectLoadedProfile(ownerIndex);
       selectMessageDefinition(decoded.frameName, frame.data_hex);
     } else {
@@ -1529,7 +1502,7 @@ export function CanFdDashboard() {
 
     if (column.kind === "payloadHeader") {
       const fieldName = column.id.slice("payload:".length);
-      const field = decodedFrame?.payloadFields.find((item) => item.name === fieldName);
+      const field = decodedFrame?.payloadDecodedFields.find((item) => item.name === fieldName);
       const value = field ? formatDecodedValue(field) : "-";
       return (
         <td key={column.id} className="px-4 py-3 font-mono text-xs" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, column.id, value, field)}>
@@ -2347,5 +2320,6 @@ export function CanFdDashboard() {
     </div>
   );
 }
+
 
 

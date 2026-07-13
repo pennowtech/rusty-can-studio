@@ -1,9 +1,14 @@
-import { CanIdField } from "../model/profile";
 import { RangeGridEditor } from "./RangeGridEditor";
+
+type CanIdGridField = {
+  name: string;
+  startBit: number;
+  bitLength: number;
+};
 
 export function CanIdBitGridEditor(props: {
   bitLength: number;
-  fields: CanIdField[];
+  fields: CanIdGridField[];
   editable?: boolean;
   onChange: (name: string, start: number, length: number) => void;
 }) {
@@ -14,7 +19,7 @@ export function CanIdBitGridEditor(props: {
       items={props.fields.map((f) => ({
         id: f.name,
         start: f.startBit,
-        length: f.length,
+        length: f.bitLength,
         label: f.name,
       }))}
       unitLabel={(i) => i.toString()}

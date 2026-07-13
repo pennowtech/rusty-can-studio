@@ -53,7 +53,7 @@ The equivalent expression is:
 
 ## Example 3: Find Bad Responses
 
-If the loaded profile defines `errorStatus`, use:
+If the loaded profile defines `errors[]`, use:
 
 ```text
 error

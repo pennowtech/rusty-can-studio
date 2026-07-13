@@ -12,10 +12,9 @@ import { useTransmitDraftStore } from "@/store/transmitDraftStore";
 import { resolveProfileReferences, useProfileStore } from "@/profile-editor/store/profileStore";
 import { decodeFrameWithProfiles, type DecodedFrame } from "@/profile-editor/decodeProfile";
 import type { WsFrame } from "@/can-bridge/ws/types";
-import type { CanProfile } from "@/profile-editor/model/profile";
+import type { ProfileDocument } from "@/profile-editor/model/profile";
 import { CheckCircle2, Clock, Copy, GitBranch, Link2, Pause, Play, Plus, RadioTower, RotateCcw, Send, Trash2, Workflow, XCircle } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { getProfileMessageSchema } from "@/profile-editor/profileAdapter";
 import { openJsonFile, saveJsonFile } from "@/profile-editor/tauriFileIO";
 
 type StepType = "send" | "wait" | "cyclic" | "delay" | "branch";
@@ -266,7 +265,7 @@ export function CanSimulatorSequences() {
   const rawProfile = useProfileStore((s) => s.draftProfile ?? s.profile);
   const loadedProfiles = useProfileStore((s) => s.loadedProfiles);
   const profilesForDecode = useMemo(
-    () => [rawProfile, ...loadedProfiles].filter(Boolean).map((profile) => resolveProfileReferences(profile as CanProfile, loadedProfiles) ?? profile) as CanProfile[],
+    () => [rawProfile, ...loadedProfiles].filter(Boolean).map((profile) => resolveProfileReferences(profile as ProfileDocument) ?? profile) as ProfileDocument[],
     [loadedProfiles, rawProfile],
   );
 
@@ -286,24 +285,22 @@ export function CanSimulatorSequences() {
   const responseOptions = useMemo(() => {
     const options = new Map<string, string>();
     for (const profile of profilesForDecode) {
-      const schema = getProfileMessageSchema(profile);
-      for (const definition of schema?.messageDefinitions ?? []) {
-        const commandClass = definition.match?.canId?.command_class;
+      for (const message of profile.messages) {
+        const commandClass = message.identifyBy.command_class;
         const commandClassText = String(commandClass ?? "").toLowerCase();
+        const messageText = `${message.id} ${message.label}`.toLowerCase();
         const looksLikeResponse =
           commandClass === 5 ||
           commandClass === 3 ||
           commandClassText === "response" ||
           commandClassText === "event" ||
           commandClassText === "event/notification" ||
-          definition.id?.toLowerCase().includes(".response") ||
-          definition.id?.toLowerCase().includes(".event") ||
-          definition.name?.toLowerCase().includes("response") ||
-          definition.name?.toLowerCase().includes("event");
+          messageText.includes(".response") ||
+          messageText.includes(".event") ||
+          messageText.includes("response") ||
+          messageText.includes("event");
         if (!looksLikeResponse) continue;
-        const id = definition.id ?? definition.name ?? definition.label;
-        if (!id) continue;
-        options.set(id, definition.label ?? definition.name ?? definition.meaning ?? id);
+        options.set(message.id, message.label ?? message.id);
       }
     }
     return Array.from(options.entries()).map(([id, label]) => ({ id, label }));
@@ -957,4 +954,3 @@ export function CanSimulatorSequences() {
     </div>
   );
 }
-

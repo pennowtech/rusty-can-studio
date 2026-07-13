@@ -115,13 +115,13 @@ Use Visual view for structured editing and JSON view for direct source editing.
 
 Common edits:
 
-- service name and identifier
+- metadata and bus settings
+- CAN ID layout fields
 - payload header fields
-- attribute names and addresses
-- operations and feature indexes
-- command, response, or event payload fields
-- value maps
-- error status dictionary
+- message identification values
+- message payload fields
+- dictionaries
+- error rules
 
 Use Decoded Preview while editing to check the selected frame against the current profile definition.
 

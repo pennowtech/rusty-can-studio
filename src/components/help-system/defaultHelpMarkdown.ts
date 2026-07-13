@@ -14,7 +14,7 @@ Use the left navigation to switch between the monitor, simulator, profile editor
 2. Select the active interface or connection profile.
 3. Start capture.
 4. Use filters to reduce the live trace to the frames you need.
-5. Inspect decoded signals and payload bytes.
+5. Inspect decoded fields and payload bytes.
 
 :::tip
 Start with a narrow CAN ID filter when the bus is busy. It keeps the trace readable and makes search results more useful.
@@ -300,9 +300,9 @@ CAN-FD has three details that matter in this application:
 
 The live trace shows timestamp, identifier, direction, DLC, CAN-FD mode, and decoded frame name. Use it to confirm that traffic is arriving and that the expected identifiers are present.
 
-### Decoded signals
+### Decoded fields
 
-Decoded signals show engineering values from the selected profile. Fresh values are updated from recent frames. Latched values are retained until replaced by a newer frame.
+Decoded fields show engineering values from the selected profile. Fresh values are updated from recent frames. Latched values are retained until replaced by a newer frame.
 
 :::warning
 Decoded values are only as reliable as the loaded profiles. Confirm profile byte order, scaling, offsets, payload header fields, and CAN ID layouts before using a value for analysis.
@@ -612,7 +612,7 @@ Bare text searches all available row values. Field conditions search one specifi
 
 Right click a column header to build a filter from that column. The menu can replace the current filter, add the selected row value with \`and\`, add it with \`or\`, or insert an editable condition template. Use the \`X\` button in the filter field to clear the expression quickly.
 
-Error rows are highlighted in red when a matching loaded profile decodes a bad response through its \`errorStatus\` block. Use \`error\` for a quick error-only filter, or use \`hasError == true\`, \`errorCode == 12\`, and \`errorText contains POSITION\` when you need a precise error view.
+Error rows are highlighted in red when a matching loaded profile decodes a bad response through its \`errors[]\` rules. Use \`error\` for a quick error-only filter, or use \`hasError == true\`, \`errorCode == 12\`, and \`errorText contains POSITION\` when you need a precise error view.
 
 ### Monitor sorting
 
@@ -977,7 +977,7 @@ Run benchmarks when changing trace parsing, display filtering, sorting, profile 
 npm run benchmark
 \`\`\`
 
-The benchmark suite covers candump parsing on larger traces and derived-field creation against a profile with many signals. Benchmark results vary by machine, so use them as before-and-after comparisons on the same computer.
+The benchmark suite covers candump parsing on larger traces and canonical profile decoding. Benchmark results vary by machine, so use them as before-and-after comparisons on the same computer.
 
 ## Transmit composer
 

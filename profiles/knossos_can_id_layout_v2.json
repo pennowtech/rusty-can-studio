@@ -1,10 +1,10 @@
 {
   "schemaVersion": "1.0",
   "meta": {
-    "id": "Universal_CAN_ID_Layout",
+    "id": "universal_can_id_layout",
     "name": "Universal CAN ID Layout",
     "version": "1.0.0",
-    "description": "Reusable 29-bit arbitration ID layout fragment."
+    "description": "Reusable 29-bit arbitration ID layout profile."
   },
   "bus": {
     "type": "can-fd",
@@ -70,17 +70,9 @@
           "dictionary": "service_identifier"
         }
       ]
-    },
-    "payloadHeader": {
-      "label": "Payload header",
-      "bitLength": 0,
-      "fields": []
     }
   },
   "dictionaries": {
-    "service_identifier": {
-      "0": "layout"
-    },
     "command_class": {
       "6": "command/request",
       "5": "response",

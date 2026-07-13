@@ -67,7 +67,7 @@ npm run benchmark
 The benchmark suite currently covers:
 
 - candump parsing for 10k and 50k frame traces
-- derived-field creation against a profile with many available signals
+- canonical profile decoding across different CAN/CAN-FD layouts
 
 Benchmark numbers vary by machine, so treat them as a local comparison tool. Run them before and after a performance-sensitive change and compare the same machine under similar load.
 

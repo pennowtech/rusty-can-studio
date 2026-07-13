@@ -78,32 +78,51 @@
         {
           "name": "attribute_address",
           "startBit": 1,
-          "bitLength": 7
+          "bitLength": 7,
+          "type": "enum",
+          "dictionary": "attribute_address"
         },
         {
           "name": "message_good",
           "startBit": 0,
           "bitLength": 1,
-          "type": "bool",
+          "type": "enum",
           "dictionary": "message_good"
         },
         {
           "name": "instance_index",
           "startBit": 12,
           "bitLength": 4,
+          "type": "enum",
           "dictionary": "instance_index"
         },
         {
           "name": "feature_index",
           "startBit": 8,
-          "bitLength": 4
+          "bitLength": 4,
+          "type": "enum",
+          "dictionary": "feature_index"
         }
       ]
     }
   },
   "dictionaries": {
-    "service_identifier": {
-      "810": "k2_light_control"
+    "attribute_address": {
+      "0": "service_version",
+      "1": "service_sha_256_hash",
+      "2": "xyz",
+      "3": "on_off_cycles",
+      "4": "total_ontime_unweighted",
+      "6": "ontime_clusters",
+      "7": "calibration_data",
+      "8": "calibration_status",
+      "9": "reference_light_output"
+    },
+    "feature_index": {
+      "1": "get_current_value",
+      "9": "set_current_value",
+      "2": "get_static_value",
+      "10": "set_static_value"
     },
     "command_class": {
       "6": "command/request",
@@ -126,27 +145,13 @@
       "0": "bad",
       "1": "good"
     },
+    "service_identifier": {
+      "810": "k2_light_control"
+    },
     "instance_index": {
       "0": "FIELD_LED",
       "1": "SCI_LED",
       "2": "TWO_DEGREE_LED"
-    },
-    "attribute_address": {
-      "0": "service_version",
-      "1": "service_sha_256_hash",
-      "2": "xyz",
-      "3": "on_off_cycles",
-      "4": "total_ontime_unweighted",
-      "6": "ontime_clusters",
-      "7": "calibration_data",
-      "8": "calibration_status",
-      "9": "reference_light_output"
-    },
-    "feature_index": {
-      "1": "get_current_value",
-      "9": "set_current_value",
-      "2": "get_static_value",
-      "10": "set_static_value"
     }
   },
   "messages": [
@@ -161,7 +166,7 @@
         "feature_index": 1
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -220,7 +225,7 @@
         "feature_index": 9
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -235,7 +240,7 @@
         "feature_index": 1
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -296,7 +301,7 @@
         "feature_index": 9
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -311,7 +316,7 @@
         "feature_index": 1
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -360,7 +365,7 @@
         "feature_index": 1
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -419,7 +424,7 @@
         "feature_index": 9
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -434,7 +439,7 @@
         "feature_index": 1
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -472,7 +477,7 @@
         "feature_index": 1
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -487,7 +492,7 @@
         "feature_index": 1
       },
       "payload": {
-        "bitLength": 48,
+        "bitLength": 336,
         "fields": [
           {
             "name": "ontime_clusters",
@@ -512,7 +517,7 @@
         "feature_index": 9
       },
       "payload": {
-        "bitLength": 48,
+        "bitLength": 336,
         "fields": [
           {
             "name": "ontime_clusters",
@@ -537,7 +542,7 @@
         "feature_index": 9
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -666,7 +671,7 @@
         "feature_index": 2
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -725,7 +730,7 @@
         "feature_index": 10
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -740,7 +745,7 @@
         "feature_index": 1
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -783,7 +788,7 @@
         "feature_index": 2
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -798,15 +803,15 @@
         "feature_index": 2
       },
       "payload": {
-        "bitLength": 24,
+        "bitLength": 8208,
         "fields": [
           {
             "name": "service_version",
             "startBit": 16,
-            "bitLength": 8,
+            "bitLength": 256,
             "type": "uint",
             "count": 32,
-            "strideBits": 8
+            "strideBits": 256
           }
         ]
       }
@@ -822,7 +827,7 @@
         "feature_index": 2
       },
       "payload": {
-        "bitLength": 0,
+        "bitLength": 16,
         "fields": []
       }
     },
@@ -837,7 +842,7 @@
         "feature_index": 2
       },
       "payload": {
-        "bitLength": 24,
+        "bitLength": 272,
         "fields": [
           {
             "name": "sha_hash",
@@ -851,18 +856,6 @@
       }
     }
   ],
-  "errors": [
-    {
-      "id": "default_error_status",
-      "when": "message_good != 1",
-      "source": {
-        "startBit": 16,
-        "bitLength": 32,
-        "type": "uint",
-        "byteOrder": "little"
-      },
-      "display": "Error ${raw}: ${text}"
-    }
-  ],
+  "errors": [],
   "display": {}
 }

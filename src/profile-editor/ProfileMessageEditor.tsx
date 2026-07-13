@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DecodedPreviewPanel } from "@/profile-editor/DecodedPreviewPanel";
-import { normalizeToCanonicalProfile } from "@/profile-editor/canonical/normalizeToCanonicalProfile";
 import { decodeFrameWithProfile } from "@/profile-editor/decodeProfile";
 import type { CanonicalField, CanonicalMessage, CanonicalProfile } from "@/profile-editor/model/canonicalProfile";
 import { resolveProfileReferences, useProfileStore } from "@/profile-editor/store/profileStore";
@@ -114,19 +113,16 @@ function createMessage(index: number): CanonicalMessage {
 export function ProfileMessageEditor() {
   const rawProfile = useProfileStore((s) => s.profile);
   const rawDraftProfile = useProfileStore((s) => s.draftProfile);
-  const loadedProfileLibrary = useProfileStore((s) => s.loadedProfiles);
   const selectedMessageDefinitionId = useProfileStore((s) => s.selectedMessageDefinitionId);
   const selectedFramePayloadHex = useProfileStore((s) => s.selectedFramePayloadHex);
   const updateDraftProfile = useProfileStore((s) => s.updateDraftProfile);
   const setView = useAppStore((s) => s.setView);
   const profile = useMemo(() => {
-    const resolved = resolveProfileReferences(rawProfile, loadedProfileLibrary);
-    return resolved ? normalizeToCanonicalProfile(resolved) : null;
-  }, [rawProfile, loadedProfileLibrary]);
+    return resolveProfileReferences(rawProfile);
+  }, [rawProfile]);
   const draftProfile = useMemo(() => {
-    const resolved = resolveProfileReferences(rawDraftProfile, loadedProfileLibrary);
-    return resolved ? normalizeToCanonicalProfile(resolved) : null;
-  }, [rawDraftProfile, loadedProfileLibrary]);
+    return resolveProfileReferences(rawDraftProfile);
+  }, [rawDraftProfile]);
   const activeProfile = draftProfile ?? profile;
   const editable = Boolean(draftProfile);
   const [selectedNode, setSelectedNode] = useState<ProfileNode>({ kind: "messages" });

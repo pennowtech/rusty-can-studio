@@ -1,133 +1,53 @@
 {
+  "schemaVersion": "1.0",
   "meta": {
-    "name": "Example CAN Profile",
-    "version": "1.0",
-    "description": "Demonstrates CAN ID + payload via JSON import"
+    "id": "example_vehicle_profile",
+    "name": "Example Vehicle Profile",
+    "version": "1.0.0",
+    "description": "Demonstrates canonical CAN ID and payload decoding."
   },
-
-  "canIdLayouts": {
-    "default": {
-      "id": "default",
-      "name": "Extended CAN ID",
-      "format": "extended",
+  "bus": {
+    "type": "can-fd",
+    "idFormat": "extended",
+    "byteOrder": "little"
+  },
+  "layouts": {
+    "canId": {
+      "label": "Extended CAN ID",
       "bitLength": 29,
       "fields": [
-        {
-          "name": "priority",
-          "startBit": 26,
-          "length": 3
-        },
-        {
-          "name": "messageType",
-          "startBit": 21,
-          "length": 5
-        },
-        {
-          "name": "sourceNode",
-          "startBit": 13,
-          "length": 8
-        },
-        {
-          "name": "destinationNode",
-          "startBit": 5,
-          "length": 8
-        }
+        { "name": "priority", "startBit": 26, "bitLength": 3, "type": "uint" },
+        { "name": "message_type", "startBit": 21, "bitLength": 5, "type": "uint" },
+        { "name": "source_node", "startBit": 13, "bitLength": 8, "type": "uint" },
+        { "name": "destination_node", "startBit": 5, "bitLength": 8, "type": "uint" }
       ]
     }
   },
-
-  "frames": {
-    "VehicleStatus": {
-      "canIdLayout": "default",
-      "signals": [
-        {
-          "name": "vehicleSpeed",
-          "startByte": 0,
-          "length": 2,
-          "byteOrder": "little",
-          "factor": 0.01,
-          "offset": 0,
-          "unit": "km/h"
-        },
-        {
-          "name": "engineRpm",
-          "startByte": 2,
-          "length": 2,
-          "byteOrder": "little",
-          "factor": 1,
-          "offset": 0,
-          "unit": "rpm"
-        },
-        {
-          "name": "gearRaw",
-          "startByte": 4,
-          "length": 1,
-          "byteOrder": "little",
-          "factor": 1,
-          "offset": 0
-        }
-      ]
+  "dictionaries": {
+    "gear": {
+      "0": "Neutral",
+      "1": "Drive",
+      "2": "Reverse",
+      "3": "Park"
     }
   },
-
-  "fieldTypes": {
-    "GearType": {
-      "kind": "enum",
-      "values": {
-        "0": "Neutral",
-        "1": "Drive",
-        "2": "Reverse",
-        "3": "Park"
+  "messages": [
+    {
+      "id": "vehicle_status",
+      "label": "Vehicle Status",
+      "identifyBy": {
+        "can_id": 419385573
+      },
+      "payload": {
+        "bitLength": 40,
+        "fields": [
+          { "name": "vehicle_speed", "startBit": 0, "bitLength": 16, "type": "uint", "factor": 0.01, "unit": "km/h" },
+          { "name": "engine_rpm", "startBit": 16, "bitLength": 16, "type": "uint", "unit": "rpm" },
+          { "name": "gear_raw", "startBit": 32, "bitLength": 8, "type": "enum", "dictionary": "gear" }
+        ]
       }
     }
-  },
-
-  "derivedFields": [
-    {
-      "name": "gear",
-      "source": "signal",
-      "signal": "gearRaw",
-      "fieldType": "GearType"
-    },
-    {
-      "name": "overspeed",
-      "source": "expression",
-      "expression": "vehicleSpeed > 120",
-      "fieldType": "boolean"
-    }
   ],
-
-  "columns": [
-    {
-      "label": "Time",
-      "source": "frame",
-      "key": "timestamp",
-      "visible": true
-    },
-    {
-      "label": "Source",
-      "source": "canId",
-      "field": "sourceNode",
-      "visible": true
-    },
-    {
-      "label": "Speed",
-      "source": "signal",
-      "signal": "vehicleSpeed",
-      "unit": "km/h",
-      "visible": true
-    },
-    {
-      "label": "Gear",
-      "source": "derived",
-      "field": "gear",
-      "visible": true
-    },
-    {
-      "label": "Overspeed",
-      "source": "derived",
-      "field": "overspeed",
-      "visible": true
-    }
-  ]
+  "errors": [],
+  "display": {}
 }

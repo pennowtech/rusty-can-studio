@@ -47,7 +47,7 @@ Optional sections:
 
 Use `startBit` and `bitLength` everywhere.
 
-Do not use `byte`, `startByte`, `lengthBytes`, or mixed byte/bit coordinates in canonical profiles.
+Use absolute `startBit` and `bitLength` for every layout and payload field.
 
 Examples:
 
@@ -347,21 +347,4 @@ The visual editor can be generic if it follows only this schema:
 | `errors` | Show error rules editor. |
 | `display` | Show monitor/editor display preferences. |
 
-The visual editor should not branch on protocol names or old profile shapes. It should render this canonical schema only. Older profile files should be imported through converters.
-
-## Migration Rules
-
-Converters should normalize older fields as follows:
-
-| Old shape | Canonical shape |
-| --- | --- |
-| `length` bits | `bitLength` |
-| `length` bytes | `bitLength = length * 8` |
-| `lengthBytes` | `bitLength = lengthBytes * 8` |
-| `byte` + bit-in-byte `startBit` | `startBit = byte * 8 + startBit` |
-| `startByte` | `startBit = startByte * 8` |
-| `match.canId` and `match.payloadHeader` | merged into `identifyBy` |
-| `payloadFields` | `payload.fields` |
-| `frames.*.signals` | `messages[].payload.fields` |
-
-After migration, the JSON view should show canonical JSON, not the original imported shape.
+The visual editor should not branch on protocol names or alternate profile shapes. It should render this canonical schema only.
