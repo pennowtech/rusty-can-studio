@@ -37,6 +37,7 @@ import { HelpShell } from "@/components/help-system/HelpShell";
 import { openJsonFile, saveJsonFile } from "@/profile-editor/tauriFileIO";
 import { useAppStore } from "@/store/appShellStore";
 import { useConnectionStore } from "@/store/connectionStore";
+import { DiagnosticLevel, useDiagnosticsStore } from "@/store/diagnosticsStore";
 import { ProfileMainShell } from "@/profile-editor/ProfileMainShell";
 import { useState } from "react";
 import { AlertTriangle, Info, Keyboard, Monitor, Palette, RotateCcw, Rows3, ShieldCheck } from "lucide-react";
@@ -46,6 +47,8 @@ function SettingsView() {
   const traceFrameLimit = useConnectionStore((s) => s.traceFrameLimit);
   const frames = useConnectionStore((s) => s.frames);
   const setTraceFrameLimit = useConnectionStore((s) => s.setTraceFrameLimit);
+  const diagnostics = useDiagnosticsStore((s) => s.entries);
+  const clearDiagnostics = useDiagnosticsStore((s) => s.clear);
   const { theme, palette, density, setTheme, setPalette, setDensity } = useTheme();
   const [draftLimit, setDraftLimit] = useState(String(traceFrameLimit));
 
@@ -60,6 +63,7 @@ function SettingsView() {
     "cansim.monitor.preferences.v1",
     "cansim.monitor.filterPresets.v1",
     "cansim.monitor.alertRules.v1",
+    "cansim.diagnostics.v1",
     "cansim.shortcuts.v1",
     "cansim.help.customMarkdown",
     "can-simulator-sequences:v1",
@@ -128,6 +132,34 @@ App version: 0.2.0
 
   function copyFeedbackTemplate() {
     void navigator.clipboard?.writeText(feedbackTemplate);
+  }
+
+  async function exportDiagnostics() {
+    await saveJsonFile(
+      JSON.stringify(
+        {
+          meta: {
+            app: "rusty-can-studio",
+            exportedAt: new Date().toISOString(),
+          },
+          diagnostics,
+        },
+        null,
+        2,
+      ),
+      "rusty-can-studio-diagnostics.json",
+    );
+  }
+
+  function clearDiagnosticsWithConfirmation() {
+    if (!window.confirm("Clear diagnostics log?")) return;
+    clearDiagnostics();
+  }
+
+  function diagnosticLevelClass(level: DiagnosticLevel) {
+    if (level === "error") return "text-destructive";
+    if (level === "warning") return "text-amber-600 dark:text-amber-300";
+    return "text-muted-foreground";
   }
 
   const densityDescription = {
@@ -297,6 +329,40 @@ App version: 0.2.0
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => void exportSettingsBackup()}>Export settings</Button>
               <Button variant="outline" onClick={() => void importSettingsBackup()}>Import settings</Button>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-sm">Diagnostics log</CardTitle>
+              <Badge variant="outline">{diagnostics.length} entries</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Connection attempts, daemon errors, transmit failures, and profile import or validation errors are recorded here for troubleshooting.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" disabled={!diagnostics.length} onClick={() => void exportDiagnostics()}>Export diagnostics</Button>
+              <Button variant="outline" disabled={!diagnostics.length} onClick={clearDiagnosticsWithConfirmation}>Clear diagnostics</Button>
+            </div>
+            <div className="max-h-72 overflow-auto rounded-md border bg-muted/20">
+              {diagnostics.length ? (
+                diagnostics.slice().reverse().map((entry) => (
+                  <div key={entry.id} className="border-b p-3 last:border-0">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-mono text-muted-foreground">{new Date(entry.time).toLocaleString()}</span>
+                      <span className={`font-semibold uppercase ${diagnosticLevelClass(entry.level)}`}>{entry.level}</span>
+                      <span className="rounded border bg-background px-1.5 py-0.5 font-medium">{entry.source}</span>
+                    </div>
+                    <div className="mt-1 text-sm">{entry.message}</div>
+                    {entry.detail && <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">{entry.detail}</pre>}
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 text-sm text-muted-foreground">No diagnostics recorded yet.</div>
+              )}
             </div>
           </CardContent>
         </Card>

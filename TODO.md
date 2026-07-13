@@ -6,7 +6,7 @@
 - [x] GUI for visualizing CAN data
 - [x] Unit tests for core functionalities
 - [x] Integration with popular CAN hardware interfaces
-- [] Error handling and logging improvements
+- [x] Error handling and logging improvements
 - [x] Configuration management (e.g., saving/loading settings)
 - [] Localization and internationalization support
 - [] Mobile app for remote CAN monitoring

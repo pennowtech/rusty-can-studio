@@ -8,6 +8,7 @@ import { openJsonFile, saveJsonFile } from "../tauriFileIO";
 import { toast } from "sonner";
 import type { WsFrame } from "@/can-bridge/ws/types";
 import { getProfileCanIdLayoutRef, getProfileMessageSchema, hasProfileMessages } from "@/profile-editor/profileAdapter";
+import { logDiagnostic } from "@/store/diagnosticsStore";
 
 function formatFrameKey(id: number) {
   return `MSG_${id.toString(16).toUpperCase().padStart(id > 0x7ff ? 8 : 3, "0")}`;
@@ -151,6 +152,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     } catch (e: any) {
       toast.error(e.message);
       console.warn("Import profile errors:", e.message);
+      logDiagnostic({ level: "error", source: "Profile", message: "Profile import failed", detail: e.message });
       set({ jsonError: e.message });
     }
   },
@@ -161,6 +163,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       const errors = validateProfile(jsonParsed);
       if (errors.length > 0) {
         set({ jsonError: errors.join("\n") });
+        logDiagnostic({ level: "error", source: "Profile", message: "Profile validation failed", detail: errors.join("\n") });
         return;
       }
 
@@ -190,6 +193,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     } catch (e: any) {
       set({ jsonError: e.message });
       toast.error(e.message);
+      logDiagnostic({ level: "error", source: "Profile", message: "Profile JSON parse failed", detail: e.message });
     }
   },
 
@@ -200,6 +204,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       const errors = validateProfile(jsonParsed);
       if (errors.length > 0) {
         set({ jsonError: errors.join("\n") });
+        logDiagnostic({ level: "error", source: "Profile", message: "Profile validation failed", detail: errors.join("\n") });
         return;
       }
       imported.push(normalizeProfile(jsonParsed));
@@ -245,6 +250,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
 
     if ((draft || draftProfile) && hasBlockingErrors) {
       toast.error("Cannot export profile while draft has validation errors");
+      logDiagnostic({ level: "warning", source: "Profile", message: "Profile export blocked by validation errors" });
       return;
     }
     const json = JSON.stringify(targetProfile, null, 2);
@@ -257,6 +263,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       const errors = validateProfile(jsonParsed);
       if (errors.length > 0) {
         set({ jsonError: errors.join("\n") });
+        logDiagnostic({ level: "error", source: "Profile", message: "Profile validation failed", detail: errors.join("\n") });
         return;
       }
 
@@ -271,6 +278,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       });
     } catch (e: any) {
       set({ jsonError: e.message });
+      logDiagnostic({ level: "error", source: "Profile", message: "Profile JSON parse failed", detail: e.message });
     }
   },
 

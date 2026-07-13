@@ -624,6 +624,26 @@ Density affects table row height, button and input height, panel padding, gaps, 
 
 The Settings preview shows typical monitor states such as RX, TX sent, TX failed, decoded values, buttons, and status badges so you can evaluate a theme before continuing work. A portable implementation reference is available in \`docs/theme-system-spec.md\`.
 
+## Diagnostics log
+
+Open Settings > Diagnostics log to inspect recent application events that are useful for troubleshooting.
+
+The diagnostics log records:
+
+- connection attempts and failures
+- remote interface discovery results
+- capture pause and resume events
+- transmit failures and daemon rejections
+- profile import, JSON parse, validation, and export-blocking errors
+
+Each entry has a timestamp, severity, source, message, and optional detail text. The log is saved locally and capped to the newest 500 entries so it stays useful without growing forever.
+
+Use Export diagnostics when you need to share troubleshooting information. Use Clear diagnostics when the old entries are no longer relevant.
+
+:::warning
+Diagnostics can include host names, interface names, CAN IDs, profile names, and error text. Review exported diagnostics before sharing them outside your team.
+:::
+
 ## Transmit composer
 
 Use the transmit composer to prepare a single CAN-FD frame or a cyclic transmission.
