@@ -1,27 +1,18 @@
-import { CanProfile } from "@/profile-editor/model/profile";
+import { ProfileDocument } from "@/profile-editor/model/profile";
 
-// TODO: Extend this later with bit overlap checks, signal collisions, etc.
-export function validateProfile(raw: CanProfile): string[] {
+export function validateProfile(raw: unknown): string[] {
   const errors: string[] = [];
-  const rawProfile = raw as CanProfile & {
-    service?: unknown;
-    payloadHeader?: unknown;
-    attributes?: unknown;
-    canIdLayoutRef?: unknown;
-  };
-  const compactSchemaProfile = Boolean(rawProfile.service && rawProfile.payloadHeader && Array.isArray(rawProfile.attributes));
+  const profile = raw as Partial<ProfileDocument>;
 
-  if (!raw.meta?.name) {
-    errors.push("meta.name is required");
-  }
-
-  if (!compactSchemaProfile && !raw.messageSchema && (!raw.canIdLayouts || typeof raw.canIdLayouts !== "object")) {
-    errors.push("canIdLayouts must be an object when messageSchema is not defined");
-  }
-
-  if (!compactSchemaProfile && !raw.messageSchema && (!raw.frames || typeof raw.frames !== "object")) {
-    errors.push("frames must be an object when messageSchema is not defined");
-  }
+  if (profile.schemaVersion !== "1.0") errors.push('schemaVersion must be "1.0"');
+  if (!profile.meta?.id) errors.push("meta.id is required");
+  if (!profile.meta?.name) errors.push("meta.name is required");
+  if (!profile.meta?.version) errors.push("meta.version is required");
+  if (!profile.bus?.type) errors.push("bus.type is required");
+  if (!profile.bus?.idFormat) errors.push("bus.idFormat is required");
+  if (!profile.bus?.byteOrder) errors.push("bus.byteOrder is required");
+  if (!profile.layouts?.canId?.fields) errors.push("layouts.canId.fields is required");
+  if (!Array.isArray(profile.messages)) errors.push("messages must be an array");
 
   return errors;
 }

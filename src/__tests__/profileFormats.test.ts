@@ -2,49 +2,48 @@ import { describe, expect, it } from "vitest";
 
 import { parseCandump } from "@/can/candump";
 import { decodeFrameWithProfiles } from "@/profile-editor/decodeProfile";
-import type { CanProfile } from "@/profile-editor/model/profile";
+import type { CanonicalProfile } from "@/profile-editor/model/canonicalProfile";
 
 function decodedMap(decoded: NonNullable<ReturnType<typeof decodeFrameWithProfiles>>) {
   return Object.fromEntries(decoded.fields.map((field) => [field.name, field.displayValue]));
 }
 
-describe("profile decoding across unrelated CAN-FD formats", () => {
-  it("decodes a generic exact-CAN-ID motor status profile", () => {
-    const profile: CanProfile = {
-      meta: { name: "Motor Controller Generic", version: "1.0.0" },
-      byteOrder: "little",
-      canIdLayouts: {
-        standard11: {
-          id: "standard11",
-          name: "Standard 11-bit ID",
-          format: "standard",
+describe("canonical profile decoding across unrelated CAN-FD formats", () => {
+  it("decodes a standard-ID motor profile", () => {
+    const profile: CanonicalProfile = {
+      schemaVersion: "1.0",
+      meta: { id: "motor_generic", name: "Motor Controller Generic", version: "1.0.0" },
+      bus: { type: "can", idFormat: "standard", byteOrder: "little" },
+      layouts: {
+        canId: {
+          label: "Standard 11-bit ID",
           bitLength: 11,
           fields: [
-            { name: "node_id", startBit: 0, length: 7 },
-            { name: "message_class", startBit: 7, length: 4 },
+            { name: "node_id", startBit: 0, bitLength: 7, type: "uint" },
+            { name: "message_class", startBit: 7, bitLength: 4, type: "uint" },
           ],
         },
       },
-      defaultCanIdLayoutId: "standard11",
-      frames: {
-        motor_status: {
-          canId: 0x321,
-          canIdLayout: "standard11",
-          signals: [
-            { name: "rpm", startByte: 0, length: 2, factor: 0.25, unit: "rpm" },
-            { name: "temperature", startByte: 2, length: 1, offset: -40, unit: "degC" },
-            { name: "enabled", startByte: 3, length: 1, bitLength: 1 },
-          ],
+      messages: [
+        {
+          id: "motor_status",
+          label: "Motor Status",
+          identifyBy: { can_id: 0x321 },
+          payload: {
+            bitLength: 32,
+            fields: [
+              { name: "rpm", startBit: 0, bitLength: 16, type: "uint", factor: 0.25, unit: "rpm" },
+              { name: "temperature", startBit: 16, bitLength: 8, type: "uint", offset: -40, unit: "degC" },
+              { name: "enabled", startBit: 24, bitLength: 1, type: "bool" },
+            ],
+          },
         },
-      },
-      fieldTypes: {},
-      derivedFields: [],
-      columns: [],
+      ],
     };
     const [frame] = parseCandump("(000.000000) can0 321 [08] 20 4E 64 01 00 00 00 00");
     const decoded = decodeFrameWithProfiles([profile], frame);
 
-    expect(decoded?.frameName).toBe("motor_status");
+    expect(decoded?.meaning).toBe("Motor Status");
     expect(decodedMap(decoded!)).toMatchObject({
       node_id: "33",
       message_class: "6",
@@ -54,107 +53,36 @@ describe("profile decoding across unrelated CAN-FD formats", () => {
     });
   });
 
-  it("decodes a compact service/header schema profile", () => {
-    const profile: CanProfile = {
-      meta: { name: "Compact Service Example", version: "1.0.0" },
-      byteOrder: "little",
-      protocol: "schema",
-      canIdLayoutRef: "service29",
-      canIdLayouts: {
-        service29: {
-          id: "service29",
-          name: "Service 29-bit ID",
-          format: "extended",
+  it("decodes an extended-ID J1939-style profile", () => {
+    const profile: CanonicalProfile = {
+      schemaVersion: "1.0",
+      meta: { id: "j1939_engine", name: "J1939 Engine Snapshot", version: "1.0.0" },
+      bus: { type: "can", idFormat: "extended", byteOrder: "little" },
+      layouts: {
+        canId: {
+          label: "J1939 29-bit ID",
           bitLength: 29,
           fields: [
-            { name: "service_identifier", startBit: 0, length: 10 },
-            { name: "source_address", startBit: 13, length: 6 },
-            { name: "destination_address", startBit: 19, length: 6 },
-            {
-              name: "command_class",
-              startBit: 26,
-              length: 4,
-              values: { "6": "command", "5": "response", "3": "event" },
-            },
+            { name: "source_address", startBit: 0, bitLength: 8, type: "uint" },
+            { name: "pgn", startBit: 8, bitLength: 18, type: "uint" },
+            { name: "priority", startBit: 26, bitLength: 3, type: "uint" },
           ],
         },
       },
-      service: { name: "compact_light", identifier: 0x321 },
-      payloadHeader: {
-        lengthBytes: 2,
-        fields: [
-          { name: "attribute_address", byte: 0, startBit: 1, length: 7 },
-          { name: "message_good", byte: 0, startBit: 0, length: 1, values: { "0": "bad", "1": "good" } },
-          { name: "feature_index", byte: 1, startBit: 0, length: 4 },
-        ],
-      },
-      attributes: [
+      messages: [
         {
-          name: "brightness",
-          address: 5,
-          operations: [
-            {
-              type: "set_current_value",
-              featureIndex: 2,
-              variants: {
-                command: [{ name: "brightness_raw", byte: 2, startBit: 0, length: 16, unit: "permille" }],
-              },
-            },
-          ],
-        },
-      ],
-      errorStatus: { field: "message_good", goodValue: 1, byteOffset: 2, byteLength: 4, byteOrder: "little" },
-      frames: {},
-      fieldTypes: {},
-      derivedFields: [],
-      columns: [],
-    };
-    const [frame] = parseCandump("(000.000000) can0 18000321 [04] 0B 02 E8 03");
-    const decoded = decodeFrameWithProfiles([profile], frame);
-
-    expect(decoded?.requiresSchema).toBeFalsy();
-    expect(decoded?.meaning).toBe("compact_light.brightness.set_current_value.command");
-    expect(decodedMap(decoded!)).toMatchObject({
-      service_identifier: "compact_light",
-      command_class: "command",
-      attribute_address: "brightness",
-      feature_index: "set_current_value.command",
-      brightness_raw: "1000 permille",
-    });
-  });
-
-  it("decodes a J1939-style extended ID and payload", () => {
-    const profile: CanProfile = {
-      meta: { name: "J1939 Engine Snapshot", version: "1.0.0" },
-      byteOrder: "little",
-      messageSchema: {
-        name: "j1939",
-        canIdLayout: {
-          bitLength: 29,
-          fields: [
-            { name: "source_address", startBit: 0, length: 8 },
-            { name: "pgn", startBit: 8, length: 18 },
-            { name: "priority", startBit: 26, length: 3 },
-          ],
-        },
-        payloadHeader: { lengthBytes: 0, fields: [] },
-        messageDefinitions: [
-          {
-            id: "j1939.engine_speed",
-            label: "Engine Speed",
-            match: { canId: { pgn: 0xf004 } },
-            payloadFields: [
-              { name: "engine_speed", byte: 3, startBit: 0, length: 16, factor: 0.125, unit: "rpm" },
-              { name: "actual_torque", byte: 2, startBit: 0, length: 8, offset: -125, unit: "%" },
+          id: "j1939.engine_speed",
+          label: "Engine Speed",
+          identifyBy: { pgn: 0xf004 },
+          payload: {
+            bitLength: 64,
+            fields: [
+              { name: "actual_torque", startBit: 16, bitLength: 8, type: "uint", offset: -125, unit: "%" },
+              { name: "engine_speed", startBit: 24, bitLength: 16, type: "uint", factor: 0.125, unit: "rpm" },
             ],
           },
-        ],
-      },
-      canIdLayouts: {},
-      frames: {},
-      fieldTypes: {},
-      derivedFields: [],
-      columns: [],
+        },
+      ],
     };
     const [frame] = parseCandump("(000.000000) can0 0CF00401 [08] FF FF 7D 20 4E FF FF FF");
     const decoded = decodeFrameWithProfiles([profile], frame);
@@ -169,130 +97,226 @@ describe("profile decoding across unrelated CAN-FD formats", () => {
     });
   });
 
-  it("decodes a UDS-style diagnostic request with byte header fields", () => {
-    const profile: CanProfile = {
-      meta: { name: "UDS Diagnostic Request", version: "1.0.0" },
-      byteOrder: "little",
-      messageSchema: {
-        name: "uds",
-        canIdLayout: {
+  it("uses dictionaries and error rules from canonical profile data", () => {
+    const profile: CanonicalProfile = {
+      schemaVersion: "1.0",
+      meta: { id: "service_profile", name: "Service Profile", version: "1.0.0" },
+      bus: { type: "can-fd", idFormat: "extended", byteOrder: "little" },
+      layouts: {
+        canId: {
           bitLength: 29,
           fields: [
-            { name: "target_address", startBit: 8, length: 8 },
-            { name: "source_address", startBit: 0, length: 8 },
-            { name: "addressing_type", startBit: 24, length: 5 },
+            { name: "service_identifier", startBit: 0, bitLength: 10, type: "enum", dictionary: "service_identifier" },
+            { name: "command_class", startBit: 26, bitLength: 4, type: "enum", dictionary: "command_class" },
           ],
         },
         payloadHeader: {
-          lengthBytes: 2,
+          bitLength: 16,
           fields: [
-            { name: "payload_length", byte: 0, startBit: 0, length: 8 },
-            { name: "service_id", byte: 1, startBit: 0, length: 8, values: { "34": "ReadDataByIdentifier" } },
+            { name: "message_good", startBit: 0, bitLength: 1, type: "enum", dictionary: "message_good" },
+            { name: "attribute_address", startBit: 1, bitLength: 7, type: "enum", dictionary: "attribute_address" },
+            { name: "feature_index", startBit: 8, bitLength: 4, type: "uint" },
           ],
         },
-        messageDefinitions: [
-          {
-            id: "uds.read_data_by_identifier.request",
-            label: "Read DID request",
-            match: { payloadHeader: { service_id: 0x22 } },
-            payloadFields: [{ name: "did", byte: 2, startBit: 0, length: 16 }],
-          },
-        ],
       },
-      canIdLayouts: {},
-      frames: {},
-      fieldTypes: {},
-      derivedFields: [],
-      columns: [],
+      dictionaries: {
+        service_identifier: { "810": "light" },
+        command_class: { "5": "response" },
+        message_good: { "0": "bad", "1": "good" },
+        attribute_address: { "3": "on_off_cycles" },
+        error_status: { "12": "ERROR_AXIS_POSITION_NOT_REACHED" },
+      },
+      messages: [
+        {
+          id: "light.on_off_cycles.response",
+          label: "on_off_cycles response",
+          identifyBy: { service_identifier: 810, command_class: 5, attribute_address: 3, feature_index: 1 },
+          payload: { bitLength: 48, fields: [] },
+        },
+      ],
+      errors: [
+        {
+          id: "default_error_status",
+          when: "message_good != 1",
+          source: { startBit: 16, bitLength: 32, type: "uint", byteOrder: "little" },
+          dictionary: "error_status",
+          display: "Error ${raw}: ${text}",
+        },
+      ],
     };
-    const [frame] = parseCandump("(000.000000) can0 18DA10F1 [08] 03 22 F1 90 00 00 00 00");
+    const [frame] = parseCandump("(000.000000) can0 1400032A [06] 06 01 0C 00 00 00");
     const decoded = decodeFrameWithProfiles([profile], frame);
 
-    expect(decoded?.meaning).toBe("Read DID request");
+    expect(decoded?.meaning).toBe("on_off_cycles response");
+    expect(decoded?.errorCode).toBe(12);
+    expect(decoded?.errorText).toBe("ERROR_AXIS_POSITION_NOT_REACHED");
     expect(decodedMap(decoded!)).toMatchObject({
-      addressing_type: "24",
-      target_address: "16",
-      source_address: "241",
-      payload_length: "3",
-      service_id: "ReadDataByIdentifier",
-      did: "37105",
+      service_identifier: "light",
+      command_class: "response",
+      attribute_address: "on_off_cycles",
+      message_good: "bad",
     });
   });
 
-  it("decodes an aerospace-style custom header without leaking another profile", () => {
-    const matchingProfile: CanProfile = {
-      meta: { name: "Aerospace Actuator Bus", version: "1.0.0" },
-      byteOrder: "little",
-      messageSchema: {
-        name: "actuator",
-        canIdLayout: {
+  it("does not decode unrelated profile message data", () => {
+    const matchingProfile: CanonicalProfile = {
+      schemaVersion: "1.0",
+      meta: { id: "actuator", name: "Actuator", version: "1.0.0" },
+      bus: { type: "can-fd", idFormat: "extended", byteOrder: "little" },
+      layouts: {
+        canId: {
           bitLength: 29,
           fields: [
-            { name: "bus_id", startBit: 24, length: 5 },
-            { name: "message_type", startBit: 16, length: 8, values: { "90": "ActuatorStatus" } },
-            { name: "node_id", startBit: 0, length: 8 },
+            { name: "message_type", startBit: 16, bitLength: 8, type: "enum", dictionary: "message_type" },
+            { name: "node_id", startBit: 0, bitLength: 8, type: "uint" },
           ],
         },
         payloadHeader: {
-          lengthBytes: 2,
-          fields: [
-            { name: "packet_kind", byte: 0, startBit: 0, length: 4, values: { "10": "status" } },
-            { name: "channel", byte: 0, startBit: 4, length: 4 },
-            { name: "sequence", byte: 1, startBit: 0, length: 8 },
-          ],
+          bitLength: 16,
+          fields: [{ name: "packet_kind", startBit: 0, bitLength: 4, type: "enum", dictionary: "packet_kind" }],
         },
-        messageDefinitions: [
-          {
-            id: "actuator.status",
-            label: "Actuator Status",
-            match: { canId: { message_type: 0x5a }, payloadHeader: { packet_kind: 0x0a } },
-            payloadFields: [
-              { name: "position", byte: 2, startBit: 0, length: 16, factor: 0.01, unit: "deg" },
-              { name: "current", byte: 4, startBit: 0, length: 16, factor: 0.001, unit: "A" },
-            ],
-          },
-        ],
       },
-      canIdLayouts: {},
-      frames: {},
-      fieldTypes: {},
-      derivedFields: [],
-      columns: [],
+      dictionaries: { message_type: { "90": "ActuatorStatus" }, packet_kind: { "10": "status" } },
+      messages: [
+        {
+          id: "actuator.status",
+          label: "Actuator Status",
+          identifyBy: { message_type: 90, packet_kind: 10 },
+          payload: { bitLength: 48, fields: [{ name: "position", startBit: 16, bitLength: 16, type: "uint", factor: 0.01, unit: "deg" }] },
+        },
+      ],
     };
-    const unrelatedProfile: CanProfile = {
-      meta: { name: "Unrelated Profile", version: "1.0.0" },
-      byteOrder: "little",
-      messageSchema: {
-        name: "unrelated",
-        canIdLayout: {
+    const unrelatedProfile: CanonicalProfile = {
+      schemaVersion: "1.0",
+      meta: { id: "unrelated", name: "Unrelated", version: "1.0.0" },
+      bus: { type: "can-fd", idFormat: "extended", byteOrder: "little" },
+      layouts: {
+        canId: {
           bitLength: 29,
-          fields: [
-            { name: "message_type", startBit: 16, length: 8, values: { "1": "WrongMessage" } },
-            { name: "node_id", startBit: 0, length: 8 },
-          ],
+          fields: [{ name: "message_type", startBit: 16, bitLength: 8, type: "enum", dictionary: "message_type" }],
         },
-        payloadHeader: { lengthBytes: 0, fields: [] },
-        messageDefinitions: [{ id: "unrelated.only", match: { canId: { message_type: 1 } }, payloadFields: [] }],
       },
-      canIdLayouts: {},
-      frames: {},
-      fieldTypes: {},
-      derivedFields: [],
-      columns: [],
+      dictionaries: { message_type: { "1": "WrongMessage" } },
+      messages: [{ id: "unrelated.only", label: "Wrong", identifyBy: { message_type: 1 }, payload: { bitLength: 0, fields: [] } }],
     };
-    const [frame] = parseCandump("(000.000000) can0 055A0042 [08] 3A 07 10 27 88 13 00 00");
+    const [frame] = parseCandump("(000.000000) can0 015A0042 [08] 0A 11 10 27 20 03 00 00");
     const decoded = decodeFrameWithProfiles([unrelatedProfile, matchingProfile], frame);
 
     expect(decoded?.meaning).toBe("Actuator Status");
+    expect(decoded?.frameName).toBe("actuator.status");
     expect(decodedMap(decoded!)).toMatchObject({
-      bus_id: "5",
       message_type: "ActuatorStatus",
-      node_id: "66",
       packet_kind: "status",
-      channel: "3",
-      sequence: "7",
       position: "100 deg",
-      current: "5 A",
+    });
+  });
+
+  it("honors identifyWhen when equality keys are not enough", () => {
+    const profile: CanonicalProfile = {
+      schemaVersion: "1.0",
+      meta: { id: "conditional", name: "Conditional messages", version: "1.0.0" },
+      bus: { type: "can-fd", idFormat: "standard", byteOrder: "little" },
+      layouts: {
+        canId: {
+          bitLength: 11,
+          fields: [{ name: "can_id", startBit: 0, bitLength: 11, type: "uint" }],
+        },
+        payloadHeader: {
+          bitLength: 8,
+          fields: [{ name: "mode", startBit: 0, bitLength: 8, type: "uint" }],
+        },
+      },
+      messages: [
+        {
+          id: "conditional.low",
+          label: "Low mode",
+          identifyBy: { can_id: 0x123 },
+          identifyWhen: "mode < 10",
+          payload: { bitLength: 16, fields: [{ name: "low_value", startBit: 8, bitLength: 8, type: "uint" }] },
+        },
+        {
+          id: "conditional.high",
+          label: "High mode",
+          identifyBy: { can_id: 0x123 },
+          identifyWhen: "mode >= 10",
+          payload: { bitLength: 16, fields: [{ name: "high_value", startBit: 8, bitLength: 8, type: "uint" }] },
+        },
+      ],
+    };
+    const [frame] = parseCandump("(000.000000) can0 123 [02] 0A 2A");
+    const decoded = decodeFrameWithProfiles([profile], frame);
+
+    expect(decoded?.frameName).toBe("conditional.high");
+    expect(decodedMap(decoded!)).toMatchObject({ mode: "10", high_value: "42" });
+  });
+
+  it("sign-extends canonical int fields before scaling", () => {
+    const profile: CanonicalProfile = {
+      schemaVersion: "1.0",
+      meta: { id: "signed", name: "Signed fields", version: "1.0.0" },
+      bus: { type: "can", idFormat: "standard", byteOrder: "little" },
+      layouts: {
+        canId: {
+          bitLength: 11,
+          fields: [{ name: "can_id", startBit: 0, bitLength: 11, type: "uint" }],
+        },
+      },
+      messages: [
+        {
+          id: "signed.sample",
+          label: "Signed sample",
+          identifyBy: { can_id: 0x222 },
+          payload: {
+            bitLength: 16,
+            fields: [
+              { name: "delta", startBit: 0, bitLength: 8, type: "int" },
+              { name: "scaled_delta", startBit: 8, bitLength: 8, type: "int", factor: 0.5, unit: "step" },
+            ],
+          },
+        },
+      ],
+    };
+    const [frame] = parseCandump("(000.000000) can0 222 [02] FF FE");
+    const decoded = decodeFrameWithProfiles([profile], frame);
+
+    expect(decodedMap(decoded!)).toMatchObject({
+      delta: "-1",
+      scaled_delta: "-1 step",
+    });
+    expect(decoded?.fields.find((field) => field.name === "delta")?.raw).toBe(-1);
+  });
+
+  it("expands repeated fields using count and strideBits", () => {
+    const profile: CanonicalProfile = {
+      schemaVersion: "1.0",
+      meta: { id: "array", name: "Array fields", version: "1.0.0" },
+      bus: { type: "can-fd", idFormat: "standard", byteOrder: "little" },
+      layouts: {
+        canId: {
+          bitLength: 11,
+          fields: [{ name: "can_id", startBit: 0, bitLength: 11, type: "uint" }],
+        },
+      },
+      messages: [
+        {
+          id: "array.samples",
+          label: "Array samples",
+          identifyBy: { can_id: 0x333 },
+          payload: {
+            bitLength: 32,
+            fields: [{ name: "sample", startBit: 0, bitLength: 8, type: "uint", count: 4, strideBits: 8 }],
+          },
+        },
+      ],
+    };
+    const [frame] = parseCandump("(000.000000) can0 333 [04] 01 02 03 04");
+    const decoded = decodeFrameWithProfiles([profile], frame);
+
+    expect(decodedMap(decoded!)).toMatchObject({
+      "sample[0]": "1",
+      "sample[1]": "2",
+      "sample[2]": "3",
+      "sample[3]": "4",
     });
   });
 });

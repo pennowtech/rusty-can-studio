@@ -90,7 +90,7 @@ npm run tauri build -- --bundles msi
 
 ## Using The App
 
-For day-to-day usage, start with `docs/user-guide.md`. For a step-by-step onboarding path, use `docs/tutorials.md`. For copyable filters, candump samples, and sequence JSON, see `docs/examples.md` and the `examples/` folder.
+For day-to-day usage, start with `docs/user-guide.md`. For step-by-step workflows, copyable filters, profile editor examples, candump samples, and sequence JSON, see `docs/examples.md`, the `examples/` folder, and the generic profile fixtures under `profiles/test/`.
 
 ### Open A Candump Log
 
@@ -131,7 +131,7 @@ bash scripts/setup-linux-daemon-prereqs.sh
 
 ### Decode Frames With Profiles
 
-Profiles are JSON files that describe how CAN IDs, payload headers, attributes, operations, and payload values should be decoded. The decoder should stay generic: protocol-specific meaning belongs in the JSON profile, not hardcoded app logic.
+Profiles are canonical JSON files that describe how CAN IDs, optional payload headers, messages, payload values, dictionaries, and errors should be decoded. The decoder should stay generic: protocol-specific meaning belongs in the JSON profile, not hardcoded app logic.
 
 You can:
 
@@ -142,6 +142,8 @@ You can:
 - Jump from decoded preview entries back into the profile editor.
 
 Profile matching is intentionally conservative. A profile should only decode a message when the relevant CAN ID and payload header fields match that profile.
+
+Generic example profiles and matching candump snippets are committed under `profiles/test/`. Local/generated working profiles in the root `profiles/` folder can be useful during development, but they should only be committed when they are intended as shared examples.
 
 ### Use Display Filters
 
@@ -217,7 +219,7 @@ src/
 src-tauri/
   src/                 Rust side of the Tauri app
   tauri.conf.json      Tauri app and bundle configuration
-profiles/             Example/profile JSON files
+profiles/             Shared profile JSON files and generic test fixtures
 scripts/              Profile conversion and helper scripts
 docs/                 Design and implementation notes
 ```

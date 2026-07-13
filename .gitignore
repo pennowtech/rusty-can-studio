@@ -32,4 +32,6 @@ candump.txt
 __pycache__/
 *.pyc
 profiles/Sim_refdrive_start_then_poll_until_response.sequence.json
-profiles/test/
+profiles/k2_light_control_profile_v2.json
+profiles/k2_xy_axis_control_profile_v2.json
+profiles/knossos_can_id_layout_v2.json

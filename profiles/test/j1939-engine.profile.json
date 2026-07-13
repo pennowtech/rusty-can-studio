@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "id": "j1939-engine",
+    "name": "J1939 Engine Snapshot",
+    "version": "1.0.0"
+  },
+  "bus": {
+    "type": "can-fd",
+    "idFormat": "extended",
+    "byteOrder": "little"
+  },
+  "layouts": {
+    "canId": {
+      "label": "J1939 29-bit ID",
+      "bitLength": 29,
+      "fields": [
+        { "name": "source_address", "startBit": 0, "bitLength": 8, "type": "uint" },
+        { "name": "pgn", "startBit": 8, "bitLength": 18, "type": "uint" },
+        { "name": "priority", "startBit": 26, "bitLength": 3, "type": "uint" }
+      ]
+    }
+  },
+  "dictionaries": {},
+  "messages": [
+    {
+      "id": "j1939.engine_speed",
+      "label": "Engine Speed",
+      "identifyBy": { "pgn": 61444 },
+      "payload": {
+        "bitLength": 40,
+        "fields": [
+          { "name": "engine_speed", "startBit": 24, "bitLength": 16, "type": "uint", "factor": 0.125, "unit": "rpm" },
+          { "name": "actual_torque", "startBit": 16, "bitLength": 8, "type": "uint", "offset": -125, "unit": "%" }
+        ]
+      }
+    }
+  ],
+  "errors": [],
+  "display": {}
+}

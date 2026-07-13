@@ -574,7 +574,7 @@ function AboutView() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {[
             { icon: Monitor, title: "Monitor", text: "Sticky trace headers, display filters, decoded preview, context copy, and transmit staging." },
-            { icon: Rows3, title: "Profiles", text: "Visual editing for service, payload header, attributes, operations, and payload fields." },
+            { icon: Rows3, title: "Profiles", text: "Visual editing for layouts, dictionaries, messages, error rules, and payload fields." },
             { icon: Palette, title: "Themes", text: "Selectable color palettes and density modes for comfortable, compact, or dense workflows." },
             { icon: ShieldCheck, title: "Help", text: "Searchable documentation, callouts, shortcuts, and workflow notes are available from Help." },
           ].map((item) => (
@@ -711,4 +711,3 @@ export function MainView() {
       return null;
   }
 }
-

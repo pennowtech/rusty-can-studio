@@ -1,18 +1,5 @@
 import type { WsFrame } from "@/can-bridge/ws/types";
-import type {
-  BitFieldDef,
-  CanIdLayoutDef,
-  CanProfile,
-  KnossosSchemaDef,
-  MessageSchemaDef,
-  PayloadFieldDef,
-  SchemaFieldLayoutDef,
-  SchemaRouteDef,
-  SignalDef,
-} from "@/profile-editor/model/profile";
-import { getProfileMessageSchema } from "@/profile-editor/profileAdapter";
-
-type ResolvedMessageSchema = MessageSchemaDef & { canIdLayout: SchemaFieldLayoutDef };
+import type { CanonicalField, CanonicalProfile } from "@/profile-editor/model/canonicalProfile";
 
 export type DecodedField = {
   name: string;
@@ -43,7 +30,7 @@ export type DecodedFrame = {
   errorCode?: number;
   errorText?: string;
   canIdFields: DecodedField[];
-  payloadFields: DecodedField[];
+  payloadDecodedFields: DecodedField[];
   fields: DecodedField[];
   meaning: string;
   requiresSchema?: boolean;
@@ -64,29 +51,8 @@ function getPayloadBit(bytes: number[], bitIndex: number) {
   return ((bytes[byteIndex] ?? 0) >> bitInByte) & 1;
 }
 
-function extractFromBytes(bytes: number[], field: BitFieldDef | PayloadFieldDef, byteOrder: "little" | "big" = "little") {
-  const startBit = field.byte != null ? field.byte * 8 + field.startBit : field.startBit;
-  let raw = 0;
-
-  if (byteOrder === "little") {
-    for (let i = 0; i < field.length; i++) {
-      raw += getPayloadBit(bytes, startBit + i) * 2 ** i;
-    }
-    return raw;
-  }
-
-  for (let i = 0; i < field.length; i++) {
-    raw = raw * 2 + getPayloadBit(bytes, startBit + i);
-  }
-  return raw;
-}
-
-function bitMask(length: number) {
+function bitMaskFor(length: number) {
   return length >= 32 ? 0xffffffff : 2 ** length - 1;
-}
-
-function extractFromCanId(id: number, field: BitFieldDef) {
-  return Math.floor(id / 2 ** field.startBit) & bitMask(field.length);
 }
 
 function formatPhysical(value: number, unit?: string) {
@@ -94,11 +60,35 @@ function formatPhysical(value: number, unit?: string) {
   return unit ? `${text} ${unit}` : text;
 }
 
+function decodedDisplay(physical: number, unit: string | undefined, meaning: string | undefined) {
+  return meaning ?? formatPhysical(physical, unit);
+}
+
+function extractFromCanId(id: number, field: CanonicalField) {
+  if (field.name === "can_id") return id & bitMaskFor(field.bitLength);
+  return Math.floor(id / 2 ** field.startBit) & bitMaskFor(field.bitLength);
+}
+
+function signedValue(raw: number, bitLength: number) {
+  if (bitLength <= 0) return raw;
+  const signBit = 2 ** (bitLength - 1);
+  return raw >= signBit ? raw - 2 ** bitLength : raw;
+}
+
+function extractFromBytes(bytes: number[], field: { startBit: number; bitLength: number }, byteOrder: "little" | "big") {
+  let raw = 0;
+  if (byteOrder === "little") {
+    for (let i = 0; i < field.bitLength; i++) raw += getPayloadBit(bytes, field.startBit + i) * 2 ** i;
+    return raw;
+  }
+  for (let i = 0; i < field.bitLength; i++) raw = raw * 2 + getPayloadBit(bytes, field.startBit + i);
+  return raw;
+}
+
 function isSafeExpression(expression: string, allowedNames: Set<string>) {
   if (!/^[\w\s()+\-*/%<>=!&|?:.,"'\\]+$/.test(expression)) return false;
   if (/[;{}[\]`]/.test(expression)) return false;
   if (/\b(?:function|return|while|for|class|new|this|globalThis|window|document|eval|import|await|async)\b/.test(expression)) return false;
-
   const expressionWithoutStrings = expression.replace(/"[^"\\]*(?:\\.[^"\\]*)*"|'[^'\\]*(?:\\.[^'\\]*)*'/g, "");
   const names = expressionWithoutStrings.match(/\b[A-Za-z_]\w*\b/g) ?? [];
   return names.every((name) => allowedNames.has(name));
@@ -106,11 +96,8 @@ function isSafeExpression(expression: string, allowedNames: Set<string>) {
 
 function evaluateExpression(expression: string | undefined, context: Record<string, number>) {
   if (!expression?.trim()) return undefined;
-
   const names = Object.keys(context);
-  const allowedNames = new Set(names);
-  if (!isSafeExpression(expression, allowedNames)) return undefined;
-
+  if (!isSafeExpression(expression, new Set(names))) return undefined;
   try {
     const fn = new Function(...names, `"use strict"; return (${expression});`) as (...values: number[]) => unknown;
     const result = fn(...names.map((name) => context[name]));
@@ -123,24 +110,22 @@ function evaluateExpression(expression: string | undefined, context: Record<stri
   }
 }
 
-function fieldMeaning(raw: number, field: BitFieldDef | PayloadFieldDef, values?: Record<string, string>) {
-  return field.values?.[String(raw)] ?? values?.[String(raw)];
+function fieldNumericValue(raw: number, field: CanonicalField | { type?: string; bitLength: number }) {
+  return field.type === "int" ? signedValue(raw, field.bitLength) : raw;
 }
 
-function decodedDisplay(physical: number, unit: string | undefined, meaning: string | undefined) {
-  return meaning ?? formatPhysical(physical, unit);
-}
-
-function decodeCanIdField(id: number, field: BitFieldDef, values?: Record<string, string>): DecodedField {
-  const raw = extractFromCanId(id, field);
-  const meaning = fieldMeaning(raw, field, values);
+function decodeCanIdField(id: number, field: CanonicalField, profile: CanonicalProfile): DecodedField {
+  const extracted = extractFromCanId(id, field);
+  const raw = fieldNumericValue(extracted, field);
+  const dictionaryId = field.dictionary ?? field.name;
+  const meaning = profile.dictionaries?.[dictionaryId]?.[String(raw)];
   return {
     name: field.name,
     raw,
     physical: raw,
     displayValue: decodedDisplay(raw, undefined, meaning),
     startBit: field.startBit,
-    length: field.length,
+    length: field.bitLength,
     source: "canId",
     meaning,
   };
@@ -148,323 +133,195 @@ function decodeCanIdField(id: number, field: BitFieldDef, values?: Record<string
 
 function decodePayloadField(
   bytes: number[],
-  field: PayloadFieldDef | BitFieldDef,
+  field: CanonicalField,
   byteOrder: "little" | "big",
-  context: Record<string, number> = {},
+  profile: CanonicalProfile,
+  context: Record<string, number>,
+  index?: number,
 ): DecodedField {
-  const startBit = field.byte != null ? field.byte * 8 + field.startBit : field.startBit;
-  const raw = extractFromBytes(bytes, field, byteOrder);
-  const scaled = raw * (("factor" in field ? field.factor : undefined) ?? 1) + (("offset" in field ? field.offset : undefined) ?? 0);
-  const expressionValue = evaluateExpression("expression" in field ? field.expression : undefined, {
-    ...context,
-    raw,
-    value: scaled,
-  });
+  const fieldAtIndex = {
+    ...field,
+    startBit: field.startBit + (index ?? 0) * (field.strideBits ?? field.bitLength),
+  };
+  const extracted = extractFromBytes(bytes, fieldAtIndex, byteOrder);
+  const raw = fieldNumericValue(extracted, fieldAtIndex);
+  const scaled = raw * (field.factor ?? 1) + (field.offset ?? 0);
+  const expressionValue = evaluateExpression(field.display?.expression, { ...context, raw, value: scaled });
   const physical = typeof expressionValue === "number" ? expressionValue : scaled;
-  const unit = "unit" in field ? field.unit : undefined;
-  const meaning = fieldMeaning(raw, field);
-  const displayValue = typeof expressionValue === "string" ? expressionValue : decodedDisplay(physical, unit, meaning);
+  const dictionaryId = field.dictionary ?? field.name;
+  const meaning = profile.dictionaries?.[dictionaryId]?.[String(raw)];
+  const displayValue = typeof expressionValue === "string" ? expressionValue : decodedDisplay(physical, field.unit, meaning);
+  const name = index == null ? field.name : `${field.name}[${index}]`;
   return {
-    name: field.name,
+    name,
     raw,
     physical,
     displayValue,
-    unit,
-    startBit,
-    length: field.length,
+    unit: field.unit,
+    startBit: fieldAtIndex.startBit,
+    length: field.bitLength,
     source: "payload",
     meaning,
   };
 }
 
-function decodeSignal(bytes: number[], signal: SignalDef, byteOrder: "little" | "big"): DecodedField {
-  const startBit = signal.startBit ?? signal.startByte * 8;
-  const length = signal.bitLength ?? signal.length * 8;
-  let raw = extractFromBytes(
-    bytes,
-    {
-      name: signal.name,
-      startBit,
-      length,
-    },
-    byteOrder,
-  );
+function decodePayloadFields(bytes: number[], field: CanonicalField, byteOrder: "little" | "big", profile: CanonicalProfile, context: Record<string, number>) {
+  const count = Math.max(1, Math.floor(field.count ?? 1));
+  return Array.from({ length: count }, (_, index) => decodePayloadField(bytes, field, byteOrder, profile, context, count > 1 ? index : undefined));
+}
 
-  if (signal.signed && length > 0) {
-    const signBit = 2 ** (length - 1);
-    if (raw >= signBit) raw -= 2 ** length;
+function putDecodedValue(context: Record<string, number>, field: DecodedField) {
+  context[field.name] = field.physical;
+  const indexed = field.name.match(/^(.+)\[(\d+)]$/);
+  if (indexed) {
+    const [, baseName, index] = indexed;
+    context[`${baseName}_${index}`] = field.physical;
+    if (index === "0") context[baseName] = field.physical;
   }
-
-  const scaled = raw * (signal.factor ?? 1) + (signal.offset ?? 0);
-  const expressionValue = evaluateExpression(signal.expression, { raw, value: scaled });
-  const physical = typeof expressionValue === "number" ? expressionValue : scaled;
-  const displayValue = typeof expressionValue === "string" ? expressionValue : formatPhysical(physical, signal.unit);
-
-  return {
-    name: signal.name,
-    raw,
-    physical,
-    displayValue,
-    unit: signal.unit,
-    startBit,
-    length,
-    source: "payload",
-  };
 }
 
 function valuesByName(fields: DecodedField[]) {
   return Object.fromEntries(fields.map((field) => [field.name, field.raw]));
 }
 
-function applyDisplayOverrides(fields: DecodedField[], overrides: Record<string, string | undefined>) {
-  return fields.map((field) => {
-    const displayValue = overrides[field.name];
-    return displayValue
-      ? {
-          ...field,
-          displayValue,
-          meaning: displayValue,
-        }
-      : field;
-  });
-}
-
-function matchesExpected(actual: number | undefined, expected: number | string | boolean) {
+function matchesExpected(actual: number | undefined, expected: number | string | boolean | null) {
+  if (expected === null) return actual == null;
   if (actual == null) return false;
   if (typeof expected === "boolean") return Boolean(actual) === expected;
   if (typeof expected === "number") return actual === expected;
   return String(actual) === expected;
 }
 
-function canIdMatch(route: SchemaRouteDef, canFields: Record<string, number>) {
-  return Object.entries(route.match?.canId ?? {}).every(([field, expected]) => matchesExpected(canFields[field], expected));
+function messageMatches(message: CanonicalProfile["messages"][number], values: Record<string, number>) {
+  const identifyByMatches = Object.entries(message.identifyBy ?? {}).every(([field, expected]) => matchesExpected(values[field], expected));
+  if (!identifyByMatches) return false;
+  if (!message.identifyWhen?.trim()) return true;
+  return Boolean(evaluateExpression(message.identifyWhen, values));
 }
 
-function payloadHeaderMatch(route: SchemaRouteDef, headerFields: Record<string, number>) {
-  return Object.entries(route.match?.payloadHeader ?? {}).every(([field, expected]) => matchesExpected(headerFields[field], expected));
-}
-
-function readInteger(bytes: number[], byteOffset: number, byteLength: number, byteOrder: "little" | "big") {
-  let value = 0;
-  for (let index = 0; index < byteLength; index++) {
-    const byte = bytes[byteOffset + index] ?? 0;
-    value = byteOrder === "little" ? value + byte * 256 ** index : value * 256 + byte;
+function expressionErrorState(expression: string, values: Record<string, number>) {
+  const notEqual = expression.match(/^\s*([A-Za-z_]\w*)\s*!=\s*(.+?)\s*$/);
+  if (notEqual) {
+    const [, field, rawExpected] = notEqual;
+    const expected = Number(rawExpected);
+    return Number.isFinite(expected) ? values[field] !== expected : String(values[field]) !== rawExpected.replace(/^["']|["']$/g, "");
   }
-  return value;
-}
-
-function schemaFromKnossos(knossos: KnossosSchemaDef): ResolvedMessageSchema {
-  const messageDefinitions = knossos.services.flatMap((service) =>
-    service.instances.flatMap((instance) =>
-      instance.attributes.flatMap((attribute) =>
-        attribute.features.map((feature) => ({
-          id: `${service.name}.${instance.name}.${attribute.name}.${feature.name}`,
-          serviceName: service.name,
-          instanceName: instance.name,
-          attributeName: attribute.name,
-          featureName: feature.name,
-          match: {
-            canId: { service_identifier: service.serviceIdentifier },
-            payloadHeader: {
-              instance_index: instance.index,
-              attribute_address: attribute.attributeAddress,
-              feature_index: feature.index,
-            },
-          },
-          payloadFields: feature.fields,
-        })),
-      ),
-    ),
-  );
-
-  return {
-    name: "Legacy Knossos schema",
-    canIdLayout: knossos.canIdLayout,
-    payloadHeader: knossos.payloadHeader,
-    messageDefinitions,
-    errors: knossos.errors,
-    error: {
-      field: "message_good",
-      goodValue: 1,
-      byteOffset: 2,
-      byteLength: 4,
-      byteOrder: "little",
-      values: knossos.errors,
-    },
-  };
-}
-
-function schemaLayoutFromCanLayout(layout: CanIdLayoutDef | undefined) {
-  return layout
-    ? {
-        bitLength: layout.bitLength,
-        fields: layout.fields,
-      }
-    : undefined;
-}
-
-function defaultCanIdLayout(profile: CanProfile) {
-  return profile.defaultCanIdLayoutId ? profile.canIdLayouts?.[profile.defaultCanIdLayoutId] : Object.values(profile.canIdLayouts ?? {})[0];
-}
-
-function resolveSchema(profile: CanProfile): ResolvedMessageSchema | undefined {
-  const schema = getProfileMessageSchema(profile);
-  if (schema) {
-    const canIdLayout = schema.canIdLayout ?? schemaLayoutFromCanLayout(defaultCanIdLayout(profile));
-    return canIdLayout ? { ...schema, canIdLayout } : undefined;
+  const equal = expression.match(/^\s*([A-Za-z_]\w*)\s*==\s*(.+?)\s*$/);
+  if (equal) {
+    const [, field, rawExpected] = equal;
+    const expected = Number(rawExpected);
+    return Number.isFinite(expected) ? values[field] === expected : String(values[field]) === rawExpected.replace(/^["']|["']$/g, "");
   }
-  if (profile.knossos) return schemaFromKnossos(profile.knossos);
-  return undefined;
+  return Boolean(evaluateExpression(expression, values));
 }
 
-function decodeWithSchema(profile: CanProfile, schema: ResolvedMessageSchema, frame: WsFrame): DecodedFrame {
+function decodeCanonical(profile: CanonicalProfile, frame: WsFrame): DecodedFrame {
   const bytes = bytesFromHex(frame.data_hex);
-  const byteOrder = profile.byteOrder ?? "little";
-  const canIdFields = (schema.canIdLayout.fields ?? []).map((field) =>
-    decodeCanIdField(frame.id, field, schema.canIdLayout.enums?.[field.name]),
-  );
+  const byteOrder = profile.bus.byteOrder;
+  const canIdFields = profile.layouts.canId.fields.map((field) => decodeCanIdField(frame.id, field, profile));
   const canValues = valuesByName(canIdFields);
-  const candidateDefinitions = schema.messageDefinitions.filter((item) => canIdMatch(item, canValues));
+  canValues.can_id = frame.id;
+  const candidateMessages = profile.messages.filter((message) =>
+    Object.entries(message.identifyBy ?? {})
+      .filter(([field]) => field in canValues || field === "can_id")
+      .every(([field, expected]) => matchesExpected(canValues[field], expected)),
+  );
 
-  if (!candidateDefinitions.length) {
+  if (!candidateMessages.length) {
     return {
       serviceIdentifier: canValues.service_identifier,
       sourceAddress: canValues.source_address,
       destinationAddress: canValues.destination_address,
       commandClass: canIdFields.find((field) => field.name === "command_class")?.displayValue,
       canIdFields,
-      payloadFields: [],
+      payloadDecodedFields: [],
       fields: canIdFields,
       requiresSchema: true,
       meaning: "CAN ID does not match this profile",
     };
   }
 
+  const context: Record<string, number> = { ...canValues };
   const headerFields: DecodedField[] = [];
-  const schemaContext: Record<string, number> = {};
-  for (const field of schema.payloadHeader?.fields ?? []) {
-    const decoded = decodePayloadField(bytes, field, byteOrder, schemaContext);
-    headerFields.push(decoded);
-    schemaContext[decoded.name] = decoded.physical;
+  for (const field of profile.layouts.payloadHeader?.fields ?? []) {
+    for (const decoded of decodePayloadFields(bytes, field, byteOrder, profile, context)) {
+      headerFields.push(decoded);
+      putDecodedValue(context, decoded);
+    }
   }
-  const headerValues = valuesByName(headerFields);
-  const route = candidateDefinitions.find((item) => payloadHeaderMatch(item, headerValues));
-  const serviceName = route?.serviceName ?? candidateDefinitions[0]?.serviceName;
-  const displayedCanIdFields = applyDisplayOverrides(canIdFields, {
-    service_identifier: serviceName,
-  });
-  const displayedHeaderFields = route
-    ? applyDisplayOverrides(headerFields, {
-        instance_index: route.instanceName,
-        attribute_address: route.attributeName,
-        feature_index: route.featureName,
-      })
-    : headerFields;
-  const displayedHeaderByName = Object.fromEntries(displayedHeaderFields.map((field) => [field.name, field]));
-  for (const field of canIdFields) {
-    schemaContext[field.name] = field.physical;
-  }
-  const routeFields: DecodedField[] = [];
-  for (const field of route?.payloadFields ?? []) {
-    const decoded = decodePayloadField(bytes, field, byteOrder, schemaContext);
-    routeFields.push(decoded);
-    schemaContext[decoded.name] = decoded.physical;
-  }
-  const payloadFields = [...displayedHeaderFields, ...routeFields];
-  const fields = [...displayedCanIdFields, ...payloadFields];
 
-  const errorConfig = schema.error;
-  const errorFieldValue = errorConfig?.field ? headerValues[errorConfig.field] ?? canValues[errorConfig.field] : undefined;
-  const messageGood = errorConfig?.goodValue != null && errorFieldValue != null ? matchesExpected(errorFieldValue, errorConfig.goodValue) : undefined;
-  const errorByteLength = errorConfig?.byteLength ?? 4;
-  const errorByteOffset = errorConfig?.byteOffset ?? 0;
-  const hasEnoughErrorBytes = bytes.length >= errorByteOffset + errorByteLength;
-  const hasError =
-    route && errorConfig && errorFieldValue != null && hasEnoughErrorBytes
-      ? errorConfig.badValue != null
-        ? matchesExpected(errorFieldValue, errorConfig.badValue)
-        : messageGood === false
-      : false;
-  const errorCode =
-    hasError && errorConfig
-      ? readInteger(bytes, errorByteOffset, errorByteLength, errorConfig.byteOrder ?? byteOrder)
-      : undefined;
-  const errorText = errorCode != null ? errorConfig?.values?.[String(errorCode)] ?? schema.errors?.[String(errorCode)] : undefined;
-  const decodedErrorCode = errorCode === 0 && !errorText ? undefined : errorCode;
+  const headerValues = { ...valuesByName(headerFields), ...context };
+  const allIdentificationValues = { ...canValues, ...headerValues };
+  const message = candidateMessages.find((item) => messageMatches(item, allIdentificationValues));
 
-  return {
-    frameName: route?.id ?? route?.name,
-    commandClass: canIdFields.find((field) => field.name === "command_class")?.displayValue,
-    sourceAddress: canValues.source_address,
-    destinationAddress: canValues.destination_address,
-    serviceName: route?.serviceName,
-    serviceIdentifier: canValues.service_identifier,
-    instanceName: route?.instanceName ?? displayedHeaderByName.instance_index?.meaning,
-    instanceIndex: headerValues.instance_index,
-    attributeName: route?.attributeName,
-    attributeAddress: headerValues.attribute_address,
-    featureName: route?.featureName,
-    featureIndex: headerValues.feature_index,
-    messageGood,
-    errorCode: decodedErrorCode,
-    errorText,
-    canIdFields: displayedCanIdFields,
-    payloadFields,
-    fields,
-    requiresSchema: !route,
-    meaning: route?.meaning ?? route?.label ?? route?.id ?? route?.name ?? "Unmatched message definition",
-  };
-}
-
-function decodeGeneric(profile: CanProfile, frame: WsFrame): DecodedFrame {
-  const frameEntry = Object.entries(profile.frames).find(([, def]) => def.canId === frame.id);
-  const bytes = bytesFromHex(frame.data_hex);
-  const defaultCanIdLayout = profile.defaultCanIdLayoutId
-    ? profile.canIdLayouts?.[profile.defaultCanIdLayoutId]
-    : Object.values(profile.canIdLayouts ?? {})[0];
-  const canIdFields = (defaultCanIdLayout?.fields ?? []).map((field) => decodeCanIdField(frame.id, field));
-
-  if (!frameEntry) {
+  if (!message) {
     return {
+      serviceIdentifier: canValues.service_identifier,
+      sourceAddress: canValues.source_address,
+      destinationAddress: canValues.destination_address,
+      commandClass: canIdFields.find((field) => field.name === "command_class")?.displayValue,
       canIdFields,
-      payloadFields: [],
-      fields: canIdFields,
-      meaning: canIdFields.length ? "CAN ID fields decoded; no message payload profile matches this CAN ID" : "No profile message matches this CAN ID",
+      payloadDecodedFields: headerFields,
+      fields: [...canIdFields, ...headerFields],
       requiresSchema: true,
+      meaning: "CAN ID and payload header decoded; matching message definition is missing",
     };
   }
 
-  const [frameName, def] = frameEntry;
-  const payloadFields = def.signals.map((signal) => decodeSignal(bytes, signal, profile.byteOrder ?? "little"));
-  const fields = [...canIdFields, ...payloadFields];
+  const payloadValues: Record<string, number> = {};
+  const messageFields: DecodedField[] = [];
+  for (const field of message.payload.fields ?? []) {
+    for (const decoded of decodePayloadFields(bytes, field, byteOrder, profile, context)) {
+      messageFields.push(decoded);
+      putDecodedValue(context, decoded);
+      payloadValues[decoded.name] = decoded.physical;
+    }
+  }
+
+  const payloadDecodedFields = [...headerFields, ...messageFields];
+  const fields = [...canIdFields, ...payloadDecodedFields];
+  const allValues = { ...allIdentificationValues, ...context, ...payloadValues };
+  const errorRule = profile.errors?.find((rule) => expressionErrorState(rule.when, allValues));
+  const extractedErrorCode = errorRule ? extractFromBytes(bytes, errorRule.source, errorRule.source.byteOrder ?? byteOrder) : undefined;
+  const errorCode = errorRule && extractedErrorCode != null ? fieldNumericValue(extractedErrorCode, errorRule.source) : undefined;
+  const errorText = errorRule?.dictionary && errorCode != null ? profile.dictionaries?.[errorRule.dictionary]?.[String(errorCode)] : undefined;
+  const messageGoodField = fields.find((field) => field.name === "message_good");
 
   return {
-    frameName,
+    frameName: message.id,
+    commandClass: canIdFields.find((field) => field.name === "command_class")?.displayValue,
+    sourceAddress: canValues.source_address,
+    destinationAddress: canValues.destination_address,
+    serviceIdentifier: canValues.service_identifier,
+    instanceName: fields.find((field) => field.name === "instance_index")?.meaning,
+    instanceIndex: headerValues.instance_index,
+    attributeName: fields.find((field) => field.name === "attribute_address")?.meaning,
+    attributeAddress: headerValues.attribute_address,
+    featureName: fields.find((field) => field.name === "feature_index")?.meaning,
+    featureIndex: headerValues.feature_index,
+    messageGood: messageGoodField ? Boolean(messageGoodField.raw) : undefined,
+    errorCode,
+    errorText,
     canIdFields,
-    payloadFields,
+    payloadDecodedFields,
     fields,
-    meaning: fields.length ? `Decoded ${fields.length} fields from ${frameName}` : `${frameName} has no fields`,
+    requiresSchema: false,
+    meaning: message.label ?? message.id,
   };
 }
 
-export function decodeFrameWithProfile(profile: CanProfile | null, frame: WsFrame): DecodedFrame | null {
+export function decodeFrameWithProfile(profile: CanonicalProfile | null, frame: WsFrame): DecodedFrame | null {
   if (!profile) return null;
-
-  const schema = resolveSchema(profile);
-  if (schema) return decodeWithSchema(profile, schema, frame);
-
-  return decodeGeneric(profile, frame);
+  return decodeCanonical(profile, frame);
 }
 
-export function decodeFrameWithProfiles(profiles: CanProfile[], frame: WsFrame): DecodedFrame | null {
+export function decodeFrameWithProfiles(profiles: CanonicalProfile[], frame: WsFrame): DecodedFrame | null {
   let fallback: DecodedFrame | null = null;
-
   for (const profile of profiles) {
     const decoded = decodeFrameWithProfile(profile, frame);
     if (!decoded) continue;
     if (!fallback) fallback = decoded;
     if (!decoded.requiresSchema) return decoded;
   }
-
   return fallback;
 }

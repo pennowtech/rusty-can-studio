@@ -17,7 +17,7 @@ src/
   store/               Zustand state stores
 src-tauri/
   src/                 Tauri application entry points
-profiles/             Example JSON profiles
+profiles/             Shared profile JSON files and generic test fixtures
 scripts/              Local setup, quality, audit, and conversion scripts
 docs/                 User and developer documentation
 ```
@@ -29,7 +29,7 @@ The canonical profile contract is documented in:
 - `docs/canonical-profile-guide.md`
 - `docs/canonical-profile.schema.json`
 
-New profile-editor work should target that canonical shape. Importers can support older or external formats, but the visual editor should render the canonical schema instead of branching on protocol-specific profile structures.
+New profile-editor work should target that canonical shape. The runtime, visual editor, JSON view, decoder, display filter, transmit helpers, and simulator matching should consume canonical profiles only. External source formats should be converted before import.
 
 ## Core Runtime Flow
 
@@ -184,45 +184,42 @@ When adding live-frame behavior, avoid expensive synchronous work in frame handl
 
 File: `src/profile-editor/model/profile.ts`
 
-Primary type:
+Runtime profile contract:
 
 ```ts
-type CanProfile = {
-  meta: ProfileMeta;
-  byteOrder?: "little" | "big";
-  protocol?: "generic" | "knossos" | "schema";
-  canIdLayoutRef?: string;
-  service?: CompactProfileServiceDef;
-  payloadHeader?: SchemaFieldLayoutDef;
-  attributes?: CompactProfileAttributeDef[];
-  errorStatus?: CompactProfileErrorStatusDef;
-  canIdLayouts: Record<string, CanIdLayoutDef>;
-  frames: Record<string, FrameDef>;
-  fieldTypes: Record<string, FieldTypeDef>;
-  derivedFields: DerivedFieldDef[];
-  columns: ColumnDef[];
+type CanonicalProfile = {
+  schemaVersion: "1.0";
+  meta: CanonicalProfileMeta;
+  bus: CanonicalProfileBus;
+  layouts: {
+    canId: CanonicalLayout;
+    payloadHeader?: CanonicalLayout;
+  };
+  dictionaries?: Record<string, Record<string, string>>;
+  messages: CanonicalMessage[];
+  errors?: CanonicalErrorRule[];
+  display?: Record<string, unknown>;
 }
 ```
 
-Compact schema profiles should keep service, payload header, attributes, operations, variants, and error status in the source JSON. Runtime decode helpers derive matching rules from that structure.
+Profile Editor Visual, JSON view, CAN Monitor decoding, display filters, transmit helpers, and simulator matching consume the canonical profile shape.
+
+Generic canonical fixtures live under `profiles/test/`. They are intentionally protocol-varied so decoder and editor changes can be checked without relying on private working profiles.
 
 ### Profile decoding
 
 Files:
 
 - `src/profile-editor/decodeProfile.ts`
-- `src/profile-editor/profileAdapter.ts`
-- `src/profile-editor/normalizeProfile.ts`
 
 Decoder rules:
 
-- resolve shared CAN ID layouts when profiles reference them
-- decode CAN ID fields from configured bit layout
+- decode CAN ID fields from `layouts.canId.fields`
 - decode payload header fields before message matching
-- match only profiles whose service/header/message criteria apply
-- decode route-specific payload fields after a match
-- expose raw and display values when value maps exist
-- decode `errorStatus` only when the configured status field indicates failure
+- match only profiles whose `messages[].identifyBy` criteria apply
+- decode message-specific `payload.fields` after a match
+- expose raw and display values when dictionaries exist
+- evaluate `errors[]` only when the configured condition indicates failure
 
 Do not hardcode product or protocol meanings in decoder code.
 
@@ -279,12 +276,10 @@ Recommended sequence:
 
 ## Adding A Profile Field
 
-For compact schema profiles:
-
-1. Add or edit the field under the correct attribute operation variant.
-2. Use `byte`, `startBit`, and `length` for bit layout.
-3. Add `type`, `factor`, `offset`, `unit`, `values`, `count`, or `stride` only when needed.
-4. Use profile-level `errorStatus` for error-code handling.
+1. Add or edit the field under the correct `messages[].payload.fields` entry.
+2. Use absolute `startBit` and `bitLength` for bit layout.
+3. Add `type`, `factor`, `offset`, `unit`, `dictionary`, `count`, or `strideBits` only when needed.
+4. Use `errors[]` for error-code handling.
 5. Validate with Decoded Preview and a known frame.
 
 ## Adding A Daemon Message
@@ -312,4 +307,4 @@ For compact schema profiles:
 - The desktop app relies on the daemon for live Linux SocketCAN access.
 - Browser compatibility checks are baseline checks, not full visual regression tests.
 - Accessibility checks are baseline checks, not a full WCAG audit.
-- Some app modules still contain older generic profile support alongside the compact schema profile model.
+- The app intentionally does not include compatibility branches for older profile JSON layouts.
