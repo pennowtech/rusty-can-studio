@@ -52,7 +52,7 @@
 - [x] Cross-browser compatibility testing.
 **Documentation:**
 - [x] Detailed user guide for end-users.
-- Developer documentation with API reference.
+- [x] Developer documentation with API reference.
 - Tutorials and examples for common scenarios.
 - FAQ and troubleshooting section.
 **Backup and restore:**

@@ -165,6 +165,35 @@ Use the end-user guide as the task-oriented reference for normal operation. It c
 Do not transmit on a physical bus unless you understand the target system. Incorrect frames can disturb diagnostics, flashing, or control traffic.
 :::
 
+## Developer guide
+
+The developer guide describes the internal architecture for contributors extending the app.
+
+Main areas:
+
+| Area | Reference |
+| --- | --- |
+| Candump parsing | \`src/can/candump.ts\` |
+| Daemon transport | \`src/can-bridge/ws/WsJsonDaemonClient.tsx\` and \`types.ts\` |
+| Connection state | \`src/store/connectionStore.ts\` |
+| Profile model | \`src/profile-editor/model/profile.ts\` |
+| Profile decoding | \`src/profile-editor/decodeProfile.ts\` |
+| Help content | \`src/components/help-system/defaultHelpMarkdown.ts\` |
+| Quality scripts | \`scripts/*.ps1\` |
+
+Extension rules:
+
+1. Keep protocol-specific meaning in profile JSON.
+2. Keep raw frame parsing separate from profile decoding.
+3. Add typed daemon messages before using them in stores or UI.
+4. Use timeouts for request/response transport operations.
+5. Update Help and docs when behavior changes.
+6. Run \`npm run quality:check\` before pushing larger changes.
+
+:::tip
+Use \`docs/developer-guide.md\` for the fuller API reference, including WebSocket message types, frame fields, connection store actions, and profile model notes.
+:::
+
 ## Remote daemon connection
 
 To monitor CAN or CAN-FD traffic from WSL, run can-bridge-daemon in the WSL environment where the SocketCAN interfaces exist. The daemon forwards packets from interfaces such as \`vcan0\` or \`can0\` to this UI over WebSocket JSON.

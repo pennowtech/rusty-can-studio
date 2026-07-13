@@ -256,6 +256,8 @@ When changing decoding behavior, keep protocol knowledge in JSON profiles. The a
 
 For a fuller local quality pass, run `npm run quality:check`. It runs unit tests, production build, accessibility baseline checks, browser compatibility baseline checks, dependency audit, and Rust `cargo check`. Use `npm run benchmark` when changing trace parsing, filtering, decoding, or other performance-sensitive paths. The CI quality workflow runs the core compile/test checks on pull requests and pushes to `main`. More detail is in `docs/testing.md`.
 
+For module ownership, internal APIs, profile model notes, daemon transport types, and extension rules, see `docs/developer-guide.md`.
+
 ## Security Checks
 
 Run the local security baseline before sharing changes:
