@@ -1,6 +1,7 @@
 import { WsJsonDaemonClient } from "@/can-bridge/ws/WsJsonDaemonClient";
 import type { WsFrame, WsHelloAck } from "@/can-bridge/ws/types";
 import type { ConnectionProfile } from "@/model/connection";
+import { logDiagnostic } from "@/store/diagnosticsStore";
 import { STORAGE_KEY } from "@/utils/consts";
 import { create } from "zustand";
 
@@ -209,10 +210,17 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     const profile = get().profiles.find((item) => item.id === id);
     if (!profile) {
       set({ status: "error", statusMessage: "Connection profile not found" });
+      logDiagnostic({ level: "error", source: "Connection", message: "Connection profile not found", detail: id });
       return;
     }
 
     await closeActiveClient();
+    logDiagnostic({
+      level: "info",
+      source: "Connection",
+      message: `Connecting to ${profile.name}`,
+      detail: `${profile.mode} ${profile.host ?? ""}:${profile.port ?? ""} ${profile.iface ?? ""}`.trim(),
+    });
 
     set({
       activeId: id,
@@ -233,6 +241,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
         status: "error",
         statusMessage: "Local CAN direct capture is not implemented. Use Remote Daemon for WSL.",
       });
+      logDiagnostic({ level: "warning", source: "Connection", message: "Local CAN direct capture is not implemented", detail: profile.name });
       return;
     }
 
@@ -241,6 +250,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
         status: "error",
         statusMessage: `Protocol ${profile.protocol ?? "unknown"} is not implemented in the UI yet. Use WebSocket JSON.`,
       });
+      logDiagnostic({ level: "warning", source: "Connection", message: "Unsupported connection protocol", detail: `${profile.name}: ${profile.protocol ?? "unknown"}` });
       return;
     }
 
@@ -300,9 +310,16 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
           subscribedIfaces,
           capturePaused: false,
         });
+        logDiagnostic({ level: "info", source: "Connection", message: `Connected to ${profile.name}`, detail: `Subscribed: ${subscribedIfaces.join(", ")}` });
         return;
       } catch (error) {
         lastError = error;
+        logDiagnostic({
+          level: attempt < attempts ? "warning" : "error",
+          source: "Connection",
+          message: `Connection attempt ${attempt}/${attempts} failed`,
+          detail: error instanceof Error ? error.message : String(error),
+        });
         client.close();
         if (activeClient === client) activeClient = null;
         if (attempt < attempts) {
@@ -319,6 +336,12 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       subscribedIfaces: [],
       capturePaused: false,
     });
+    logDiagnostic({
+      level: "error",
+      source: "Connection",
+      message: `Failed to connect to ${profile.name}`,
+      detail: lastError instanceof Error ? lastError.message : "Remote daemon connection failed",
+    });
   },
 
   discoverRemoteIfaces: async (profile) => {
@@ -327,6 +350,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     try {
       await client.connect({ clientName: "cansim-app-rust-discovery", timeoutMs: 3000 });
       const response = await client.listIfaces(3000);
+      logDiagnostic({ level: "info", source: "Connection", message: "Discovered remote CAN interfaces", detail: response.items.join(", ") || "No interfaces" });
       return response.items;
     } finally {
       client.close();
@@ -335,6 +359,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   disconnect: async () => {
     await closeActiveClient();
+    logDiagnostic({ level: "info", source: "Connection", message: "Disconnected" });
     set({
       activeId: undefined,
       status: "disconnected",
@@ -350,6 +375,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     if (!activeClient) return;
 
     await activeClient.unsubscribe(3000);
+    logDiagnostic({ level: "info", source: "Capture", message: "Capture paused" });
     set({
       subscribedIfaces: [],
       capturePaused: true,
@@ -372,10 +398,12 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
     if (!subscribedIfaces.length) {
       set({ status: "error", statusMessage: "No CAN interface is available to resume capture" });
+      logDiagnostic({ level: "error", source: "Capture", message: "No CAN interface is available to resume capture" });
       return;
     }
 
     await activeClient.subscribe(subscribedIfaces, 3000, profile?.captureFilters);
+    logDiagnostic({ level: "info", source: "Capture", message: "Capture resumed", detail: subscribedIfaces.join(", ") });
     set({
       subscribedIfaces,
       capturePaused: false,
@@ -440,6 +468,12 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
     if (!activeClient) {
       set({ status: "error", statusMessage: "No remote daemon connection is active" });
+      logDiagnostic({
+        level: "error",
+        source: "Transmit",
+        message: "Transmit failed: no remote daemon connection is active",
+        detail: `${params.iface} ${params.arbitrationId.toString(16).toUpperCase()}`,
+      });
       set((state) => ({
         frames: state.frames.map((frame) =>
           frame.tx_sequence === txFrameWithLine.tx_sequence ? { ...frame, tx_status: "failed", tx_error: "No remote daemon connection is active" } : frame,
@@ -467,9 +501,18 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
         statusMessage: ack.ok ? state.statusMessage : ack.error ?? ack.error_message ?? "Daemon rejected CAN frame",
       }));
 
+      if (!ack.ok) {
+        logDiagnostic({
+          level: "error",
+          source: "Transmit",
+          message: "Daemon rejected CAN frame",
+          detail: ack.error ?? ack.error_message ?? `${params.iface} ${params.arbitrationId.toString(16).toUpperCase()}`,
+        });
+      }
       return { ok: ack.ok, error: ack.error ?? ack.error_message };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to send CAN frame";
+      logDiagnostic({ level: "error", source: "Transmit", message: "Failed to send CAN frame", detail: message });
       set((state) => ({
         status: "error",
         statusMessage: message,

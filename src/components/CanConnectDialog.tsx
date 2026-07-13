@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { v4 as uuid } from "uuid";
 import { useConnectionStore } from "@/store/connectionStore";
-import type { ConnectionProfile, TransportProtocol } from "@/model/connection";
+import type { CanHardwareAdapter, ConnectionProfile, TransportProtocol } from "@/model/connection";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,26 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const adapterLabels = {
+  socketcan: "Generic SocketCAN",
+  vcan: "Virtual CAN",
+  "peak-pcan": "PEAK PCAN",
+  kvaser: "Kvaser",
+  vector: "Vector",
+  "canable-slcan": "CANable / SLCAN",
+  other: "Other SocketCAN adapter",
+} as const;
+
+const adapterHints: Record<keyof typeof adapterLabels, string> = {
+  socketcan: "Use this for any Linux interface already exposed as can0, can1, and so on.",
+  vcan: "Use this for local simulation with vcan0 or another virtual SocketCAN interface.",
+  "peak-pcan": "Install the Linux driver if needed, then bring the PCAN interface up as SocketCAN.",
+  kvaser: "Use Kvaser Linux drivers or SocketCAN support, then connect to the exposed can interface.",
+  vector: "Use the vendor Linux driver or SocketCAN-compatible setup on the daemon host.",
+  "canable-slcan": "Attach through slcand or candlelight firmware, then use the resulting slcan/can interface.",
+  other: "Use this when your adapter is already bridged into SocketCAN by another driver or tool.",
+};
 
 function formatHex(value: number | undefined) {
   return value == null ? "" : value.toString(16).toUpperCase().padStart(8, "0");
@@ -19,6 +39,15 @@ function parseOptionalHex(value: string) {
   if (!trimmed) return undefined;
   const parsed = Number.parseInt(trimmed, 16);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function bitrateValue(value: number | undefined) {
+  return value == null ? "" : String(value);
+}
+
+function parseBitrate(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : undefined;
 }
 
 export function CanConnectDialog({
@@ -64,6 +93,10 @@ export function CanConnectDialog({
       host: "127.0.0.1",
       port: 9501,
       protocol: "ws-json",
+      adapter: "vcan",
+      fdEnabled: true,
+      nominalBitrate: 500000,
+      dataBitrate: 2000000,
       autoReconnect: true,
     };
     setProfile(nextProfile);
@@ -77,6 +110,9 @@ export function CanConnectDialog({
     if (nextProfile.mode === "local" && !nextProfile.iface?.trim()) {
       return "Interface is required";
     }
+
+    if (nextProfile.nominalBitrate != null && nextProfile.nominalBitrate <= 0) return "Nominal bitrate must be greater than zero";
+    if (nextProfile.fdEnabled && nextProfile.dataBitrate != null && nextProfile.dataBitrate <= 0) return "Data bitrate must be greater than zero";
 
     if (nextProfile.mode === "remote") {
       if (!nextProfile.iface?.trim()) return "Daemon CAN interface is required";
@@ -166,6 +202,10 @@ export function CanConnectDialog({
                 host: profile.host ?? "127.0.0.1",
                 port: profile.port ?? 9501,
                 protocol: profile.protocol ?? "ws-json",
+                adapter: profile.adapter ?? (value === "remote" ? "vcan" : "socketcan"),
+                fdEnabled: profile.fdEnabled ?? true,
+                nominalBitrate: profile.nominalBitrate ?? 500000,
+                dataBitrate: profile.dataBitrate ?? 2000000,
               })
             }
           >
@@ -180,13 +220,61 @@ export function CanConnectDialog({
                 <Input value={profile.iface ?? ""} onChange={(e) => setProfile({ ...profile, iface: e.target.value })} />
                 <p className="text-xs text-muted-foreground">Local CAN direct capture is not wired yet. Use Remote Daemon for WSL.</p>
               </div>
+              <div className="space-y-2">
+                <Label>Adapter family</Label>
+                <Select value={profile.adapter ?? "socketcan"} onValueChange={(adapter) => setProfile({ ...profile, adapter: adapter as CanHardwareAdapter })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(adapterLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">{adapterHints[(profile.adapter ?? "socketcan") as keyof typeof adapterLabels]}</p>
+              </div>
+              <div className="rounded-md border bg-muted/20 p-3">
+                <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">CAN timing metadata</div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    checked={profile.fdEnabled ?? true}
+                    onCheckedChange={(value) => setProfile({ ...profile, fdEnabled: Boolean(value), dataBitrate: Boolean(value) ? (profile.dataBitrate ?? 2000000) : undefined })}
+                  />
+                  <Label>CAN-FD interface</Label>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Nominal bitrate</Label>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="500000"
+                      value={bitrateValue(profile.nominalBitrate)}
+                      onChange={(event) => setProfile({ ...profile, nominalBitrate: parseBitrate(event.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Data bitrate</Label>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="2000000"
+                      disabled={!profile.fdEnabled}
+                      value={bitrateValue(profile.dataBitrate)}
+                      onChange={(event) => setProfile({ ...profile, dataBitrate: parseBitrate(event.target.value) })}
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Saved with the profile. Direct Local CAN is not wired yet, so this does not configure the interface from the app.
+                </p>
+              </div>
             </TabsContent>
 
             <TabsContent value="remote" className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <Label>CAN Interface on Daemon Host</Label>
-                  <Button type="button" size="sm" variant="outline" disabled={discovering} onClick={() => void discoverIfaces()}>
+                  <Button size="sm" variant="outline" disabled={discovering} onClick={() => void discoverIfaces()}>
                     {discovering ? "Discovering" : "Discover"}
                   </Button>
                 </div>
@@ -214,6 +302,21 @@ export function CanConnectDialog({
                   This interface must exist in WSL where can-bridge-daemon is running.
                 </p>
                 {discoveryError && <p className="text-xs text-destructive">{discoveryError}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Adapter family on daemon host</Label>
+                <Select value={profile.adapter ?? "vcan"} onValueChange={(adapter) => setProfile({ ...profile, adapter: adapter as CanHardwareAdapter })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(adapterLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">{adapterHints[(profile.adapter ?? "vcan") as keyof typeof adapterLabels]}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -253,6 +356,41 @@ export function CanConnectDialog({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">Only WebSocket JSON is connected in the UI right now.</p>
+              </div>
+
+              <div className="rounded-md border bg-muted/20 p-3">
+                <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">CAN timing metadata</div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    checked={profile.fdEnabled ?? true}
+                    onCheckedChange={(value) => setProfile({ ...profile, fdEnabled: Boolean(value), dataBitrate: Boolean(value) ? (profile.dataBitrate ?? 2000000) : undefined })}
+                  />
+                  <Label>CAN-FD interface</Label>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Nominal bitrate</Label>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="500000"
+                      value={bitrateValue(profile.nominalBitrate)}
+                      onChange={(event) => setProfile({ ...profile, nominalBitrate: parseBitrate(event.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Data bitrate</Label>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="2000000"
+                      disabled={!profile.fdEnabled}
+                      value={bitrateValue(profile.dataBitrate)}
+                      onChange={(event) => setProfile({ ...profile, dataBitrate: parseBitrate(event.target.value) })}
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Saved for documentation and profile selection. The SocketCAN interface must already be configured with these rates on the daemon host.
+                </p>
               </div>
 
               <div className="rounded-md border bg-muted/20 p-3">
@@ -314,3 +452,4 @@ export function CanConnectDialog({
     </Dialog>
   );
 }
+

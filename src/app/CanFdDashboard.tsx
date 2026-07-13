@@ -16,19 +16,20 @@ import { useConnectionStore } from "@/store/connectionStore";
 import { useAppStore } from "@/store/appShellStore";
 import { useUiStore } from "@/store/uiStore";
 import { useTransmitDraftStore } from "@/store/transmitDraftStore";
-import { monitorColumnLabels, MonitorColumnId, useMonitorPreferencesStore } from "@/store/monitorPreferencesStore";
+import { loadedTracePageSizes, monitorColumnLabels, MonitorColumnId, useMonitorPreferencesStore } from "@/store/monitorPreferencesStore";
 import { resolveProfileReferences, useProfileStore } from "@/profile-editor/store/profileStore";
 import { DecodedField, DecodedFrame, decodeFrameWithProfiles } from "@/profile-editor/decodeProfile";
 import { DecodedPreviewColumnMenu, DecodedPreviewPanel } from "@/profile-editor/DecodedPreviewPanel";
 import { parseCandump } from "@/can/candump";
-import { Activity, Cable, Columns3, Download, Eye, EyeOff, FileUp, Gauge, HelpCircle, Pause, Play, RadioTower, Search, Send, Trash2, X } from "lucide-react";
+import { Activity, ArrowDown, ArrowUp, Cable, Columns3, Download, Eye, EyeOff, FileUp, Gauge, HelpCircle, Pause, Play, RadioTower, Search, Send, Trash2, X } from "lucide-react";
 import { forwardRef, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import type { HTMLAttributes, MouseEvent } from "react";
+import type { HTMLAttributes, KeyboardEvent, MouseEvent } from "react";
 import { TableVirtuoso } from "react-virtuoso";
 import type { TableComponents, TableVirtuosoHandle } from "react-virtuoso";
 import type { WsFrame } from "@/can-bridge/ws/types";
 import type { CanProfile } from "@/profile-editor/model/profile";
 import { getProfileMessageSchema } from "@/profile-editor/profileAdapter";
+import { toast } from "sonner";
 
 function formatCanId(id: number) {
   return id.toString(16).toUpperCase().padStart(id > 0x7ff ? 8 : 3, "0");
@@ -391,6 +392,100 @@ type HeaderContextMenu = {
   column: TraceColumn;
 };
 
+type DisplayFilterPreset = {
+  id: string;
+  name: string;
+  expression: string;
+};
+
+type SortDirection = "asc" | "desc";
+
+type MonitorSortRule = {
+  id: string;
+  columnId: string;
+  label: string;
+  direction: SortDirection;
+};
+
+type MonitorSortPreset = {
+  id: string;
+  name: string;
+  rules: MonitorSortRule[];
+};
+
+type MonitorAlertRule = {
+  id: string;
+  name: string;
+  expression: string;
+  enabled: boolean;
+};
+
+const DISPLAY_FILTER_PRESETS_KEY = "cansim.monitor.filterPresets.v1";
+const MONITOR_SORT_PRESETS_KEY = "cansim.monitor.sortPresets.v1";
+const MONITOR_SORT_RULES_KEY = "cansim.monitor.sortRules.v1";
+const MONITOR_ALERT_RULES_KEY = "cansim.monitor.alertRules.v1";
+
+function loadDisplayFilterPresets(): DisplayFilterPreset[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DISPLAY_FILTER_PRESETS_KEY) ?? "[]") as DisplayFilterPreset[];
+    return Array.isArray(parsed) ? parsed.filter((preset) => preset.name && preset.expression) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveDisplayFilterPresets(presets: DisplayFilterPreset[]) {
+  localStorage.setItem(DISPLAY_FILTER_PRESETS_KEY, JSON.stringify(presets));
+}
+
+function validSortRule(rule: MonitorSortRule) {
+  return Boolean(rule.columnId && rule.label && (rule.direction === "asc" || rule.direction === "desc"));
+}
+
+function loadMonitorSortRules(): MonitorSortRule[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MONITOR_SORT_RULES_KEY) ?? "[]") as MonitorSortRule[];
+    return Array.isArray(parsed) ? parsed.filter(validSortRule) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMonitorSortRules(rules: MonitorSortRule[]) {
+  localStorage.setItem(MONITOR_SORT_RULES_KEY, JSON.stringify(rules));
+}
+
+function loadMonitorSortPresets(): MonitorSortPreset[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MONITOR_SORT_PRESETS_KEY) ?? "[]") as MonitorSortPreset[];
+    return Array.isArray(parsed)
+      ? parsed
+          .filter((preset) => preset.name && Array.isArray(preset.rules))
+          .map((preset) => ({ ...preset, rules: preset.rules.filter(validSortRule) }))
+          .filter((preset) => preset.rules.length > 0)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMonitorSortPresets(presets: MonitorSortPreset[]) {
+  localStorage.setItem(MONITOR_SORT_PRESETS_KEY, JSON.stringify(presets));
+}
+
+function loadMonitorAlertRules(): MonitorAlertRule[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MONITOR_ALERT_RULES_KEY) ?? "[]") as MonitorAlertRule[];
+    return Array.isArray(parsed) ? parsed.filter((rule) => rule.name && rule.expression) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMonitorAlertRules(rules: MonitorAlertRule[]) {
+  localStorage.setItem(MONITOR_ALERT_RULES_KEY, JSON.stringify(rules));
+}
+
 function filterFieldForColumn(column: TraceColumn) {
   if (column.kind === "canId") return column.id;
   if (column.kind === "payloadHeader") return column.id;
@@ -419,6 +514,38 @@ function appendFilterExpression(current: string, expression: string, connector: 
   const trimmed = current.trim();
   if (!trimmed) return expression;
   return `${trimmed} ${connector} ${expression}`;
+}
+
+function sortFieldForColumn(columnId: string) {
+  return columnId;
+}
+
+function compareRowsByRule(a: TraceRow, b: TraceRow, rule: MonitorSortRule) {
+  const fieldName = sortFieldForColumn(rule.columnId);
+  const left = getRowField(a, fieldName);
+  const right = getRowField(b, fieldName);
+  const direction = rule.direction === "asc" ? 1 : -1;
+
+  if (!left && !right) return 0;
+  if (!left) return 1;
+  if (!right) return -1;
+  if (left.numeric != null && right.numeric != null && left.numeric !== right.numeric) {
+    return (left.numeric - right.numeric) * direction;
+  }
+
+  const textCompare = left.value.localeCompare(right.value, undefined, { numeric: true, sensitivity: "base" });
+  return textCompare * direction;
+}
+
+function sortTraceRows(rows: TraceRow[], rules: MonitorSortRule[]) {
+  if (!rules.length) return rows;
+  return [...rows].sort((a, b) => {
+    for (const rule of rules) {
+      const result = compareRowsByRule(a, b, rule);
+      if (result !== 0) return result;
+    }
+    return a.numericValues.line - b.numericValues.line;
+  });
 }
 
 function TraceColumnMenu({
@@ -535,6 +662,10 @@ export function CanFdDashboard() {
   const setDynamicMonitorColumns = useMonitorPreferencesStore((s) => s.setDynamicMonitorColumns);
   const columnOrder = useMonitorPreferencesStore((s) => s.columnOrder);
   const setColumnOrder = useMonitorPreferencesStore((s) => s.setColumnOrder);
+  const loadedPageSize = useMonitorPreferencesStore((s) => s.loadedPageSize);
+  const loadedPageIndex = useMonitorPreferencesStore((s) => s.loadedPageIndex);
+  const setLoadedPageSize = useMonitorPreferencesStore((s) => s.setLoadedPageSize);
+  const setLoadedPageIndex = useMonitorPreferencesStore((s) => s.setLoadedPageIndex);
   const showDecodedPreview = useMonitorPreferencesStore((s) => s.showDecodedPreview);
   const setShowDecodedPreview = useMonitorPreferencesStore((s) => s.setShowDecodedPreview);
   const showTransmitComposer = useMonitorPreferencesStore((s) => s.showTransmitComposer);
@@ -544,6 +675,7 @@ export function CanFdDashboard() {
   const tableVirtuosoRef = useRef<TableVirtuosoHandle>(null);
   const cyclicTimerRef = useRef<number | null>(null);
   const cyclicRunningRef = useRef(false);
+  const lastAlertedLineRef = useRef(0);
   const [draftSearch, setDraftSearch] = useState(search);
   const [txId, setTxId] = useState("18DA10F1");
   const [txPayload, setTxPayload] = useState("02 10 03 00 00 00 00 00");
@@ -558,6 +690,13 @@ export function CanFdDashboard() {
   const [cyclicActive, setCyclicActive] = useState(false);
   const [contextMenu, setContextMenu] = useState<CellContextMenu | null>(null);
   const [headerContextMenu, setHeaderContextMenu] = useState<HeaderContextMenu | null>(null);
+  const [filterPresets, setFilterPresets] = useState<DisplayFilterPreset[]>(loadDisplayFilterPresets);
+  const [selectedFilterPresetId, setSelectedFilterPresetId] = useState("");
+  const [sortRules, setSortRules] = useState<MonitorSortRule[]>(loadMonitorSortRules);
+  const [sortPresets, setSortPresets] = useState<MonitorSortPreset[]>(loadMonitorSortPresets);
+  const [selectedSortPresetId, setSelectedSortPresetId] = useState("");
+  const [alertRules, setAlertRules] = useState<MonitorAlertRule[]>(loadMonitorAlertRules);
+  const lastTraceSourceNameRef = useRef<string | undefined>(traceSourceName);
 
   useEffect(() => {
     setDraftSearch(search);
@@ -585,6 +724,58 @@ export function CanFdDashboard() {
   );
 
   const filteredRows = useMemo(() => traceRows.filter((row) => rowMatchesFilter(row, parsedFilter)), [parsedFilter, traceRows]);
+  const sortedRows = useMemo(() => sortTraceRows(filteredRows, sortRules), [filteredRows, sortRules]);
+  const loadedTracePaginationEnabled = Boolean(traceSourceName);
+  const loadedTracePageCount = loadedTracePaginationEnabled ? Math.max(1, Math.ceil(sortedRows.length / loadedPageSize)) : 1;
+  const safeLoadedPageIndex = loadedTracePaginationEnabled ? Math.min(loadedPageIndex, loadedTracePageCount - 1) : 0;
+  const pageStartIndex = loadedTracePaginationEnabled ? safeLoadedPageIndex * loadedPageSize : 0;
+  const pageEndIndex = loadedTracePaginationEnabled ? Math.min(pageStartIndex + loadedPageSize, sortedRows.length) : sortedRows.length;
+  const visibleRows = useMemo(
+    () => (loadedTracePaginationEnabled ? sortedRows.slice(pageStartIndex, pageEndIndex) : sortedRows),
+    [loadedTracePaginationEnabled, pageEndIndex, pageStartIndex, sortedRows],
+  );
+
+  useEffect(() => {
+    if (!loadedTracePaginationEnabled) return;
+    if (loadedPageIndex > loadedTracePageCount - 1) setLoadedPageIndex(loadedTracePageCount - 1);
+  }, [loadedPageIndex, loadedTracePageCount, loadedTracePaginationEnabled, setLoadedPageIndex]);
+
+  useEffect(() => {
+    if (traceSourceName && traceSourceName !== lastTraceSourceNameRef.current) {
+      setLoadedPageIndex(0);
+    }
+    lastTraceSourceNameRef.current = traceSourceName;
+  }, [setLoadedPageIndex, traceSourceName]);
+
+  useEffect(() => {
+    if (!loadedTracePaginationEnabled) return;
+    tableVirtuosoRef.current?.scrollToIndex({ index: 0, align: "start" });
+    if (visibleRows.length && !visibleRows.some((row) => row.key === selectedFrameKey)) {
+      setSelectedFrameKey(visibleRows[0].key);
+    }
+  }, [loadedPageSize, loadedTracePaginationEnabled, safeLoadedPageIndex, selectedFrameKey, setSelectedFrameKey, visibleRows]);
+  const traceStats = useMemo(() => {
+    const total = filteredRows.length;
+    const rx = filteredRows.filter((row) => row.frame.dir === "rx").length;
+    const tx = filteredRows.filter((row) => row.frame.dir === "tx").length;
+    const errors = filteredRows.filter((row) => row.hasError).length;
+    const txFailed = filteredRows.filter((row) => row.frame.tx_status === "failed").length;
+    const byCanId = new Map<string, number>();
+    for (const row of filteredRows) {
+      const id = formatCanId(row.frame.id);
+      byCanId.set(id, (byCanId.get(id) ?? 0) + 1);
+    }
+    const topIds = Array.from(byCanId.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    return {
+      total,
+      rx,
+      tx,
+      errors,
+      txFailed,
+      uniqueIds: byCanId.size,
+      topIds,
+    };
+  }, [filteredRows]);
 
   const dynamicCanIdColumns = useMemo<DynamicMonitorColumn[]>(() => {
     const byId = new Map<string, DynamicMonitorColumn>();
@@ -648,10 +839,32 @@ export function CanFdDashboard() {
     setDynamicMonitorColumns([...dynamicCanIdColumns, ...dynamicPayloadColumns].map((column) => column.id));
   }, [dynamicCanIdColumns, dynamicPayloadColumns, setDynamicMonitorColumns]);
 
+  useEffect(() => {
+    const enabledRules = alertRules.filter((rule) => rule.enabled);
+    if (!enabledRules.length || !traceRows.length) {
+      lastAlertedLineRef.current = Math.max(lastAlertedLineRef.current, traceRows[traceRows.length - 1]?.frame.line_no ?? 0);
+      return;
+    }
+
+    const newRows = traceRows.filter((row) => (row.frame.line_no ?? 0) > lastAlertedLineRef.current);
+    if (!newRows.length) return;
+
+    for (const row of newRows) {
+      for (const rule of enabledRules) {
+        const parsed = parseFilter(rule.expression);
+        if (!parsed.valid || !rowMatchesFilter(row, parsed)) continue;
+        toast.warning(rule.name, {
+          description: `${formatCanId(row.frame.id)} ${formatPayloadBytes(row.frame.data_hex)}`.trim(),
+        });
+      }
+    }
+    lastAlertedLineRef.current = Math.max(lastAlertedLineRef.current, newRows[newRows.length - 1]?.frame.line_no ?? lastAlertedLineRef.current);
+  }, [alertRules, traceRows]);
+
   const selectedFrame = useMemo(() => {
-    const selected = selectedFrameKey ? filteredRows.find((row) => row.key === selectedFrameKey)?.frame : undefined;
-    return selected ?? filteredRows[filteredRows.length - 1]?.frame ?? frames[frames.length - 1];
-  }, [filteredRows, frames, selectedFrameKey]);
+    const selected = selectedFrameKey ? sortedRows.find((row) => row.key === selectedFrameKey)?.frame : undefined;
+    return selected ?? sortedRows[sortedRows.length - 1]?.frame ?? frames[frames.length - 1];
+  }, [frames, selectedFrameKey, sortedRows]);
 
   const selectedTraceRow = useMemo(() => {
     if (selectedFrameKey) return traceRows.find((row) => row.key === selectedFrameKey) ?? null;
@@ -672,6 +885,7 @@ export function CanFdDashboard() {
   const cyclicDisabledReason = cyclicActive ? undefined : txDisabledReason;
   const visibleMonitorColumnCount =
     visibleTraceColumns.length;
+  const keyboardRows = loadedTracePaginationEnabled ? visibleRows : sortedRows;
 
   useEffect(() => {
     if (status !== "connected" || traceSourceName) return;
@@ -687,6 +901,50 @@ export function CanFdDashboard() {
     },
     [],
   );
+
+  function shouldIgnoreNavigationKey(event: KeyboardEvent<HTMLElement>) {
+    const target = event.target as HTMLElement | null;
+    if (!target) return false;
+    const tagName = target.tagName.toLowerCase();
+    return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
+  }
+
+  function selectTraceRowAt(index: number) {
+    if (!keyboardRows.length) return;
+    const nextIndex = Math.max(0, Math.min(keyboardRows.length - 1, index));
+    const nextRow = keyboardRows[nextIndex];
+    setSelectedFrameKey(nextRow.key);
+    tableVirtuosoRef.current?.scrollToIndex({ index: nextIndex, align: "center" });
+  }
+
+  function handleMonitorKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (shouldIgnoreNavigationKey(event)) return;
+    const selectedIndex = Math.max(0, keyboardRows.findIndex((row) => row.key === selectedFrameKey));
+    const pageSize = 10;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      selectTraceRowAt(selectedIndex + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      selectTraceRowAt(selectedIndex - 1);
+    } else if (event.key === "PageDown") {
+      event.preventDefault();
+      selectTraceRowAt(selectedIndex + pageSize);
+    } else if (event.key === "PageUp") {
+      event.preventDefault();
+      selectTraceRowAt(selectedIndex - pageSize);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      selectTraceRowAt(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      selectTraceRowAt(keyboardRows.length - 1);
+    } else if (event.key === "Enter" && selectedFrame) {
+      event.preventDefault();
+      setShowDecodedPreview(!showDecodedPreview);
+    }
+  }
 
   useEffect(() => {
     if (!connected) stopCyclicTx();
@@ -716,7 +974,7 @@ export function CanFdDashboard() {
 
   function exportVisibleCsv() {
     const headers = visibleTraceColumns.map((column) => column.label);
-    const rows = filteredRows.map((row) =>
+    const rows = sortedRows.map((row) =>
       visibleTraceColumns.map((column) => {
         if (column.kind === "static") {
           if (column.id === "line") return String(row.frame.line_no ?? row.numericValues.line);
@@ -933,6 +1191,163 @@ export function CanFdDashboard() {
     setDraftSearch(value);
   }
 
+  function updateFilterPresets(next: DisplayFilterPreset[]) {
+    setFilterPresets(next);
+    saveDisplayFilterPresets(next);
+  }
+
+  function saveCurrentFilterPreset() {
+    const expression = draftSearch.trim();
+    if (!expression) return;
+    const name = window.prompt("Preset name", selectedFilterPresetId ? filterPresets.find((preset) => preset.id === selectedFilterPresetId)?.name : "");
+    if (!name?.trim()) return;
+    const existingId = selectedFilterPresetId || `preset_${Date.now()}`;
+    const nextPreset: DisplayFilterPreset = {
+      id: existingId,
+      name: name.trim(),
+      expression,
+    };
+    const next = [...filterPresets.filter((preset) => preset.id !== existingId), nextPreset].sort((a, b) => a.name.localeCompare(b.name));
+    updateFilterPresets(next);
+    setSelectedFilterPresetId(nextPreset.id);
+  }
+
+  function applyFilterPreset(id: string) {
+    setSelectedFilterPresetId(id);
+    const preset = filterPresets.find((item) => item.id === id);
+    if (preset) setDisplayFilter(preset.expression);
+  }
+
+  function deleteSelectedFilterPreset() {
+    if (!selectedFilterPresetId) return;
+    const preset = filterPresets.find((item) => item.id === selectedFilterPresetId);
+    if (!preset) return;
+    if (!window.confirm(`Delete filter preset "${preset.name}"?`)) return;
+    updateFilterPresets(filterPresets.filter((item) => item.id !== selectedFilterPresetId));
+    setSelectedFilterPresetId("");
+  }
+
+  function updateSortRules(next: MonitorSortRule[]) {
+    setSortRules(next);
+    saveMonitorSortRules(next);
+  }
+
+  function updateSortPresets(next: MonitorSortPreset[]) {
+    setSortPresets(next);
+    saveMonitorSortPresets(next);
+  }
+
+  function makeSortRule(column: TraceColumn, direction: SortDirection): MonitorSortRule {
+    return {
+      id: `${column.id}_${Date.now()}`,
+      columnId: column.id,
+      label: column.label,
+      direction,
+    };
+  }
+
+  function applyColumnSort(column: TraceColumn, direction: SortDirection, mode: "replace" | "add") {
+    const rule = makeSortRule(column, direction);
+    const next = mode === "replace" ? [rule] : [...sortRules.filter((item) => item.columnId !== column.id), rule];
+    updateSortRules(next);
+    setSelectedSortPresetId("");
+    setHeaderContextMenu(null);
+  }
+
+  function clearSortRules() {
+    updateSortRules([]);
+    setSelectedSortPresetId("");
+    setHeaderContextMenu(null);
+  }
+
+  function removeSortRule(id: string) {
+    updateSortRules(sortRules.filter((rule) => rule.id !== id));
+    setSelectedSortPresetId("");
+  }
+
+  function moveSortRule(id: string, direction: "up" | "down") {
+    const index = sortRules.findIndex((rule) => rule.id === id);
+    const target = direction === "up" ? index - 1 : index + 1;
+    if (index < 0 || target < 0 || target >= sortRules.length) return;
+    const next = [...sortRules];
+    const [moved] = next.splice(index, 1);
+    next.splice(target, 0, moved);
+    updateSortRules(next);
+    setSelectedSortPresetId("");
+  }
+
+  function flipSortRule(id: string) {
+    updateSortRules(sortRules.map((rule) => (rule.id === id ? { ...rule, direction: rule.direction === "asc" ? "desc" : "asc" } : rule)));
+    setSelectedSortPresetId("");
+  }
+
+  function saveCurrentSortPreset() {
+    if (!sortRules.length) return;
+    const name = window.prompt("Sort preset name", selectedSortPresetId ? sortPresets.find((preset) => preset.id === selectedSortPresetId)?.name : "");
+    if (!name?.trim()) return;
+    const existingId = selectedSortPresetId || `sort_${Date.now()}`;
+    const nextPreset: MonitorSortPreset = {
+      id: existingId,
+      name: name.trim(),
+      rules: sortRules,
+    };
+    const next = [...sortPresets.filter((preset) => preset.id !== existingId), nextPreset].sort((a, b) => a.name.localeCompare(b.name));
+    updateSortPresets(next);
+    setSelectedSortPresetId(nextPreset.id);
+  }
+
+  function applySortPreset(id: string) {
+    setSelectedSortPresetId(id);
+    const preset = sortPresets.find((item) => item.id === id);
+    if (preset) updateSortRules(preset.rules);
+  }
+
+  function deleteSelectedSortPreset() {
+    if (!selectedSortPresetId) return;
+    const preset = sortPresets.find((item) => item.id === selectedSortPresetId);
+    if (!preset) return;
+    if (!window.confirm(`Delete sort preset "${preset.name}"?`)) return;
+    updateSortPresets(sortPresets.filter((item) => item.id !== selectedSortPresetId));
+    setSelectedSortPresetId("");
+  }
+
+  function updateAlertRules(next: MonitorAlertRule[]) {
+    setAlertRules(next);
+    saveMonitorAlertRules(next);
+  }
+
+  function addAlertRuleFromCurrentFilter() {
+    const expression = draftSearch.trim();
+    if (!expression) return;
+    const parsed = parseFilter(expression);
+    if (!parsed.valid) {
+      window.alert(parsed.error || "The current display filter is not valid.");
+      return;
+    }
+    const name = window.prompt("Alert rule name", "CAN alert");
+    if (!name?.trim()) return;
+    updateAlertRules([
+      ...alertRules,
+      {
+        id: `alert_${Date.now()}`,
+        name: name.trim(),
+        expression,
+        enabled: true,
+      },
+    ]);
+  }
+
+  function toggleAlertRule(id: string) {
+    updateAlertRules(alertRules.map((rule) => (rule.id === id ? { ...rule, enabled: !rule.enabled } : rule)));
+  }
+
+  function deleteAlertRule(id: string) {
+    const rule = alertRules.find((item) => item.id === id);
+    if (!rule) return;
+    if (!window.confirm(`Delete alert rule "${rule.name}"?`)) return;
+    updateAlertRules(alertRules.filter((item) => item.id !== id));
+  }
+
   function filterTextActive() {
     return draftSearch.trim();
   }
@@ -1067,6 +1482,8 @@ export function CanFdDashboard() {
   }
 
   function renderTraceHeader(column: TraceColumn) {
+    const sortIndex = sortRules.findIndex((rule) => rule.columnId === column.id);
+    const sortRule = sortIndex >= 0 ? sortRules[sortIndex] : undefined;
     return (
       <th
         key={column.id}
@@ -1084,7 +1501,15 @@ export function CanFdDashboard() {
         className={`cursor-move whitespace-nowrap px-4 py-2 font-medium ${column.id === "line" ? "text-right" : ""}`}
         title="Drag to reorder columns. Right click to build a display filter."
       >
-        {column.label}
+        <span className="inline-flex items-center gap-1">
+          {column.label}
+          {sortRule && (
+            <span className="inline-flex items-center gap-0.5 rounded-sm bg-primary/10 px-1 py-0.5 text-[10px] text-primary">
+              {sortRule.direction === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+              {sortIndex + 1}
+            </span>
+          )}
+        </span>
       </th>
     );
   }
@@ -1185,7 +1610,7 @@ export function CanFdDashboard() {
   }
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background" onClick={() => {
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background" tabIndex={0} onKeyDown={handleMonitorKeyDown} onClick={() => {
       setContextMenu(null);
       setHeaderContextMenu(null);
     }}>
@@ -1202,11 +1627,11 @@ export function CanFdDashboard() {
       />
 
       <div
-        className={`grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 ${
+        className={`grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto p-2 sm:p-3 xl:overflow-hidden ${
           showDecodedPreview || showTransmitComposer ? "xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]" : ""
         }`}
       >
-        <div className="h-full min-h-0 min-w-0 overflow-hidden">
+        <div className="min-h-[65vh] min-w-0 overflow-hidden xl:h-full xl:min-h-0">
           <section className="grid h-full min-h-0 min-w-0">
             <Card className="flex min-h-0 min-w-0 flex-col rounded-lg border-border/70 shadow-sm">
               <CardHeader className="flex-row items-center justify-between gap-2 border-b bg-muted/20 p-2.5">
@@ -1319,6 +1744,39 @@ export function CanFdDashboard() {
                   <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" title="Open display filter help" onClick={openDisplayFilterHelp}>
                     <HelpCircle className="h-4 w-4" />
                   </Button>
+                  <Select value={selectedFilterPresetId || "__none"} onValueChange={(value) => value === "__none" ? setSelectedFilterPresetId("") : applyFilterPreset(value)}>
+                    <SelectTrigger className="h-9 w-40 shrink-0 text-xs">
+                      <SelectValue placeholder="Presets" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">Filter presets</SelectItem>
+                      {filterPresets.map((preset) => (
+                        <SelectItem key={preset.id} value={preset.id}>
+                          {preset.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 shrink-0 px-2 text-xs"
+                    disabled={!draftSearch.trim()}
+                    title="Save current display filter as a preset"
+                    onClick={saveCurrentFilterPreset}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 shrink-0 px-2 text-xs"
+                    disabled={!selectedFilterPresetId}
+                    title="Delete selected filter preset"
+                    onClick={deleteSelectedFilterPreset}
+                  >
+                    Delete
+                  </Button>
                 </div>
                 <div
                   className={`mt-1 text-[11px] ${filterStatusClass()}`}
@@ -1326,11 +1784,134 @@ export function CanFdDashboard() {
                   {filterStatusText()}
                 </div>
               </div>
+              <div className="flex flex-wrap items-center gap-2 border-b bg-background px-3 py-2 text-xs">
+                <span className="font-medium text-muted-foreground">Sort</span>
+                {sortRules.length === 0 ? (
+                  <span className="text-muted-foreground">Original trace order</span>
+                ) : (
+                  sortRules.map((rule, index) => (
+                    <span key={rule.id} className="inline-flex items-center gap-1 rounded-md border bg-muted/30 px-2 py-1">
+                      <span className="text-[10px] text-muted-foreground">{index + 1}</span>
+                      <span className="font-medium">{rule.label}</span>
+                      <button type="button"
+                        className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
+                        title="Toggle sort direction"
+                        onClick={() => flipSortRule(rule.id)}
+                      >
+                        {rule.direction === "asc" ? "ASC" : "DESC"}
+                      </button>
+                      <button type="button" className="text-muted-foreground hover:text-foreground" disabled={index === 0} title="Move earlier" onClick={() => moveSortRule(rule.id, "up")}>
+                        <ArrowUp className="h-3 w-3" />
+                      </button>
+                      <button type="button"
+                        className="text-muted-foreground hover:text-foreground"
+                        disabled={index === sortRules.length - 1}
+                        title="Move later"
+                        onClick={() => moveSortRule(rule.id, "down")}
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </button>
+                      <button type="button" className="text-muted-foreground hover:text-destructive" title="Remove sort rule" onClick={() => removeSortRule(rule.id)}>
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))
+                )}
+                <div className="ml-auto flex flex-wrap items-center gap-2">
+                  <Select value={selectedSortPresetId || "__none"} onValueChange={(value) => value === "__none" ? setSelectedSortPresetId("") : applySortPreset(value)}>
+                    <SelectTrigger className="h-8 w-40 text-xs">
+                      <SelectValue placeholder="Sort presets" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">Sort presets</SelectItem>
+                      {sortPresets.map((preset) => (
+                        <SelectItem key={preset.id} value={preset.id}>
+                          {preset.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" disabled={!sortRules.length} onClick={saveCurrentSortPreset}>
+                    Save
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" disabled={!selectedSortPresetId} onClick={deleteSelectedSortPreset}>
+                    Delete
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" disabled={!sortRules.length} onClick={clearSortRules}>
+                    Clear
+                  </Button>
+                </div>
+              </div>
+              <div className="border-b bg-muted/20 px-3 py-2">
+                <div className="grid gap-2 text-xs md:grid-cols-[repeat(6,minmax(0,1fr))]">
+                  {[
+                    ["Frames", traceStats.total],
+                    ["RX", traceStats.rx],
+                    ["TX", traceStats.tx],
+                    ["Decoded errors", traceStats.errors],
+                    ["TX failed", traceStats.txFailed],
+                    ["Unique IDs", traceStats.uniqueIds],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md border bg-background px-2 py-1.5">
+                      <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
+                      <div className="mt-0.5 font-mono text-sm font-semibold">{value}</div>
+                    </div>
+                  ))}
+                </div>
+                {traceStats.topIds.length > 0 && (
+                  <div className="mt-2 grid gap-1 md:grid-cols-5">
+                    {traceStats.topIds.map(([id, count]) => {
+                      const width = traceStats.total ? Math.max(4, Math.round((count / traceStats.total) * 100)) : 0;
+                      return (
+                        <div key={id} className="min-w-0">
+                          <div className="mb-1 flex justify-between gap-2 font-mono text-[11px]">
+                            <span className="truncate">{id}</span>
+                            <span className="text-muted-foreground">{count}</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-muted">
+                            <div className="h-1.5 rounded-full bg-primary" style={{ width: `${width}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="mt-2 flex flex-wrap items-center gap-2 border-t pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    disabled={!draftSearch.trim()}
+                    title="Create an alert rule from the current display filter"
+                    onClick={addAlertRuleFromCurrentFilter}
+                  >
+                    Add alert from filter
+                  </Button>
+                  {alertRules.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">No alert rules</span>
+                  ) : (
+                    alertRules.map((rule) => (
+                      <span key={rule.id} className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs">
+                        <button type="button"
+                          className={rule.enabled ? "font-medium text-amber-600 dark:text-amber-300" : "text-muted-foreground"}
+                          title={rule.expression}
+                          onClick={() => toggleAlertRule(rule.id)}
+                        >
+                          {rule.enabled ? "On" : "Off"}: {rule.name}
+                        </button>
+                        <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => deleteAlertRule(rule.id)} title="Delete alert">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
               <CardContent className="min-h-0 min-w-0 flex-1 p-0">
                 <TableVirtuoso
                   ref={tableVirtuosoRef}
                   className="h-full"
-                  data={filteredRows}
+                  data={visibleRows}
                   components={virtuosoComponents}
                   computeItemKey={(_index, row) => row.key}
                   fixedHeaderContent={fixedHeaderContent}
@@ -1339,12 +1920,77 @@ export function CanFdDashboard() {
                   followOutput={status === "connected" && !traceSourceName ? "smooth" : false}
                 />
               </CardContent>
+              {loadedTracePaginationEnabled && (
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/20 px-3 py-2 text-xs">
+                  <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                    <span className="font-medium text-foreground">Loaded trace pages</span>
+                    <span>
+                      {filteredRows.length === 0 ? "0 frames" : `${pageStartIndex + 1}-${pageEndIndex} of ${filteredRows.length} frames`}
+                    </span>
+                    {frames.length !== filteredRows.length && <span>filtered from {frames.length}</span>}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-muted-foreground">Rows</span>
+                    <Select value={String(loadedPageSize)} onValueChange={(value) => setLoadedPageSize(Number(value))}>
+                      <SelectTrigger className="h-8 w-24 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {loadedTracePageSizes.map((size) => (
+                          <SelectItem key={size} value={String(size)}>
+                            {size}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      disabled={safeLoadedPageIndex === 0}
+                      onClick={() => setLoadedPageIndex(0)}
+                    >
+                      First
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      disabled={safeLoadedPageIndex === 0}
+                      onClick={() => setLoadedPageIndex(safeLoadedPageIndex - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <span className="min-w-24 text-center font-mono text-[11px] text-muted-foreground">
+                      Page {safeLoadedPageIndex + 1} / {loadedTracePageCount}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      disabled={safeLoadedPageIndex >= loadedTracePageCount - 1}
+                      onClick={() => setLoadedPageIndex(safeLoadedPageIndex + 1)}
+                    >
+                      Next
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      disabled={safeLoadedPageIndex >= loadedTracePageCount - 1}
+                      onClick={() => setLoadedPageIndex(loadedTracePageCount - 1)}
+                    >
+                      Last
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
           </section>
         </div>
 
         {(showDecodedPreview || showTransmitComposer) && (
-        <aside className="min-w-0 flex min-h-0 flex-col gap-3 overflow-hidden">
+        <aside className="min-w-0 flex min-h-[45vh] flex-col gap-3 overflow-visible xl:min-h-0 xl:overflow-hidden">
           {showDecodedPreview && (
           <Card className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border-border/70 shadow-sm">
             <CardHeader className="p-4 pb-2">
@@ -1539,13 +2185,47 @@ export function CanFdDashboard() {
             <div className="mt-0.5 truncate font-mono text-xs">{filterFieldForColumn(headerContextMenu.column)}</div>
           </div>
           <div className="my-1 border-t" />
+          <button type="button"
+            className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
+            onClick={() => applyColumnSort(headerContextMenu.column, "asc", "replace")}
+          >
+            <span>Sort ascending</span>
+            <ArrowUp className="h-3.5 w-3.5" />
+          </button>
+          <button type="button"
+            className="flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
+            onClick={() => applyColumnSort(headerContextMenu.column, "desc", "replace")}
+          >
+            <span>Sort descending</span>
+            <ArrowDown className="h-3.5 w-3.5" />
+          </button>
+          <button type="button"
+            className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
+            onClick={() => applyColumnSort(headerContextMenu.column, "asc", "add")}
+          >
+            Add as next ascending sort
+          </button>
+          <button type="button"
+            className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
+            onClick={() => applyColumnSort(headerContextMenu.column, "desc", "add")}
+          >
+            Add as next descending sort
+          </button>
+          {sortRules.length > 0 && (
+            <button type="button"
+              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-destructive hover:bg-destructive/10"
+              onClick={clearSortRules}
+            >
+              Clear sorting
+            </button>
+          )}
+          <div className="my-1 border-t" />
           {(() => {
             const selectedValue = selectedValueForColumn(headerContextMenu.column);
             const canAppend = headerCanAppend();
             return (
               <>
-                <button
-                  type="button"
+                <button type="button"
                   className="flex w-full items-center justify-between gap-3 rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={selectedValue == null}
                   onClick={() => selectedValue != null && applyColumnFilter(headerContextMenu.column, "replace", selectedValue)}
@@ -1553,16 +2233,14 @@ export function CanFdDashboard() {
                   <span>Replace with selected value</span>
                   <span className="max-w-28 truncate font-mono text-xs text-muted-foreground">{selectedValue ?? "No row"}</span>
                 </button>
-                <button
-                  type="button"
+                <button type="button"
                   className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={selectedValue == null || !canAppend}
                   onClick={() => selectedValue != null && applyColumnFilter(headerContextMenu.column, "and", selectedValue)}
                 >
                   Add AND selected value
                 </button>
-                <button
-                  type="button"
+                <button type="button"
                   className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={selectedValue == null || !canAppend}
                   onClick={() => selectedValue != null && applyColumnFilter(headerContextMenu.column, "or", selectedValue)}
@@ -1570,23 +2248,20 @@ export function CanFdDashboard() {
                   Add OR selected value
                 </button>
                 <div className="my-1 border-t" />
-                <button
-                  type="button"
+                <button type="button"
                   className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
                   onClick={() => applyColumnFilter(headerContextMenu.column, "replace")}
                 >
                   Start editable condition
                 </button>
-                <button
-                  type="button"
+                <button type="button"
                   className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={!canAppend}
                   onClick={() => applyColumnFilter(headerContextMenu.column, "and")}
                 >
                   Add AND editable condition
                 </button>
-                <button
-                  type="button"
+                <button type="button"
                   className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={!canAppend}
                   onClick={() => applyColumnFilter(headerContextMenu.column, "or")}
@@ -1596,8 +2271,7 @@ export function CanFdDashboard() {
                 {currentFilterForAppend() && (
                   <>
                     <div className="my-1 border-t" />
-                    <button
-                      type="button"
+                    <button type="button"
                       className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-destructive hover:bg-destructive/10"
                       onClick={clearDisplayFilter}
                     >
@@ -1622,51 +2296,44 @@ export function CanFdDashboard() {
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(event) => event.stopPropagation()}
         >
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => copyText(contextMenu.value)}
           >
             Copy Value
           </button>
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => copyText(formatCanMessage(contextMenu.frame))}
           >
             Copy CAN Message
           </button>
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => copyText(formatCandumpLine(contextMenu.frame))}
           >
             Copy candump Line
           </button>
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => stageFrameForTransmit(contextMenu.frame)}
           >
             Use in Transmit Composer
           </button>
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => stageFrameForSimulator(contextMenu.frame)}
           >
             Copy to Simulator TX
           </button>
           <div className="my-1 border-t" />
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => defineMessageStructure(contextMenu.frame)}
           >
             Define Message Structure
           </button>
-          <button
-            type="button"
+          <button type="button"
             className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
             onClick={() => {
               editFrameFromTrace(contextMenu.frame);
@@ -1680,3 +2347,5 @@ export function CanFdDashboard() {
     </div>
   );
 }
+
+

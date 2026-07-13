@@ -49,7 +49,7 @@ export function SidebarButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       title={collapsed ? label : undefined}
       className={`

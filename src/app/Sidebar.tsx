@@ -26,9 +26,11 @@
  * - Collapsible
  */
 import { SidebarButton } from "@/components/SidebarButton";
+import { useI18nStore } from "@/i18n/i18nStore";
 import { useAppStore } from "@/store/appShellStore";
 import {
   Activity,
+  Terminal,
   Sliders,
   Edit3,
   Settings,
@@ -39,18 +41,20 @@ import {
 
 export function Sidebar() {
   const { view, setView, sidebarMode, toggleSidebarMode } = useAppStore();
+  const t = useI18nStore((s) => s.t);
 
   const collapsed = sidebarMode === "icon";
   const primaryItems = [
-    { icon: Activity, label: "CAN Monitor", view: "monitor" as const },
-    { icon: Sliders, label: "Simulator", view: "simulator" as const },
+    { icon: Activity, label: t("nav.monitor"), view: "monitor" as const },
+    { icon: Terminal, label: t("nav.terminal"), view: "terminal" as const },
+    { icon: Sliders, label: t("nav.simulator"), view: "simulator" as const },
   ];
   const profileItems = [
-    { icon: Edit3, label: "Profile Editor", view: "profile-editor" as const },
+    { icon: Edit3, label: t("nav.profileEditor"), view: "profile-editor" as const },
   ];
   const supportItems = [
-    { icon: Settings, label: "Settings", view: "settings" as const },
-    { icon: HelpCircleIcon, label: "Help", view: "help" as const },
+    { icon: Settings, label: t("nav.settings"), view: "settings" as const },
+    { icon: HelpCircleIcon, label: t("nav.help"), view: "help" as const },
   ];
 
   return (
@@ -60,7 +64,7 @@ export function Sidebar() {
          ${collapsed ? "w-14" : "w-56"}
        `}
     >
-      <button
+      <button type="button"
         onClick={toggleSidebarMode}
         className="mb-3 flex w-full items-center justify-center rounded-md border border-transparent p-2 text-muted-foreground hover:bg-background hover:text-foreground"
         title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}

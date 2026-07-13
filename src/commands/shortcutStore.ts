@@ -3,6 +3,7 @@ import { create } from "zustand";
 export const defaultShortcuts: Record<string, string> = {
   "app.commandPalette": "Ctrl+Shift+P",
   "view.monitor": "Ctrl+1",
+  "view.terminalTrace": "Ctrl+3",
   "view.profileEditor": "Ctrl+2",
   "view.settings": "Ctrl+,",
   "help.user.documentation": "F1",

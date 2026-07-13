@@ -20,6 +20,211 @@ Use the left navigation to switch between the monitor, simulator, profile editor
 Start with a narrow CAN ID filter when the bus is busy. It keeps the trace readable and makes search results more useful.
 :::
 
+## New user tutorials
+
+Use these short exercises as a first training path. They build from offline inspection to live capture, decoding, transmit, and simulator workflows.
+
+### Tutorial 1: inspect a candump log
+
+1. Open CAN Monitor.
+2. Select Open candump.
+3. Choose a \`.log\`, \`.txt\`, or \`.candump\` file.
+4. Select a row and inspect Decoded Preview.
+5. Try a display filter such as \`canId == 0x18203C01\` or \`payload contains "01 01"\`.
+
+:::note
+Loaded logs keep the original file order and source line numbers. Display filters hide rows visually but do not renumber the source log.
+:::
+
+### Tutorial 2: load profiles and decode frames
+
+1. Open Profile Editor.
+2. Load the profile JSON files for the messages you want to decode.
+3. Load a shared CAN ID layout profile if your service profiles reference one.
+4. Return to CAN Monitor.
+5. Select a frame and confirm that Decoded Preview shows CAN ID fields, payload header fields, message name, payload values, and error status.
+
+:::warning
+If a frame belongs to a service or message that is not covered by a loaded profile, it should not borrow names or value maps from unrelated profiles. Load the correct profile or inspect the raw values.
+:::
+
+### Tutorial 3: connect to the remote daemon
+
+1. Start \`can_bridge_daemon\` where the SocketCAN interface exists.
+2. Open Connect.
+3. Choose Remote Daemon.
+4. Enter the WebSocket host and port.
+5. Use Discover to list interfaces.
+6. Select the interface and connect.
+
+\`\`\`bash
+cargo run -- --tcp-bind 0.0.0.0:9500 --ws-bind 0.0.0.0:9501 --grpc-bind 0.0.0.0:9502
+\`\`\`
+
+:::tip
+For WSL testing, create \`vcan0\` first with \`sudo modprobe vcan\`, \`sudo ip link add dev vcan0 type vcan\`, and \`sudo ip link set up vcan0\`.
+:::
+
+### Tutorial 4: send one frame
+
+1. Connect to a remote daemon.
+2. Open the transmit composer.
+3. Enter CAN ID, DLC, payload, CAN-FD, and BRS settings.
+4. Select Send Frame.
+5. Watch CAN Monitor for \`TX:pending\`, \`TX:sent\`, or \`TX:failed\`.
+
+:::note
+\`TX:sent\` means the daemon accepted the send call for the selected interface. It does not mean the target device sent an application-level response.
+:::
+
+### Tutorial 5: build a cyclic request
+
+1. Load or capture a known request frame.
+2. Right click the row and choose Use in Transmit Composer.
+3. Open Cyclic TX settings.
+4. Set the period, for example \`500 ms\`.
+5. Set Send mode to Wait for CAN response.
+6. Choose an expected response from loaded profiles.
+7. Start cyclic TX and inspect matching RX rows.
+
+### Tutorial 6: create a simulator sequence
+
+1. Open CAN Simulator.
+2. Add a sequence.
+3. Add Send Once, Wait For Response, and Send Cyclic steps.
+4. Define the success condition, response timeout, and stop policy.
+5. Run the sequence and inspect the run log.
+
+Example flow:
+
+\`\`\`text
+1. Send start command once.
+2. Wait for start response with message_good == 1.
+3. Send status request cyclically every 100 ms.
+4. Stop when the expected status response arrives.
+\`\`\`
+
+:::tip
+Keep the transmit composer for quick manual sends. Use CAN Simulator when a workflow needs multiple dependent steps.
+:::
+
+### Tutorial 7: save work for later
+
+1. Export raw candump logs for replayable evidence.
+2. Export decoded CSV for spreadsheet analysis.
+3. Save display filter and sort presets for repeated investigations.
+4. Export settings when moving the same setup to another installation.
+
+:::warning
+Review exported traces, settings, diagnostics, and profile JSON before sharing. They can contain host names, CAN identifiers, decoded names, and timing data.
+:::
+
+## End-user guide
+
+Use the end-user guide as the task-oriented reference for normal operation. It covers the main workspaces and the decisions users make during a real session.
+
+### Daily workflow map
+
+| Task | Where to go |
+| --- | --- |
+| Inspect loaded logs | CAN Monitor |
+| Capture live traffic | CAN Monitor and Connect |
+| Decode raw frames | Profile Editor plus CAN Monitor |
+| Filter and sort rows | Display filter and column header menus |
+| Send one frame | Transmit Composer |
+| Send repeated frames | Cyclic TX |
+| Run chained workflows | CAN Simulator |
+| Save evidence | Export candump, export CSV, or Historical traces |
+| Change appearance | Settings |
+
+### Typical offline workflow
+
+1. Load profile JSON files.
+2. Open a candump log.
+3. Filter to a service, CAN ID, payload value, or error state.
+4. Inspect Decoded Preview.
+5. Export decoded CSV or raw candump when needed.
+
+### Typical live workflow
+
+1. Start the daemon where the SocketCAN interface exists.
+2. Connect from CAN Monitor.
+3. Load matching profiles.
+4. Apply a narrow display filter if the bus is busy.
+5. Capture the event.
+6. Save a historical trace or export evidence.
+
+### Typical transmit workflow
+
+1. Right click a known monitor row and stage it into Transmit Composer.
+2. Adjust CAN ID, payload, DLC, CAN-FD, or BRS if needed.
+3. Send once and inspect \`TX:pending\`, \`TX:sent\`, or \`TX:failed\`.
+4. Use Wait for CAN response or CAN Simulator when the next action depends on a received frame.
+
+:::warning
+Do not transmit on a physical bus unless you understand the target system. Incorrect frames can disturb diagnostics, flashing, or control traffic.
+:::
+
+## Developer guide
+
+The developer guide describes the internal architecture for contributors extending the app.
+
+Main areas:
+
+| Area | Reference |
+| --- | --- |
+| Candump parsing | \`src/can/candump.ts\` |
+| Daemon transport | \`src/can-bridge/ws/WsJsonDaemonClient.tsx\` and \`types.ts\` |
+| Connection state | \`src/store/connectionStore.ts\` |
+| Profile model | \`src/profile-editor/model/profile.ts\` |
+| Profile decoding | \`src/profile-editor/decodeProfile.ts\` |
+| Help content | \`src/components/help-system/defaultHelpMarkdown.ts\` |
+| Quality scripts | \`scripts/*.ps1\` |
+
+Extension rules:
+
+1. Keep protocol-specific meaning in profile JSON.
+2. Keep raw frame parsing separate from profile decoding.
+3. Add typed daemon messages before using them in stores or UI.
+4. Use timeouts for request/response transport operations.
+5. Update Help and docs when behavior changes.
+6. Run \`npm run quality:check\` before pushing larger changes.
+
+:::tip
+Use \`docs/developer-guide.md\` for the fuller API reference, including WebSocket message types, frame fields, connection store actions, and profile model notes.
+:::
+
+## Examples
+
+Use the examples guide when you need copyable filters, sample candump rows, or sequence JSON.
+
+Common examples:
+
+| Scenario | Starting point |
+| --- | --- |
+| Load a small candump | \`examples/sample-candump.log\` |
+| Filter by service bits | \`service_identifier == 810\` or raw ID/mask |
+| Find bad responses | \`error\`, \`hasError == true\`, \`errorText contains POSITION\` |
+| Stage TX from monitor | Right click row, Use in Transmit Composer |
+| Run a sequence | \`examples/start-then-poll.sequence.json\` |
+
+Daemon-side filter example for a service identifier in CAN ID bits \`9:0\`:
+
+\`\`\`text
+CAN ID: 0000032A
+Mask:   000003FF
+\`\`\`
+
+Equivalent expression:
+
+\`\`\`text
+(frame.id & 0x000003FF) == (0x0000032A & 0x000003FF)
+\`\`\`
+
+:::tip
+Use \`docs/examples.md\` for the complete example workflows and copyable sequence JSON.
+:::
+
 ## Remote daemon connection
 
 To monitor CAN or CAN-FD traffic from WSL, run can-bridge-daemon in the WSL environment where the SocketCAN interfaces exist. The daemon forwards packets from interfaces such as \`vcan0\` or \`can0\` to this UI over WebSocket JSON.
@@ -436,6 +641,30 @@ Right click a column header to build a filter from that column. The menu can rep
 
 Error rows are highlighted in red when a matching loaded profile decodes a bad response through its \`errorStatus\` block. Use \`error\` for a quick error-only filter, or use \`hasError == true\`, \`errorCode == 12\`, and \`errorText contains POSITION\` when you need a precise error view.
 
+### Monitor sorting
+
+CAN Monitor supports multi-column sorting after display filtering. Sorting is applied before loaded-log pagination, so every page follows the same ordered result set.
+
+Right click a column header to:
+
+- sort ascending
+- sort descending
+- add the column as the next ascending sort priority
+- add the column as the next descending sort priority
+- clear the current sort rules
+
+Active sort rules are shown in the sort strip above the trace summary. Each rule shows its priority, column name, and direction. Use the up and down controls on the rule chip to change priority, click the direction text to toggle ascending or descending, or click \`X\` to remove that one rule.
+
+:::tip
+Use sorting for offline analysis, for example sort by \`canId\`, then \`time\`, or sort by \`errorCode\`, then \`attributeName\`. For live capture, original stream order is usually easier to follow.
+:::
+
+Sort presets let you save a useful rule set and restore it later. Build the active sort rules, click Save in the sort strip, give the preset a name, and then reload it from the Sort presets dropdown. Delete removes only the selected sort preset, not the trace data.
+
+:::note
+Sorting does not modify the loaded candump file or captured frame buffer. It only changes table presentation and CSV export order.
+:::
+
 ### Monitor columns
 
 When schema profiles are loaded, CAN Monitor keeps the table stable by showing:
@@ -461,10 +690,84 @@ Use a smaller live trace retention limit when the bus is very busy. It keeps dec
 
 The status bar Frames value is the total captured or loaded frame count. It does not shrink when a display filter is active or when live trace retention removes older rows. Table line numbers keep increasing during live capture, so removed rows do not cause reused sequence numbers.
 
-Use Log to export retained trace rows as standard candump text. Use CSV to export the current decoded table view with the active display filter, visible columns, and column order.
+### Loaded trace pagination
+
+Loaded candump and log files use pagination at the bottom of CAN Monitor. Live capture does not use pagination; it continues to append and follow the newest frame as before.
+
+The pagination footer provides:
+
+- First, Previous, Next, and Last page controls
+- row count choices: 10, 25, 50, 100, 250, 500, and 1000
+- current page and total page count
+- visible row range and total filtered row count
+
+The selected row count and current page are saved with monitor preferences. When a new log is opened, the table starts at page 1. If a display filter reduces the result set and the old page no longer exists, the app automatically moves to the last valid page.
+
+:::warning
+Pagination is only for loaded traces. Do not expect live capture to pause at page boundaries; live capture is intentionally stream-oriented.
+:::
+
+Use Log to export retained trace rows as standard candump text. Use CSV to export the current decoded table view with the active display filter, active sorting, visible columns, and column order.
 
 :::note
 CSV export follows the table as currently configured. Hide columns or apply a display filter before exporting when you only need a focused subset.
+:::
+
+### Monitor keyboard navigation
+
+When focus is on CAN Monitor and not inside an input field, the table supports keyboard navigation:
+
+- Arrow Up and Arrow Down move the selected row.
+- Page Up and Page Down move by a larger step.
+- Home moves to the first visible row.
+- End moves to the last visible row.
+- Enter toggles the decoded preview panel.
+
+For loaded traces, keyboard navigation follows the current page. For live capture, it follows the current filtered and sorted stream.
+
+## Terminal Trace
+
+Terminal Trace is a candump-style text view for the same frame buffer used by CAN Monitor. Open it from the sidebar, the View menu, or the command panel.
+
+Use it when you want a fast, plain text view of live traffic or a loaded log:
+
+- each line is formatted like candump output
+- live capture follows the newest frame when Follow is enabled
+- loaded candump files are shown in source order
+- the line limit can show the newest 250, 500, 1000, 5000, or all frames
+- Wrap controls whether long payload lines stay horizontal or wrap inside the panel
+- Copy places the visible terminal text on the clipboard
+- Save writes the visible terminal text as a candump log file
+
+:::note
+Terminal Trace is a presentation view. It does not replace CAN Monitor filtering, decoded preview, sorting, or pagination. Use CAN Monitor for structured analysis and Terminal Trace when plain candump-style text is easier to inspect or copy.
+:::
+
+:::tip
+For very busy live buses, keep the terminal line limit at 1000 or below and leave Follow enabled. This keeps the text stream responsive while still showing the newest traffic.
+:::
+
+## Mobile remote monitoring
+
+Rusty CAN Studio can be installed as a browser-based mobile web app from the PWA build. This is intended for remote monitoring on a phone or tablet while the CAN bridge daemon runs on the Linux or WSL host where the CAN interfaces exist.
+
+Recommended mobile workflow:
+
+1. Start can-bridge-daemon on the machine attached to the CAN bus.
+2. Serve the web build on a network address reachable from the mobile device.
+3. Open the app in the mobile browser.
+4. Use the browser option to add the app to the home screen.
+5. Open Connect and create a Remote Daemon profile pointing to the daemon host and WebSocket port.
+6. Use CAN Monitor or Terminal Trace for live traffic.
+
+The mobile layout gives the monitor the full screen width, hides the desktop sidebar, stacks decoded preview and transmit panels below the trace, and keeps the status bar compact. The top menu and command panel remain available for navigation.
+
+:::warning
+Mobile browsers can block insecure WebSocket connections depending on network, HTTPS, and browser policy. For reliable field use, serve the app and daemon endpoint with a network setup accepted by the target device.
+:::
+
+:::note
+The mobile web app is for remote monitoring and light inspection. Profile editing, large loaded log analysis, and complex simulator sequences are still more comfortable on desktop.
 :::
 
 Field layout expressions can control how a payload value is displayed. Expressions are intentionally small: arithmetic, comparisons, ternary conditions, and quoted display strings are supported. Statements, loops, imports, global objects, and full JavaScript programs are not allowed.
@@ -505,6 +808,7 @@ Default shortcuts:
 - Ctrl+Shift+P: open the command panel.
 - Ctrl+1: open CAN Monitor.
 - Ctrl+2: open Profile Editor.
+- Ctrl+3: open Terminal Trace.
 - Ctrl+,: open Settings.
 - Ctrl+/: open Keyboard Shortcuts.
 - F1: open Help.
@@ -522,6 +826,34 @@ Open Help > About to view application information, current appearance settings, 
 ## Appearance settings
 
 Open Settings to change how the whole application looks and feels. Appearance changes apply immediately and are saved for the next session.
+
+## Localization settings
+
+Open Settings > Localization to choose the application locale. The current implementation provides a localization foundation for selected app chrome and settings surfaces, plus locale-aware formatting.
+
+Available locale choices:
+
+- English
+- Deutsch
+- Francais
+- Arabic
+
+Changing the locale updates:
+
+- selected navigation and menu labels
+- selected Settings labels
+- date and time formatting
+- number formatting
+- document language
+- document direction for right-to-left locales
+
+:::note
+Profile names, decoded field names, CAN payload values, daemon messages, and imported JSON content are shown exactly as provided by profiles, traces, and the daemon. They are protocol data, not translated UI strings.
+:::
+
+:::tip
+Use the preview cards in Localization to verify number and date formatting immediately after changing language.
+:::
 
 Available mode options:
 
@@ -547,6 +879,132 @@ Available density options:
 Density affects table row height, button and input height, panel padding, gaps, and font scale. The difference is most visible in CAN Monitor and Profile Editor tables.
 
 The Settings preview shows typical monitor states such as RX, TX sent, TX failed, decoded values, buttons, and status badges so you can evaluate a theme before continuing work. A portable implementation reference is available in \`docs/theme-system-spec.md\`.
+
+## Diagnostics log
+
+Open Settings > Diagnostics log to inspect recent application events that are useful for troubleshooting.
+
+The diagnostics log records:
+
+- connection attempts and failures
+- remote interface discovery results
+- capture pause and resume events
+- transmit failures and daemon rejections
+- profile import, JSON parse, validation, and export-blocking errors
+
+Each entry has a timestamp, severity, source, message, and optional detail text. The log is saved locally and capped to the newest 500 entries so it stays useful without growing forever.
+
+Use Export diagnostics when you need to share troubleshooting information. Use Clear diagnostics when the old entries are no longer relevant.
+
+:::warning
+Diagnostics can include host names, interface names, CAN IDs, profile names, and error text. Review exported diagnostics before sharing them outside your team.
+:::
+
+## Historical traces
+
+Open Settings > Historical traces to save and reload retained trace snapshots.
+
+The archive stores the current retained CAN Monitor frame buffer as candump text. Saved traces can be:
+
+- loaded back into CAN Monitor
+- exported as candump log files
+- deleted individually
+- cleared as a group
+
+Use this for short-term investigation workflows, for example saving a failing live capture before reconnecting, preserving a filtered test run, or keeping a known reference trace available for profile work.
+
+:::note
+Historical traces are stored locally in browser/Tauri storage and are capped to the newest saved entries. For long-term evidence, export the trace as a candump log and store it in your normal project or test-result location.
+:::
+
+## Security checks
+
+The repository includes a repeatable security baseline for dependency and accidental-secret checks.
+
+Run the web dependency audit:
+
+\`\`\`bash
+npm run audit
+\`\`\`
+
+Run the fuller local helper on Windows:
+
+\`\`\`powershell
+npm run security:audit
+\`\`\`
+
+The helper runs npm audit, tries cargo audit for Tauri dependencies when available, and scans repository files for common secret patterns. The CI workflow also runs audit, tests, build, and Rust dependency audit on pull requests and pushes to main.
+
+:::warning
+Security checks do not sanitize engineering data. Review diagnostics exports, trace archives, candump logs, settings backups, and profile JSON before sharing them.
+:::
+
+## Testing and quality checks
+
+Use the automated quality checks before sharing changes or before packaging a build.
+
+Run the fast unit test suite:
+
+\`\`\`bash
+npm run test
+\`\`\`
+
+Run the fuller local quality check on Windows:
+
+\`\`\`powershell
+npm run quality:check
+\`\`\`
+
+The full local check runs Vitest unit tests, a production frontend build, accessibility baseline checks, browser compatibility baseline checks, npm dependency audit, and Rust \`cargo check\` for the Tauri crate.
+
+Useful variants:
+
+\`\`\`powershell
+npm run quality:check -- -SkipRust
+npm run quality:check -- -SkipAudit
+\`\`\`
+
+Run the accessibility baseline directly:
+
+\`\`\`powershell
+npm run accessibility:check
+\`\`\`
+
+The accessibility baseline checks document language, viewport, document title, icon button accessible-name fallback, screen-reader-only text, alert roles, helpful title text, and raw button \`type\` attributes.
+
+Run the browser compatibility baseline after a production build:
+
+\`\`\`powershell
+npm run browser:check
+\`\`\`
+
+The browser baseline checks production browser targets, responsive viewport metadata, PWA manifest metadata, generated module output, built manifest display mode, and direct user-agent browser sniffing.
+
+:::tip
+Use the fast test command while editing logic, then run the full quality check before pushing a larger feature.
+:::
+
+:::note
+The CI quality workflow runs install, tests, production build, and Rust compile checks on pull requests and pushes to main. The separate security workflow handles dependency vulnerability checks.
+:::
+
+:::warning
+Automated accessibility checks are a baseline, not a full WCAG audit. For major UI changes, also verify keyboard navigation, visible focus, screen-reader names, contrast in each theme, 200 percent zoom, and compact/dense layouts manually.
+:::
+
+:::tip
+For UI-heavy changes, preview the production build in Chromium/WebView2, Firefox, and Safari when available. Check candump loading, display filters, Help, Profile Editor, sticky headers, dialogs, scrolling, themes, and density settings.
+:::
+
+### Performance benchmarks
+
+Run benchmarks when changing trace parsing, display filtering, sorting, profile decoding, or any path that may touch thousands of frames:
+
+\`\`\`bash
+npm run benchmark
+\`\`\`
+
+The benchmark suite covers candump parsing on larger traces and derived-field creation against a profile with many signals. Benchmark results vary by machine, so use them as before-and-after comparisons on the same computer.
 
 ## Transmit composer
 
@@ -687,6 +1145,38 @@ Open Connect to create or edit connection profiles. Remote Daemon profiles can b
 Local CAN is shown separately from Remote Daemon. Direct Local CAN capture is not wired in this UI yet, so Save and Connect is disabled for Local CAN profiles.
 
 Remote Daemon connections retry automatically when Auto reconnect is enabled. The status bar reports only the connection state: Disconnected, Connecting, Connected, or Failed.
+
+Connection profiles can also store CAN timing metadata:
+
+- CAN-FD enabled or disabled
+- nominal bitrate for the arbitration phase
+- data bitrate for the CAN-FD payload phase
+
+These values are saved with the profile and shown in the Connection Profiles dialog. They are useful when you keep several remote daemon profiles for different buses or test benches.
+
+:::warning
+The bitrate fields document the expected interface timing. The current desktop app and WebSocket JSON daemon path do not reconfigure SocketCAN timing. Bring the interface up with matching \`ip link\` settings on the daemon host before connecting.
+:::
+
+### Hardware adapters
+
+The app integrates with common CAN hardware through the Linux SocketCAN interface exposed by the daemon host. Connection profiles can record the adapter family so profiles remain understandable when you switch between virtual CAN, lab hardware, and vehicle adapters.
+
+Supported adapter profile labels include:
+
+- Generic SocketCAN
+- Virtual CAN
+- PEAK PCAN
+- Kvaser
+- Vector
+- CANable / SLCAN
+- Other SocketCAN adapter
+
+This label does not change the wire protocol used by the desktop app. The daemon still subscribes to Linux CAN interfaces such as \`vcan0\`, \`can0\`, or \`can1\`. Vendor drivers, \`slcand\`, candlelight firmware, or other setup tools must expose the adapter as SocketCAN before the app can use it.
+
+:::tip
+Use one connection profile per physical bus setup. For example, keep separate profiles for \`vcan0\` simulation, PEAK PCAN at 500000/2000000 bit/s, and CANable/SLCAN at classic 500000 bit/s.
+:::
 
 ## CAN bridge daemon
 

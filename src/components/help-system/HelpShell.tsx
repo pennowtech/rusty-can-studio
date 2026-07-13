@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { useHelpStore } from "@/components/help-system/store/helpStore";
 import { HelpToolbar } from "./HelpToolbar";
 import { useHelpContentStore } from "./store/helpContentStore";
+import { HelpChapterList } from "./HelpChapterList";
 
 type HelpMode = "view" | "edit" | "diff";
 
@@ -17,6 +18,7 @@ export function HelpShell() {
   const moveActive = useHelpStore((s) => s.moveActive);
   const clearSearch = useHelpStore((s) => s.clearSearch);
   const loadHelpContent = useHelpContentStore((s) => s.loadHelp);
+  const selectedChapterId = useHelpContentStore((s) => s.selectedChapterId);
 
   useEffect(() => {
     searchRef.current?.focus();
@@ -35,13 +37,14 @@ export function HelpShell() {
     }, 150);
 
     return () => window.clearTimeout(timer);
-  }, [mode]);
+  }, [mode, selectedChapterId]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      const isMac = /Mac|iPhone|iPod|iPad/.test(navigator.userAgent);
+      const platform = navigator.platform || "";
+      const isAppleKeyboard = /Mac|iPhone|iPod|iPad/.test(platform);
 
-      if ((isMac ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "f") {
+      if ((isAppleKeyboard ? e.metaKey : e.ctrlKey) && e.key.toLowerCase() === "f") {
         e.preventDefault();
         searchRef.current?.focus();
         searchRef.current?.select();
@@ -83,13 +86,15 @@ export function HelpShell() {
       <Separator />
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <HelpChapterList />
+
         <main className="min-h-0 flex-1 overflow-hidden">
           {mode === "view" && <HelpPreview />}
           {mode === "edit" && <HelpEditor />}
           {mode === "diff" && <HelpDiff />}
         </main>
 
-        <aside className="order-first max-h-40 overflow-auto border-b lg:order-none lg:max-h-none lg:w-72 lg:border-b-0 lg:border-l">
+        <aside className="max-h-40 overflow-auto border-t lg:max-h-none lg:w-72 lg:border-l lg:border-t-0">
           <HelpTOC />
         </aside>
       </div>

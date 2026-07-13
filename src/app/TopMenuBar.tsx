@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/menubar";
 import { useAppStore } from "@/store/appShellStore";
 import { useTheme } from "@/components/ThemeProvider";
+import { useI18nStore } from "@/i18n/i18nStore";
 import { Button } from "@/components/ui/button";
 import { Command, HelpCircle } from "lucide-react";
 import { useCommandPaletteStore } from "@/store/commandPaletteStore";
@@ -17,6 +18,7 @@ import { useConnectionStore } from "@/store/connectionStore";
 
 export function TopMenuBar() {
   const setView = useAppStore((s) => s.setView);
+  const t = useI18nStore((s) => s.t);
   const { setTheme } = useTheme();
   const toggleSidebarMode = useAppStore((s) => s.toggleSidebarMode);
   const openPalette = useCommandPaletteStore((s) => s.openPalette);
@@ -35,7 +37,7 @@ export function TopMenuBar() {
 
       <Menubar className="shrink-0 rounded-none border-0">
         <MenubarMenu>
-          <MenubarTrigger>File</MenubarTrigger>
+          <MenubarTrigger>{t("menu.file")}</MenubarTrigger>
           <MenubarContent>
             <MenubarItem
               onClick={() => {
@@ -50,13 +52,14 @@ export function TopMenuBar() {
         </MenubarMenu>
 
         <MenubarMenu>
-          <MenubarTrigger>View</MenubarTrigger>
+          <MenubarTrigger>{t("menu.view")}</MenubarTrigger>
           <MenubarContent>
             <MenubarItem onClick={toggleSidebarMode}>Toggle Sidebar</MenubarItem>
             <MenubarSeparator />
-            <MenubarItem onClick={() => setView("profile-editor")}>Profile Editor</MenubarItem>
-            <MenubarItem onClick={() => setView("monitor")}>CAN Monitor</MenubarItem>
-            <MenubarItem onClick={() => setView("simulator")}>CAN Simulator</MenubarItem>
+            <MenubarItem onClick={() => setView("profile-editor")}>{t("nav.profileEditor")}</MenubarItem>
+            <MenubarItem onClick={() => setView("monitor")}>{t("nav.monitor")}</MenubarItem>
+            <MenubarItem onClick={() => setView("terminal")}>{t("nav.terminal")}</MenubarItem>
+            <MenubarItem onClick={() => setView("simulator")}>{t("nav.simulator")}</MenubarItem>
             <MenubarSeparator />
             <MenubarItem onClick={() => setTheme("light")}>Appearance: Light</MenubarItem>
             <MenubarItem onClick={() => setTheme("dark")}>Appearance: Dark</MenubarItem>
@@ -65,7 +68,7 @@ export function TopMenuBar() {
         </MenubarMenu>
 
         <MenubarMenu>
-          <MenubarTrigger>CAN</MenubarTrigger>
+          <MenubarTrigger>{t("menu.can")}</MenubarTrigger>
           <MenubarContent>
             <MenubarItem onClick={openConnectDialog}>Connect</MenubarItem>
             <MenubarItem disabled={connectionStatus === "disconnected"} onClick={() => void disconnect()}>
@@ -77,7 +80,7 @@ export function TopMenuBar() {
         </MenubarMenu>
 
         <MenubarMenu>
-          <MenubarTrigger>Help</MenubarTrigger>
+          <MenubarTrigger>{t("menu.help")}</MenubarTrigger>
           <MenubarContent>
             <MenubarItem onClick={() => setView("help")}>Open Help</MenubarItem>
             <MenubarItem onClick={() => setView("help")}>Documentation</MenubarItem>
@@ -92,9 +95,10 @@ export function TopMenuBar() {
         Connect to remote can-bridge-daemon, define packet formats, and monitor sent/received packets.
       </div>
 
-      <button onClick={() => setView("help")} className="mr-2 shrink-0 rounded p-1 hover:bg-muted" title="Help">
+      <button type="button" onClick={() => setView("help")} className="mr-2 shrink-0 rounded p-1 hover:bg-muted" title="Help">
         <HelpCircle className="h-4 w-4" />
       </button>
     </div>
   );
 }
+

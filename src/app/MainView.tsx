@@ -23,6 +23,7 @@
 
 import { CanFdDashboard } from "@/app/CanFdDashboard";
 import { CanSimulatorSequences } from "@/app/CanSimulatorSequences";
+import { TerminalTraceView } from "@/app/TerminalTraceView";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,8 +34,13 @@ import { displayShortcut, formatShortcutFromEvent, shortcutConflicts, useShortcu
 import { useTheme } from "@/components/ThemeProvider";
 import type { Theme, ThemeDensity, ThemePalette } from "@/components/ThemeProvider";
 import { HelpShell } from "@/components/help-system/HelpShell";
+import { localeOptions, useI18nStore } from "@/i18n/i18nStore";
+import { openJsonFile, saveJsonFile } from "@/profile-editor/tauriFileIO";
 import { useAppStore } from "@/store/appShellStore";
 import { useConnectionStore } from "@/store/connectionStore";
+import { DiagnosticLevel, useDiagnosticsStore } from "@/store/diagnosticsStore";
+import { useTraceArchiveStore } from "@/store/traceArchiveStore";
+import { parseCandump } from "@/can/candump";
 import { ProfileMainShell } from "@/profile-editor/ProfileMainShell";
 import { useState } from "react";
 import { AlertTriangle, Info, Keyboard, Monitor, Palette, RotateCcw, Rows3, ShieldCheck } from "lucide-react";
@@ -43,12 +49,194 @@ import { AlertTriangle, Info, Keyboard, Monitor, Palette, RotateCcw, Rows3, Shie
 function SettingsView() {
   const traceFrameLimit = useConnectionStore((s) => s.traceFrameLimit);
   const frames = useConnectionStore((s) => s.frames);
+  const loadTraceFrames = useConnectionStore((s) => s.loadTraceFrames);
   const setTraceFrameLimit = useConnectionStore((s) => s.setTraceFrameLimit);
+  const traceArchive = useTraceArchiveStore((s) => s.entries);
+  const addTraceArchiveEntry = useTraceArchiveStore((s) => s.addEntry);
+  const deleteTraceArchiveEntry = useTraceArchiveStore((s) => s.deleteEntry);
+  const clearTraceArchive = useTraceArchiveStore((s) => s.clear);
+  const diagnostics = useDiagnosticsStore((s) => s.entries);
+  const clearDiagnostics = useDiagnosticsStore((s) => s.clear);
+  const locale = useI18nStore((s) => s.locale);
+  const setLocale = useI18nStore((s) => s.setLocale);
+  const formatDateTime = useI18nStore((s) => s.formatDateTime);
+  const formatNumber = useI18nStore((s) => s.formatNumber);
+  const t = useI18nStore((s) => s.t);
   const { theme, palette, density, setTheme, setPalette, setDensity } = useTheme();
   const [draftLimit, setDraftLimit] = useState(String(traceFrameLimit));
 
   function saveTraceLimit() {
     setTraceFrameLimit(Number(draftLimit));
+  }
+
+  const backupKeys = [
+    "can-app-theme",
+    "cansim.locale.v1",
+    "can-connection-profiles",
+    "cansim.trace.settings.v1",
+    "cansim.traceArchive.v1",
+    "cansim.monitor.preferences.v1",
+    "cansim.monitor.filterPresets.v1",
+    "cansim.monitor.alertRules.v1",
+    "cansim.diagnostics.v1",
+    "cansim.shortcuts.v1",
+    "cansim.help.customMarkdown",
+    "can-simulator-sequences:v1",
+    "can-simulator-sequences:selected-sequence",
+    "can-simulator-sequences:selected-step",
+    "can-simulator-sequences:run-log",
+    "can-simulator-sequences:run-state",
+  ];
+
+  async function exportSettingsBackup() {
+    const settings = Object.fromEntries(backupKeys.map((key) => [key, localStorage.getItem(key)]).filter(([, value]) => value != null));
+    await saveJsonFile(
+      JSON.stringify(
+        {
+          meta: {
+            app: "rusty-can-studio",
+            version: "0.2.0",
+            exportedAt: new Date().toISOString(),
+          },
+          settings,
+        },
+        null,
+        2,
+      ),
+      "rusty-can-studio-settings.json",
+    );
+  }
+
+  async function importSettingsBackup() {
+    const text = await openJsonFile();
+    if (!text) return;
+    const parsed = JSON.parse(text) as { settings?: Record<string, string | null> };
+    if (!parsed.settings || typeof parsed.settings !== "object") {
+      window.alert("This file does not look like a Rusty CAN Studio settings backup.");
+      return;
+    }
+    const shouldImport = window.confirm("Importing this backup will replace local settings and reload the app. Continue?");
+    if (!shouldImport) return;
+    for (const key of backupKeys) {
+      const value = parsed.settings[key];
+      if (typeof value === "string") localStorage.setItem(key, value);
+      if (value === null) localStorage.removeItem(key);
+    }
+    window.location.reload();
+  }
+
+  const feedbackTemplate = `Summary:
+
+What happened:
+
+What I expected:
+
+Steps to reproduce:
+1.
+2.
+3.
+
+App version: 0.2.0
+`;
+
+  function openFeedbackIssue() {
+    const title = encodeURIComponent("Feedback: ");
+    const body = encodeURIComponent(feedbackTemplate);
+    window.open(`https://github.com/pennowtech/rusty-can-studio/issues/new?title=${title}&body=${body}`, "_blank", "noopener,noreferrer");
+  }
+
+  function copyFeedbackTemplate() {
+    void navigator.clipboard?.writeText(feedbackTemplate);
+  }
+
+  async function exportDiagnostics() {
+    await saveJsonFile(
+      JSON.stringify(
+        {
+          meta: {
+            app: "rusty-can-studio",
+            exportedAt: new Date().toISOString(),
+          },
+          diagnostics,
+        },
+        null,
+        2,
+      ),
+      "rusty-can-studio-diagnostics.json",
+    );
+  }
+
+  function clearDiagnosticsWithConfirmation() {
+    if (!window.confirm("Clear diagnostics log?")) return;
+    clearDiagnostics();
+  }
+
+  function diagnosticLevelClass(level: DiagnosticLevel) {
+    if (level === "error") return "text-destructive";
+    if (level === "warning") return "text-amber-600 dark:text-amber-300";
+    return "text-muted-foreground";
+  }
+
+  function formatCanId(id: number) {
+    return id.toString(16).toUpperCase().padStart(id > 0x7ff ? 8 : 3, "0");
+  }
+
+  function byteLength(dataHex: string) {
+    return Math.floor(dataHex.replace(/[^0-9a-fA-F]/g, "").length / 2);
+  }
+
+  function formatPayloadBytes(dataHex: string) {
+    const cleaned = dataHex.replace(/[^0-9a-fA-F]/g, "").toUpperCase();
+    return cleaned.match(/.{1,2}/g)?.join(" ") ?? "";
+  }
+
+  function formatCandumpLine(frame: (typeof frames)[number]) {
+    return `(${(frame.ts_ms / 1000).toFixed(6)}) ${frame.iface} ${formatCanId(frame.id)} [${byteLength(frame.data_hex).toString().padStart(2, "0")}] ${formatPayloadBytes(frame.data_hex)}`.trim();
+  }
+
+  function downloadTextFile(filename: string, contents: string) {
+    const blob = new Blob([contents], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function saveCurrentTraceToArchive() {
+    if (!frames.length) return;
+    const name = window.prompt("Trace name", `trace-${new Date().toISOString().replace(/[:.]/g, "-")}.candump.log`);
+    if (!name?.trim()) return;
+    addTraceArchiveEntry({
+      name: name.trim(),
+      frameCount: frames.length,
+      candumpText: frames.map(formatCandumpLine).join("\n"),
+    });
+  }
+
+  function loadArchivedTrace(id: string) {
+    const entry = traceArchive.find((item) => item.id === id);
+    if (!entry) return;
+    loadTraceFrames(entry.name, parseCandump(entry.candumpText));
+  }
+
+  function exportArchivedTrace(id: string) {
+    const entry = traceArchive.find((item) => item.id === id);
+    if (!entry) return;
+    downloadTextFile(entry.name.endsWith(".log") ? entry.name : `${entry.name}.candump.log`, entry.candumpText);
+  }
+
+  function deleteArchivedTrace(id: string) {
+    const entry = traceArchive.find((item) => item.id === id);
+    if (!entry) return;
+    if (!window.confirm(`Delete archived trace "${entry.name}"?`)) return;
+    deleteTraceArchiveEntry(id);
+  }
+
+  function clearArchivedTraces() {
+    if (!window.confirm("Delete all archived traces?")) return;
+    clearTraceArchive();
   }
 
   const densityDescription = {
@@ -67,12 +255,45 @@ function SettingsView() {
     <div className="h-full overflow-auto p-6">
       <div className="max-w-3xl space-y-4">
         <div>
-          <h1 className="text-lg font-semibold">Settings</h1>
-          <p className="text-sm text-muted-foreground">Configure appearance, monitor retention, and CAN-FD defaults.</p>
+          <h1 className="text-lg font-semibold">{t("settings.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("settings.subtitle")}</p>
         </div>
         <Card className="rounded-lg">
           <CardHeader>
-            <CardTitle className="text-sm">Appearance</CardTitle>
+            <CardTitle className="text-sm">{t("settings.localization")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              <label className="space-y-1 text-xs font-medium">
+                {t("settings.language")}
+                <Select value={locale} onValueChange={(value) => setLocale(value as typeof locale)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {localeOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+              <div className="rounded-md border bg-muted/20 p-3">
+                <div className="text-[11px] uppercase text-muted-foreground">Number</div>
+                <div className="mt-1 font-mono text-sm">{formatNumber(1234567.89)}</div>
+              </div>
+              <div className="rounded-md border bg-muted/20 p-3">
+                <div className="text-[11px] uppercase text-muted-foreground">Date and time</div>
+                <div className="mt-1 font-mono text-sm">{formatDateTime(Date.now())}</div>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">{t("settings.localizationDescription")}</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <CardTitle className="text-sm">{t("settings.appearance")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 md:grid-cols-3">
@@ -203,6 +424,107 @@ function SettingsView() {
             </div>
             <div className="text-xs text-muted-foreground">
               Current trace: {frames.length} rows. Saved limit: {traceFrameLimit} rows.
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-sm">Historical traces</CardTitle>
+              <Badge variant="outline">{formatNumber(traceArchive.length)} saved</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Save the current retained trace as candump text for later inspection. Archived traces can be loaded back into CAN Monitor, exported, or deleted.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" disabled={!frames.length} onClick={saveCurrentTraceToArchive}>Save current trace</Button>
+              <Button variant="outline" disabled={!traceArchive.length} onClick={clearArchivedTraces}>Clear archive</Button>
+            </div>
+            <div className="max-h-72 overflow-auto rounded-md border bg-muted/20">
+              {traceArchive.length ? (
+                traceArchive.map((entry) => (
+                  <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 last:border-0">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">{entry.name}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {formatNumber(entry.frameCount)} frames, saved {formatDateTime(entry.createdAt)}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Button variant="outline" size="sm" onClick={() => loadArchivedTrace(entry.id)}>Load</Button>
+                      <Button variant="ghost" size="sm" onClick={() => exportArchivedTrace(entry.id)}>Export</Button>
+                      <Button variant="ghost" size="sm" onClick={() => deleteArchivedTrace(entry.id)}>Delete</Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 text-sm text-muted-foreground">No archived traces yet.</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+              <CardTitle className="text-sm">{t("settings.backup")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Export local app settings to a JSON file, or restore them on another installation. This includes appearance, shortcuts,
+              monitor preferences, connection profiles, trace retention, custom help text, and CAN Simulator sequences.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => void exportSettingsBackup()}>Export settings</Button>
+              <Button variant="outline" onClick={() => void importSettingsBackup()}>Import settings</Button>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-sm">{t("settings.diagnostics")}</CardTitle>
+              <Badge variant="outline">{formatNumber(diagnostics.length)} entries</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Connection attempts, daemon errors, transmit failures, and profile import or validation errors are recorded here for troubleshooting.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" disabled={!diagnostics.length} onClick={() => void exportDiagnostics()}>Export diagnostics</Button>
+              <Button variant="outline" disabled={!diagnostics.length} onClick={clearDiagnosticsWithConfirmation}>Clear diagnostics</Button>
+            </div>
+            <div className="max-h-72 overflow-auto rounded-md border bg-muted/20">
+              {diagnostics.length ? (
+                diagnostics.slice().reverse().map((entry) => (
+                  <div key={entry.id} className="border-b p-3 last:border-0">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-mono text-muted-foreground">{formatDateTime(entry.time)}</span>
+                      <span className={`font-semibold uppercase ${diagnosticLevelClass(entry.level)}`}>{entry.level}</span>
+                      <span className="rounded border bg-background px-1.5 py-0.5 font-medium">{entry.source}</span>
+                    </div>
+                    <div className="mt-1 text-sm">{entry.message}</div>
+                    {entry.detail && <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">{entry.detail}</pre>}
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 text-sm text-muted-foreground">No diagnostics recorded yet.</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <CardTitle className="text-sm">Feedback</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Use this when something feels confusing, slow, broken, or missing. The issue template includes the basic details that make feedback easier to act on.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={openFeedbackIssue}>Open feedback issue</Button>
+              <Button variant="outline" onClick={copyFeedbackTemplate}>Copy template</Button>
             </div>
           </CardContent>
         </Card>
@@ -367,6 +689,9 @@ export function MainView() {
     case "monitor":
       return <CanFdDashboard />;
 
+    case "terminal":
+      return <TerminalTraceView />;
+
     case "simulator":
       return <CanSimulatorSequences />;
 
@@ -386,3 +711,4 @@ export function MainView() {
       return null;
   }
 }
+

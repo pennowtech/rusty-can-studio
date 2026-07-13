@@ -1,0 +1,39 @@
+{
+  "name": "Start then poll until response",
+  "steps": [
+    {
+      "id": "send-start",
+      "type": "send",
+      "name": "Send start command",
+      "frameRef": "start.command",
+      "canId": "18203C01",
+      "payload": "01 01"
+    },
+    {
+      "id": "wait-start-response",
+      "type": "wait",
+      "name": "Wait for start response",
+      "expect": "start.response",
+      "condition": "message_good == 1",
+      "timeoutMs": 1000,
+      "retries": 2,
+      "onTimeout": "retry"
+    },
+    {
+      "id": "poll-status",
+      "type": "cyclic",
+      "name": "Poll status",
+      "frameRef": "status.command",
+      "canId": "14089C01",
+      "payload": "01 01 07 00 00 00",
+      "periodMs": 100,
+      "maxDurationMs": 10000,
+      "stopWhen": {
+        "expect": "status.response",
+        "condition": "message_good == 1",
+        "matches": 1
+      },
+      "latePolicy": "stop"
+    }
+  ]
+}

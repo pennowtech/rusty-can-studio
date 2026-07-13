@@ -9,7 +9,24 @@ const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [react(), VitePWA()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: "autoUpdate",
+      manifest: {
+        name: "Rusty CAN Studio",
+        short_name: "CAN Studio",
+        description: "Remote CAN-FD monitoring, trace inspection, and profile-driven decoding.",
+        display: "standalone",
+        orientation: "any",
+        start_url: "/",
+        scope: "/",
+        theme_color: "#0f172a",
+        background_color: "#ffffff",
+        categories: ["utilities", "productivity", "developer"],
+      },
+    }),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

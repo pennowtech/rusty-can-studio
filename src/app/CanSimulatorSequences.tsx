@@ -683,7 +683,7 @@ export function CanSimulatorSequences() {
         </div>
         <div className="h-[calc(100%-3rem)] overflow-auto p-2">
           {sequences.map((sequence) => (
-            <button
+            <button type="button"
               key={sequence.id}
               className={`mb-2 w-full rounded-md border p-3 text-left hover:bg-muted ${sequence.id === selectedSequence?.id ? "border-primary bg-primary/10" : "bg-card"}`}
               onClick={() => {
@@ -759,7 +759,7 @@ export function CanSimulatorSequences() {
             const Icon = stepIcon(step.type);
             const state = runState[step.id] ?? { status: "idle" as StepStatus };
             return (
-              <button
+              <button type="button"
                 key={step.id}
                 className={`grid grid-cols-[36px_minmax(0,1fr)_120px] items-center gap-3 rounded-lg border bg-background p-3 text-left hover:bg-muted/50 ${step.id === selectedStep?.id ? "border-primary shadow-sm" : ""}`}
                 onClick={() => setSelectedStepId(step.id)}
@@ -957,3 +957,4 @@ export function CanSimulatorSequences() {
     </div>
   );
 }
+

@@ -46,6 +46,12 @@ If you just want to try a ready-built package, download the latest release from 
 
 - Rusty CAN Studio releases: https://github.com/pennowtech/rusty-can-studio/releases
 
+For a guided Windows developer setup, run:
+
+```powershell
+./scripts/setup-windows.ps1
+```
+
 Install dependencies:
 
 ```bash
@@ -84,6 +90,8 @@ npm run tauri build -- --bundles msi
 
 ## Using The App
 
+For day-to-day usage, start with `docs/user-guide.md`. For a step-by-step onboarding path, use `docs/tutorials.md`. For copyable filters, candump samples, and sequence JSON, see `docs/examples.md` and the `examples/` folder.
+
 ### Open A Candump Log
 
 1. Open CAN Monitor.
@@ -114,6 +122,12 @@ cargo run -- \
 ```
 
 For WSL, the app usually connects to the WSL host address or `localhost`, depending on how networking is configured.
+
+To prepare common Linux/WSL daemon prerequisites from this repo, run:
+
+```bash
+bash scripts/setup-linux-daemon-prereqs.sh
+```
 
 ### Decode Frames With Profiles
 
@@ -216,6 +230,10 @@ Useful commands:
 npm run dev
 npm run build
 npm run test
+npm run benchmark
+npm run accessibility:check
+npm run browser:check
+npm run quality:check
 npm run tauri dev
 npm run tauri build -- --bundles msi
 ```
@@ -235,6 +253,26 @@ The app uses:
 When changing monitor behavior, keep performance in mind. Live capture can produce many frames quickly, so avoid heavy synchronous work during typing, filtering, or row rendering.
 
 When changing decoding behavior, keep protocol knowledge in JSON profiles. The app should know how to apply a profile, but it should not know one specific protocol's field meanings in code.
+
+For a fuller local quality pass, run `npm run quality:check`. It runs unit tests, production build, accessibility baseline checks, browser compatibility baseline checks, dependency audit, and Rust `cargo check`. Use `npm run benchmark` when changing trace parsing, filtering, decoding, or other performance-sensitive paths. The CI quality workflow runs the core compile/test checks on pull requests and pushes to `main`. More detail is in `docs/testing.md`.
+
+For module ownership, internal APIs, profile model notes, daemon transport types, and extension rules, see `docs/developer-guide.md`.
+
+## Security Checks
+
+Run the local security baseline before sharing changes:
+
+```bash
+npm run audit
+```
+
+On Windows, the fuller helper is:
+
+```powershell
+npm run security:audit
+```
+
+The detailed checklist is in `docs/security-audit.md`. It covers dependency audits, accidental-secret checks, trace/profile review, and remote daemon exposure notes.
 
 ## Release
 
@@ -257,6 +295,17 @@ The MSI is written under:
 ```text
 src-tauri/target/release/bundle/msi/
 ```
+
+CI also publishes release artifacts automatically when a version tag is pushed:
+
+```bash
+git tag v0.2.1
+git push origin v0.2.1
+```
+
+The release workflow builds Linux, Windows, and macOS bundles and attaches them to the GitHub Release for that tag.
+
+Installation instructions for release artifacts are in `docs/install-release.md`.
 
 ## Troubleshooting
 

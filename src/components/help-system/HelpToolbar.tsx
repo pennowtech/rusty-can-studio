@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Eye, EyeOff, RotateCcw, Save } from "lucide-react";
+import { Eye, EyeOff, RotateCcw, Save, Undo2 } from "lucide-react";
 import { useHelpStore } from "@/components/help-system/store/helpStore";
 import { HelpSearchInput } from "@/components/help-system/HelpSearchInput";
 import { useHelpContentStore } from "./store/helpContentStore";
@@ -15,14 +15,21 @@ export const HelpToolbar = forwardRef<HTMLInputElement>(function HelpToolbar(_, 
   const isSaving = useHelpContentStore((s) => s.isSaving);
   const save = useHelpContentStore((s) => s.saveCustomMarkdown);
   const reset = useHelpContentStore((s) => s.resetToDefaultMarkdown);
+  const resetChapter = useHelpContentStore((s) => s.resetSelectedChapter);
+  const selectedChapter = useHelpContentStore((s) => s.chapters.find((chapter) => chapter.id === s.selectedChapterId));
 
   async function confirmSave() {
-    if (!window.confirm("Save the current help markdown changes?")) return;
+    if (!window.confirm(`Save help changes for "${selectedChapter?.title ?? "this chapter"}"?`)) return;
     await save();
   }
 
+  async function confirmResetChapter() {
+    if (!window.confirm(`Reset "${selectedChapter?.title ?? "this chapter"}" to the default text?`)) return;
+    await resetChapter();
+  }
+
   async function confirmReset() {
-    if (!window.confirm("Reset help content to the default markdown? Your custom changes will be removed.")) return;
+    if (!window.confirm("Reset the complete help manual to the default markdown? All custom help changes will be removed.")) return;
     await reset();
   }
 
@@ -37,11 +44,15 @@ export const HelpToolbar = forwardRef<HTMLInputElement>(function HelpToolbar(_, 
           {previewEnabled ? <EyeOff size={16} /> : <Eye size={16} />}
         </Button>
 
-        <Button variant="ghost" size="icon" onClick={confirmSave} disabled={!isDirty || isSaving} title="Save help">
+        <Button variant="ghost" size="icon" onClick={confirmSave} disabled={!isDirty || isSaving} title="Save chapter">
           <Save size={16} />
         </Button>
 
-        <Button variant="ghost" size="icon" onClick={confirmReset} disabled={!isDirty} title="Reset to default">
+        <Button variant="ghost" size="icon" onClick={confirmResetChapter} disabled={!isDirty} title="Reset chapter">
+          <Undo2 size={16} />
+        </Button>
+
+        <Button variant="ghost" size="icon" onClick={confirmReset} disabled={!isDirty} title="Reset all help">
           <RotateCcw size={16} />
         </Button>
       </div>
@@ -50,3 +61,4 @@ export const HelpToolbar = forwardRef<HTMLInputElement>(function HelpToolbar(_, 
     </div>
   );
 });
+

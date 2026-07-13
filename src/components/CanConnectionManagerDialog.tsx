@@ -31,6 +31,22 @@ import { Copy, Pencil, Trash2, Plus } from "lucide-react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { v4 as uuid } from "uuid";
 
+const adapterLabels: Record<string, string> = {
+  socketcan: "SocketCAN",
+  vcan: "Virtual CAN",
+  "peak-pcan": "PEAK PCAN",
+  kvaser: "Kvaser",
+  vector: "Vector",
+  "canable-slcan": "CANable/SLCAN",
+  other: "Other",
+};
+
+function timingLabel(profile: { fdEnabled?: boolean; nominalBitrate?: number; dataBitrate?: number }) {
+  if (!profile.nominalBitrate && !profile.dataBitrate) return "Timing not recorded";
+  if (profile.fdEnabled === false) return `Classic CAN ${profile.nominalBitrate ?? "-"} bit/s`;
+  return `CAN-FD ${profile.nominalBitrate ?? "-"} / ${profile.dataBitrate ?? "-"} bit/s`;
+}
+
 export function CanConnectionManagerDialog({
   open,
   onOpenChange,
@@ -78,6 +94,8 @@ export function CanConnectionManagerDialog({
                   <div className="text-xs text-muted-foreground">
                     {p.mode === "local" ? `Local (${p.iface})` : `Remote (${p.protocol}://${p.host}:${p.port})`}
                   </div>
+                  <div className="text-xs text-muted-foreground">Adapter: {adapterLabels[p.adapter ?? "socketcan"] ?? p.adapter}</div>
+                  <div className="text-xs text-muted-foreground">{timingLabel(p)}</div>
                 </div>
 
                 <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
@@ -148,3 +166,4 @@ export function CanConnectionManagerDialog({
     </>
   );
 }
+

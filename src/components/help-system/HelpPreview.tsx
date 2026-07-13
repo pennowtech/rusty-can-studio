@@ -15,7 +15,7 @@ import { remarkCallouts } from "./markdown/remarkCallouts";
 import "./styles/help-markdown.css";
 
 export function HelpPreview() {
-  const markdownSource = useHelpContentStore((s) => s.resolvedMarkdown);
+  const markdownSource = useHelpContentStore((s) => s.selectedChapterMarkdown);
   const searchQuery = useHelpStore((s) => s.searchQuery);
   const setResults = useHelpStore((s) => s.setSearchResults);
   const results = useHelpStore((s) => s.searchResults);

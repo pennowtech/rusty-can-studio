@@ -4,8 +4,8 @@ import { useTheme } from "@/components/ThemeProvider";
 import { defineGithubLightTheme, defineTokyoNightTheme } from "./monacoThemes";
 
 export function HelpEditor() {
-  const value = useHelpContentStore((s) => s.customMarkdown ?? s.defaultMarkdown);
-  const setCustomMarkdown = useHelpContentStore((s) => s.setCustomMarkdown);
+  const value = useHelpContentStore((s) => s.selectedChapterMarkdown);
+  const setSelectedChapterMarkdown = useHelpContentStore((s) => s.setSelectedChapterMarkdown);
   const { resolvedTheme } = useTheme();
 
   return (
@@ -13,7 +13,7 @@ export function HelpEditor() {
       height="100%"
       language="markdown"
       value={value}
-      onChange={(value) => setCustomMarkdown(value ?? "")}
+      onChange={(value) => setSelectedChapterMarkdown(value ?? "")}
       theme={resolvedTheme === "dark" ? "tokyo-night" : "github-light"}
       beforeMount={(monaco) => {
         defineTokyoNightTheme(monaco);

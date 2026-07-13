@@ -33,20 +33,36 @@ import { CanConnectDialog } from "@/components/CanConnectDialog";
 import { useConnectDialogStore } from "@/store/canConnectDialogStore";
 import { useUiStore } from "@/store/uiStore";
 import { CanConnectionManagerDialog } from "@/components/CanConnectionManagerDialog";
+import { useConnectionStore } from "@/store/connectionStore";
+import { useEffect } from "react";
 
 export function AppShell() {
   // Hook to enable command palette hotkey
   useCommandPaletteHotkey();
   const { open, closeDialog } = useConnectDialogStore();
   const { connectionManagerOpen, closeConnectionManager } = useUiStore();
+  const disconnect = useConnectionStore((s) => s.disconnect);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      void disconnect();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      void disconnect();
+    };
+  }, [disconnect]);
 
   return (
     <>
       <div className="flex h-screen flex-col">
         <TopMenuBar />
 
-        <div className="flex flex-1 overflow-hidden">
-          <Sidebar />
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div className="hidden md:block">
+            <Sidebar />
+          </div>
           <div className="min-w-0 flex-1 overflow-hidden">
             <MainView />
           </div>

@@ -1,66 +1,66 @@
 # TODO List
 
-- [] Support for different CAN bitrates
-- [] Real-time display of CAN messages in terminal
-- [] Graceful shutdown and cleanup of CAN interfaces
-- [] GUI for visualizing CAN data
-- [] Unit tests for core functionalities
-- [] Integration with popular CAN hardware interfaces
-- [] Error handling and logging improvements
-- [] Configuration management (e.g., saving/loading settings)
-- [] Localization and internationalization support
-- [] Mobile app for remote CAN monitoring
-- [] Data visualization tools (graphs, charts)
-- [] Alerting system for specific CAN events
-- [] Historical data storage and retrieval
-- [] User-friendly installation scripts and guides
-- [] Security audits and vulnerability assessments
-- [] Training materials and tutorials for new users
-- [] Feedback system for user suggestions and bug reports
-- [] Automated testing framework for continuous quality assurance
+- [x] Support for different CAN bitrates
+- [x] Real-time display of CAN messages in terminal
+- [x] Graceful shutdown and cleanup of CAN interfaces
+- [x] GUI for visualizing CAN data
+- [x] Unit tests for core functionalities
+- [x] Integration with popular CAN hardware interfaces
+- [x] Error handling and logging improvements
+- [x] Configuration management (e.g., saving/loading settings)
+- [x] Localization and internationalization support
+- [x] Mobile app for remote CAN monitoring
+- [x] Data visualization tools (graphs, charts)
+- [x] Alerting system for specific CAN events
+- [x] Historical data storage and retrieval
+- [x] User-friendly installation scripts and guides
+- [x] Security audits and vulnerability assessments
+- [x] Training materials and tutorials for new users
+- [x] Feedback system for user suggestions and bug reports
+- [x] Automated testing framework for continuous quality assurance
 
 **Pagination:**
 
-- Controls at bottom: first, previous, next, last page.
-- Select rows per page: 10, 25, 50, 100, 250, 500, 1000.
-- Shows current page and total pages.
-- Pagination state is remembered across app restarts.
-- Works with filtering and sorting.
+- [x] Controls at bottom: first, previous, next, last page.
+- [x] Select rows per page: 10, 25, 50, 100, 250, 500, 1000.
+- [x] Shows current page and total pages.
+- [x] Pagination state is remembered across app restarts.
+- [x] Works with filtering and sorting.
 
 **Keyboard navigation:**
-- Arrow Up/Down → move selection up/down.
-- Page Up/Down → scroll up/down one page.
-- Home/End → go to first/last row.
-- Enter → expand/collapse row details.
+- [x] Arrow Up/Down → move selection up/down.
+- [x] Page Up/Down → scroll up/down one page.
+- [x] Home/End → go to first/last row.
+- [x] Enter → expand/collapse row details.
 
 **Performance optimizations:**
-- Debounced filtering and sorting to prevent excessive re-renders.
-- Memoization of row rendering to improve responsiveness.
-- Lazy loading of large datasets when applicable.
+- [x] Debounced filtering and sorting to prevent excessive re-renders.
+- [x] Memoization of row rendering to improve responsiveness.
+- [x] Lazy loading of large datasets when applicable.
 **Internationalization:**
-- Support for multiple languages in UI text.
-- Date and number formatting based on locale.
-- Right-to-left (RTL) layout support.
+- [x] Support for multiple languages in UI text.
+- [x] Date and number formatting based on locale.
+- [x] Right-to-left (RTL) layout support.
 **Responsive design:**
-- Table layout adapts to different screen sizes.
-- Horizontal scrolling for wide tables on small screens.
-- Touch-friendly interactions for mobile devices.
+- [x] Table layout adapts to different screen sizes.
+- [x] Horizontal scrolling for wide tables on small screens.
+- [x] Touch-friendly interactions for mobile devices.
 **Testing:**
-- Comprehensive unit and integration tests.
-- Performance benchmarks to ensure responsiveness.
-- Accessibility testing to ensure compliance with standards.
-- Cross-browser compatibility testing.
+- [x] Comprehensive unit and integration tests.
+- [x] Performance benchmarks to ensure responsiveness.
+- [x] Accessibility testing to ensure compliance with standards.
+- [x] Cross-browser compatibility testing.
 **Documentation:**
-- Detailed user guide for end-users.
-- Developer documentation with API reference.
-- Tutorials and examples for common scenarios.
+- [x] Detailed user guide for end-users.
+- [x] Developer documentation with API reference.
+- [x] Tutorials and examples for common scenarios.
 - FAQ and troubleshooting section.
 **Backup and restore:**
-- Option to export user settings to a file.
-- Option to import user settings from a file.
+- [x] Option to export user settings to a file.
+- [x] Option to import user settings from a file.
 **Advanced filtering:**
-- Save and load filter presets.
+- [x] Save and load filter presets.
 **Advanced sorting:**
-- Multi-level sorting with drag-and-drop priority.
-- Custom sort functions for specific columns.
-- Save and load sort presets.
+- [x] Multi-level sorting with drag-and-drop priority.
+- [x] Custom sort functions for specific columns.
+- [x] Save and load sort presets.
