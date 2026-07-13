@@ -46,6 +46,12 @@ If you just want to try a ready-built package, download the latest release from 
 
 - Rusty CAN Studio releases: https://github.com/pennowtech/rusty-can-studio/releases
 
+For a guided Windows developer setup, run:
+
+```powershell
+./scripts/setup-windows.ps1
+```
+
 Install dependencies:
 
 ```bash
@@ -114,6 +120,12 @@ cargo run -- \
 ```
 
 For WSL, the app usually connects to the WSL host address or `localhost`, depending on how networking is configured.
+
+To prepare common Linux/WSL daemon prerequisites from this repo, run:
+
+```bash
+bash scripts/setup-linux-daemon-prereqs.sh
+```
 
 ### Decode Frames With Profiles
 

@@ -13,7 +13,7 @@
 - [x] Data visualization tools (graphs, charts)
 - [x] Alerting system for specific CAN events
 - [] Historical data storage and retrieval
-- [] User-friendly installation scripts and guides
+- [x] User-friendly installation scripts and guides
 - [] Security audits and vulnerability assessments
 - [] Training materials and tutorials for new users
 - [x] Feedback system for user suggestions and bug reports
