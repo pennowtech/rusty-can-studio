@@ -296,6 +296,15 @@ The MSI is written under:
 src-tauri/target/release/bundle/msi/
 ```
 
+CI also publishes release artifacts automatically when a version tag is pushed:
+
+```bash
+git tag v0.2.1
+git push origin v0.2.1
+```
+
+The release workflow builds Linux, Windows, and macOS bundles and attaches them to the GitHub Release for that tag.
+
 ## Troubleshooting
 
 ### `cargo` Is Not Found
