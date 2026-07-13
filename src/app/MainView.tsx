@@ -105,6 +105,30 @@ function SettingsView() {
     window.location.reload();
   }
 
+  const feedbackTemplate = `Summary:
+
+What happened:
+
+What I expected:
+
+Steps to reproduce:
+1.
+2.
+3.
+
+App version: 0.2.0
+`;
+
+  function openFeedbackIssue() {
+    const title = encodeURIComponent("Feedback: ");
+    const body = encodeURIComponent(feedbackTemplate);
+    window.open(`https://github.com/pennowtech/rusty-can-studio/issues/new?title=${title}&body=${body}`, "_blank", "noopener,noreferrer");
+  }
+
+  function copyFeedbackTemplate() {
+    void navigator.clipboard?.writeText(feedbackTemplate);
+  }
+
   const densityDescription = {
     comfortable: "Touch-friendly spacing for general use.",
     compact: "Reduced spacing for more controls and rows.",
@@ -272,6 +296,20 @@ function SettingsView() {
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => void exportSettingsBackup()}>Export settings</Button>
               <Button variant="outline" onClick={() => void importSettingsBackup()}>Import settings</Button>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg">
+          <CardHeader>
+            <CardTitle className="text-sm">Feedback</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Use this when something feels confusing, slow, broken, or missing. The issue template includes the basic details that make feedback easier to act on.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={openFeedbackIssue}>Open feedback issue</Button>
+              <Button variant="outline" onClick={copyFeedbackTemplate}>Copy template</Button>
             </div>
           </CardContent>
         </Card>

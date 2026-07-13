@@ -7,7 +7,7 @@
 - [] Unit tests for core functionalities
 - [] Integration with popular CAN hardware interfaces
 - [] Error handling and logging improvements
-- [] Configuration management (e.g., saving/loading settings)
+- [x] Configuration management (e.g., saving/loading settings)
 - [] Localization and internationalization support
 - [] Mobile app for remote CAN monitoring
 - [x] Data visualization tools (graphs, charts)
@@ -16,7 +16,7 @@
 - [] User-friendly installation scripts and guides
 - [] Security audits and vulnerability assessments
 - [] Training materials and tutorials for new users
-- [] Feedback system for user suggestions and bug reports
+- [x] Feedback system for user suggestions and bug reports
 - [] Automated testing framework for continuous quality assurance
 
 **Pagination:**
