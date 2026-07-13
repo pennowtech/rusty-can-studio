@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "test": "vitest run",
     "audit": "npm audit --audit-level=moderate",
-    "security:audit": "powershell -ExecutionPolicy Bypass -File scripts/security-audit.ps1"
+    "security:audit": "powershell -ExecutionPolicy Bypass -File scripts/security-audit.ps1",
+    "quality:check": "powershell -ExecutionPolicy Bypass -File scripts/quality-check.ps1"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.1.0",

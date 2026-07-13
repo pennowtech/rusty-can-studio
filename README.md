@@ -230,6 +230,7 @@ Useful commands:
 npm run dev
 npm run build
 npm run test
+npm run quality:check
 npm run tauri dev
 npm run tauri build -- --bundles msi
 ```
@@ -249,6 +250,8 @@ The app uses:
 When changing monitor behavior, keep performance in mind. Live capture can produce many frames quickly, so avoid heavy synchronous work during typing, filtering, or row rendering.
 
 When changing decoding behavior, keep protocol knowledge in JSON profiles. The app should know how to apply a profile, but it should not know one specific protocol's field meanings in code.
+
+For a fuller local quality pass, run `npm run quality:check`. It runs unit tests, production build, dependency audit, and Rust `cargo check`. The CI quality workflow runs the same core compile/test checks on pull requests and pushes to `main`. More detail is in `docs/testing.md`.
 
 ## Security Checks
 

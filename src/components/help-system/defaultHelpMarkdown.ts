@@ -833,6 +833,39 @@ The helper runs npm audit, tries cargo audit for Tauri dependencies when availab
 Security checks do not sanitize engineering data. Review diagnostics exports, trace archives, candump logs, settings backups, and profile JSON before sharing them.
 :::
 
+## Testing and quality checks
+
+Use the automated quality checks before sharing changes or before packaging a build.
+
+Run the fast unit test suite:
+
+\`\`\`bash
+npm run test
+\`\`\`
+
+Run the fuller local quality check on Windows:
+
+\`\`\`powershell
+npm run quality:check
+\`\`\`
+
+The full local check runs Vitest unit tests, a production frontend build, npm dependency audit, and Rust \`cargo check\` for the Tauri crate.
+
+Useful variants:
+
+\`\`\`powershell
+npm run quality:check -- -SkipRust
+npm run quality:check -- -SkipAudit
+\`\`\`
+
+:::tip
+Use the fast test command while editing logic, then run the full quality check before pushing a larger feature.
+:::
+
+:::note
+The CI quality workflow runs install, tests, production build, and Rust compile checks on pull requests and pushes to main. The separate security workflow handles dependency vulnerability checks.
+:::
+
 ## Transmit composer
 
 Use the transmit composer to prepare a single CAN-FD frame or a cyclic transmission.
