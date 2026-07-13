@@ -24,6 +24,13 @@ docs/                 User and developer documentation
 
 Keep protocol-specific meaning in JSON profiles. The app should provide generic decode machinery, UI, and transport behavior.
 
+The canonical profile contract is documented in:
+
+- `docs/canonical-profile-guide.md`
+- `docs/canonical-profile.schema.json`
+
+New profile-editor work should target that canonical shape. Importers can support older or external formats, but the visual editor should render the canonical schema instead of branching on protocol-specific profile structures.
+
 ## Core Runtime Flow
 
 ### Loaded candump flow
