@@ -6,12 +6,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useConnectionStore } from "@/store/connectionStore";
+import { useConnectDialogStore } from "@/store/canConnectDialogStore";
+import { useUiStore } from "@/store/uiStore";
+import { useTransmitDraftStore } from "@/store/transmitDraftStore";
 import { resolveProfileReferences, useProfileStore } from "@/profile-editor/store/profileStore";
 import { decodeFrameWithProfiles, type DecodedFrame } from "@/profile-editor/decodeProfile";
 import type { WsFrame } from "@/can-bridge/ws/types";
 import type { CanProfile } from "@/profile-editor/model/profile";
-import { CheckCircle2, Clock, Copy, GitBranch, Pause, Play, Plus, RadioTower, RotateCcw, Send, Trash2, Workflow, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Copy, GitBranch, Link2, Pause, Play, Plus, RadioTower, RotateCcw, Send, Trash2, Workflow, XCircle } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { getProfileMessageSchema } from "@/profile-editor/profileAdapter";
 
 type StepType = "send" | "wait" | "cyclic" | "delay" | "branch";
 type StepStatus = "idle" | "running" | "sent" | "matched" | "timeout" | "failed" | "skipped" | "complete";
@@ -212,10 +216,15 @@ function stepIcon(type: StepType) {
 
 export function CanSimulatorSequences() {
   const status = useConnectionStore((s) => s.status);
+  const statusMessage = useConnectionStore((s) => s.statusMessage);
   const subscribedIfaces = useConnectionStore((s) => s.subscribedIfaces);
   const sendFrame = useConnectionStore((s) => s.sendFrame);
   const waitForFrame = useConnectionStore((s) => s.waitForFrame);
   const annotateFrame = useConnectionStore((s) => s.annotateFrame);
+  const disconnect = useConnectionStore((s) => s.disconnect);
+  const openConnectDialog = useConnectDialogStore((s) => s.openDialog);
+  const openConnectionManager = useUiStore((s) => s.openConnectionManager);
+  const transmitDraft = useTransmitDraftStore((s) => s.draft);
   const rawProfile = useProfileStore((s) => s.draftProfile ?? s.profile);
   const loadedProfiles = useProfileStore((s) => s.loadedProfiles);
   const profilesForDecode = useMemo(
@@ -234,8 +243,33 @@ export function CanSimulatorSequences() {
 
   const selectedSequence = sequences.find((sequence) => sequence.id === selectedId) ?? sequences[0];
   const selectedStep = selectedSequence?.steps.find((step) => step.id === selectedStepId) ?? selectedSequence?.steps[0];
-  const activeIface = subscribedIfaces[0] ?? selectedStep?.iface ?? "vcan0";
+  const activeIface = subscribedIfaces[0] ?? "vcan0";
   const connected = status === "connected";
+  const responseOptions = useMemo(() => {
+    const options = new Map<string, string>();
+    for (const profile of profilesForDecode) {
+      const schema = getProfileMessageSchema(profile);
+      for (const definition of schema?.messageDefinitions ?? []) {
+        const commandClass = definition.match?.canId?.command_class;
+        const commandClassText = String(commandClass ?? "").toLowerCase();
+        const looksLikeResponse =
+          commandClass === 5 ||
+          commandClass === 3 ||
+          commandClassText === "response" ||
+          commandClassText === "event" ||
+          commandClassText === "event/notification" ||
+          definition.id?.toLowerCase().includes(".response") ||
+          definition.id?.toLowerCase().includes(".event") ||
+          definition.name?.toLowerCase().includes("response") ||
+          definition.name?.toLowerCase().includes("event");
+        if (!looksLikeResponse) continue;
+        const id = definition.id ?? definition.name ?? definition.label;
+        if (!id) continue;
+        options.set(id, definition.label ?? definition.name ?? definition.meaning ?? id);
+      }
+    }
+    return Array.from(options.entries()).map(([id, label]) => ({ id, label }));
+  }, [profilesForDecode]);
 
   function updateSequences(next: SequenceDefinition[]) {
     setSequences(next);
@@ -295,7 +329,7 @@ export function CanSimulatorSequences() {
     const arbitrationId = parseCanId(step.canId);
     if (arbitrationId == null) throw new Error(`${step.name}: invalid CAN ID`);
     const result = await sendFrame({
-      iface: step.iface || activeIface,
+      iface: activeIface,
       arbitrationId,
       isFd: step.isFd ?? true,
       brs: step.brs ?? (step.isFd ?? true),
@@ -454,6 +488,38 @@ export function CanSimulatorSequences() {
     setSelectedStepId(nextSteps[0]?.id ?? "");
   }
 
+  function pasteDraftIntoSelectedStep() {
+    if (!selectedStep || !transmitDraft) return;
+    updateSelectedStep((step) => ({
+      ...step,
+      canId: transmitDraft.canId,
+      payload: transmitDraft.payload,
+      isFd: transmitDraft.isFd,
+      brs: transmitDraft.brs,
+      frameRef: step.frameRef || transmitDraft.source || "CAN Monitor frame",
+    }));
+  }
+
+  function expectedValue(step: SequenceStep) {
+    const value = step.type === "cyclic" ? step.stopWhen?.expect : step.expect;
+    return value?.trim() || "__any_rx";
+  }
+
+  function setExpectedValue(value: string) {
+    const nextValue = value === "__any_rx" ? "" : value;
+    updateSelectedStep((step) =>
+      step.type === "cyclic"
+        ? { ...step, stopWhen: { ...step.stopWhen, expect: nextValue } }
+        : { ...step, expect: nextValue },
+    );
+  }
+
+  function currentExpectedOptions(step: SequenceStep) {
+    const value = expectedValue(step);
+    if (value === "__any_rx" || responseOptions.some((option) => option.id === value)) return responseOptions;
+    return [{ id: value, label: value }, ...responseOptions];
+  }
+
   function openJson() {
     setJsonDraft(JSON.stringify(selectedSequence, null, 2));
     setJsonError(undefined);
@@ -519,7 +585,19 @@ export function CanSimulatorSequences() {
             </div>
             <p className="mt-1 text-sm text-muted-foreground">Build protocol-neutral send, wait, branch, delay, and cyclic workflows.</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            {connected ? (
+              <Button variant="outline" onClick={() => void disconnect()}>
+                <Link2 className="h-4 w-4" />
+                Disconnect
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={openConnectDialog}>
+                <Link2 className="h-4 w-4" />
+                Connect
+              </Button>
+            )}
+            <Button variant="outline" onClick={openConnectionManager}>Connections</Button>
             <Button variant="outline" onClick={duplicateSequence}><Copy className="h-4 w-4" /> Duplicate</Button>
             <Button variant="outline" onClick={deleteSequence} disabled={sequences.length === 1}><Trash2 className="h-4 w-4" /> Delete</Button>
             <Button variant="outline" onClick={() => resetRunState()}><RotateCcw className="h-4 w-4" /> Reset</Button>
@@ -530,7 +608,7 @@ export function CanSimulatorSequences() {
 
         <Card className="rounded-lg">
           <CardHeader className="pb-3">
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
               <label className="space-y-1 text-xs font-medium">
                 Sequence name
                 <Input value={selectedSequence?.name ?? ""} onChange={(event) => updateSelectedSequence((sequence) => ({ ...sequence, name: event.target.value }))} />
@@ -538,7 +616,7 @@ export function CanSimulatorSequences() {
               <div className="space-y-1 text-xs font-medium">
                 Runtime
                 <Badge className="flex h-10 w-full items-center justify-center" variant={connected ? "default" : "secondary"}>
-                  {connected ? `Connected: ${activeIface}` : "Disconnected"}
+                  {connected ? `Connected: ${activeIface}` : statusMessage}
                 </Badge>
               </div>
             </div>
@@ -608,18 +686,29 @@ export function CanSimulatorSequences() {
                 </label>
                 {["send", "cyclic"].includes(selectedStep.type) && (
                   <>
-                    <label className="space-y-1 text-xs font-medium">
-                      Frame reference
-                      <Input value={selectedStep.frameRef ?? ""} placeholder="message.operation.command" onChange={(event) => updateSelectedStep((step) => ({ ...step, frameRef: event.target.value }))} />
-                    </label>
+                    <div className="flex items-end gap-2">
+                      <label className="min-w-0 flex-1 space-y-1 text-xs font-medium">
+                        Frame reference
+                        <Input value={selectedStep.frameRef ?? ""} placeholder="message.operation.command" onChange={(event) => updateSelectedStep((step) => ({ ...step, frameRef: event.target.value }))} />
+                      </label>
+                      <Button
+                        variant="outline"
+                        className="mb-0"
+                        disabled={!transmitDraft}
+                        title={transmitDraft ? `Paste ${transmitDraft.canId} ${transmitDraft.payload}` : "Right click a CAN Monitor row and use it in the transmit composer first."}
+                        onClick={pasteDraftIntoSelectedStep}
+                      >
+                        Paste TX
+                      </Button>
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="space-y-1 text-xs font-medium">
                         CAN ID
                         <Input className="font-mono" value={selectedStep.canId ?? ""} onChange={(event) => updateSelectedStep((step) => ({ ...step, canId: event.target.value }))} />
                       </label>
                       <label className="space-y-1 text-xs font-medium">
-                        Interface
-                        <Input value={selectedStep.iface ?? ""} placeholder={activeIface} onChange={(event) => updateSelectedStep((step) => ({ ...step, iface: event.target.value }))} />
+                        Active interface
+                        <Input value={activeIface} readOnly title="Change the CAN interface from the connection dialog." />
                       </label>
                     </div>
                     <label className="space-y-1 text-xs font-medium">
@@ -632,7 +721,22 @@ export function CanSimulatorSequences() {
                   <>
                     <label className="space-y-1 text-xs font-medium">
                       Expected response
-                      <Input value={selectedStep.type === "cyclic" ? selectedStep.stopWhen?.expect ?? "" : selectedStep.expect ?? ""} onChange={(event) => updateSelectedStep((step) => step.type === "cyclic" ? { ...step, stopWhen: { ...step.stopWhen, expect: event.target.value } } : { ...step, expect: event.target.value })} />
+                      <Select value={expectedValue(selectedStep)} onValueChange={setExpectedValue}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__any_rx">Any RX frame on active interface</SelectItem>
+                          {currentExpectedOptions(selectedStep).map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {responseOptions.length === 0 && (
+                        <span className="block text-[11px] font-normal text-muted-foreground">Load a profile to select named response or event messages.</span>
+                      )}
                     </label>
                     <label className="space-y-1 text-xs font-medium">
                       Success condition
