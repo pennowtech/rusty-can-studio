@@ -35,8 +35,21 @@ type ConnectionState = {
   resumeCapture: () => Promise<void>;
   clearFrames: () => void;
   loadTraceFrames: (name: string, frames: WsFrame[]) => void;
-  sendFrame: (params: { iface: string; arbitrationId: number; isFd: boolean; brs?: boolean; dataHex: string }) => Promise<{ ok: boolean; error?: string }>;
+  sendFrame: (params: {
+    iface: string;
+    arbitrationId: number;
+    isFd: boolean;
+    brs?: boolean;
+    dataHex: string;
+    scenarioName?: string;
+    scenarioStep?: string;
+    scenarioStatus?: "tx" | "rx-match" | "timeout" | "retry" | "stop";
+  }) => Promise<{ ok: boolean; error?: string }>;
   waitForFrame: (matches: (frame: WsFrame) => boolean, timeoutMs: number) => Promise<WsFrame>;
+  annotateFrame: (
+    matches: (frame: WsFrame) => boolean,
+    metadata: Pick<WsFrame, "scenario_name" | "scenario_step" | "scenario_status">,
+  ) => void;
   setTraceFrameLimit: (limit: number) => void;
 
   addProfile: (p: ConnectionProfile) => void;
@@ -409,6 +422,9 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       tx_status: "pending",
       tx_origin: "local",
       tx_sequence: ++txSequence,
+      scenario_name: params.scenarioName,
+      scenario_step: params.scenarioStep,
+      scenario_status: params.scenarioStatus ?? (params.scenarioName ? "tx" : undefined),
     };
 
     const stateBeforeTx = get();
@@ -473,6 +489,11 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       }, timeoutMs);
       frameWaiters.push({ matches, resolve, reject, timeoutId });
     }),
+
+  annotateFrame: (matches, metadata) =>
+    set((state) => ({
+      frames: state.frames.map((frame) => (matches(frame) ? { ...frame, ...metadata } : frame)),
+    })),
 
   setTraceFrameLimit: (limit) => {
     const traceFrameLimit = clampTraceLimit(limit);

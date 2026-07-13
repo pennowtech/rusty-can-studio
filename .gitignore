@@ -31,3 +31,4 @@ CAN-FD_Message_Profile.json
 candump.txt
 __pycache__/
 *.pyc
+profiles/Sim_refdrive_start_then_poll_until_response.sequence.json

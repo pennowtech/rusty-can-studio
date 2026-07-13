@@ -87,6 +87,9 @@ export type WsFrame = {
   tx_error?: string;
   tx_origin?: "local" | "daemon";
   tx_sequence?: number;
+  scenario_name?: string;
+  scenario_step?: string;
+  scenario_status?: "tx" | "rx-match" | "timeout" | "retry" | "stop";
 };
 
 export type WsError = { type: "error"; message: string };

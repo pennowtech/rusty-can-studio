@@ -15,6 +15,7 @@ import {
 import { useConnectionStore } from "@/store/connectionStore";
 import { useAppStore } from "@/store/appShellStore";
 import { useUiStore } from "@/store/uiStore";
+import { useTransmitDraftStore } from "@/store/transmitDraftStore";
 import { monitorColumnLabels, MonitorColumnId, useMonitorPreferencesStore } from "@/store/monitorPreferencesStore";
 import { resolveProfileReferences, useProfileStore } from "@/profile-editor/store/profileStore";
 import { DecodedField, DecodedFrame, decodeFrameWithProfiles } from "@/profile-editor/decodeProfile";
@@ -495,6 +496,7 @@ export function CanFdDashboard() {
   const openConnectionManager = useUiStore((s) => s.openConnectionManager);
   const setView = useAppStore((s) => s.setView);
   const editFrameFromTrace = useProfileStore((s) => s.editFrameFromTrace);
+  const stageSharedTransmitDraft = useTransmitDraftStore((s) => s.stageFrame);
   const selectMessageDefinition = useProfileStore((s) => s.selectMessageDefinition);
   const selectLoadedProfile = useProfileStore((s) => s.selectLoadedProfile);
   const setProfileViewMode = useProfileStore((s) => s.setViewMode);
@@ -996,6 +998,8 @@ export function CanFdDashboard() {
           ? "bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 dark:text-amber-300"
           : frame.tx_status === "sent"
             ? "bg-sky-500/10 hover:bg-sky-500/15"
+            : frame.scenario_status
+              ? "bg-primary/10 hover:bg-primary/15"
             : "";
     return `cursor-pointer border-b last:border-0 hover:bg-muted/40 ${
       row.hasError ? "bg-destructive/10 text-destructive hover:bg-destructive/15" : ""
@@ -1050,9 +1054,15 @@ export function CanFdDashboard() {
   }
 
   function stageFrameForTransmit(frame: WsFrame) {
+    stageSharedTransmitDraft(frame);
     setTxId(formatCanId(frame.id));
     setTxPayload(formatPayloadBytes(frame.data_hex));
     setTxDlc(String(byteLength(frame.data_hex)));
+    setContextMenu(null);
+  }
+
+  function stageFrameForSimulator(frame: WsFrame) {
+    stageSharedTransmitDraft(frame, "CAN Monitor frame");
     setContextMenu(null);
   }
 
@@ -1143,6 +1153,7 @@ export function CanFdDashboard() {
             >
               {frame.dir.toUpperCase()}
               {frame.tx_status ? `:${frame.tx_status}` : ""}
+              {frame.scenario_status ? ` SEQ:${frame.scenario_status}` : ""}
             </Badge>
           </td>
         );
@@ -1638,6 +1649,13 @@ export function CanFdDashboard() {
             onClick={() => stageFrameForTransmit(contextMenu.frame)}
           >
             Use in Transmit Composer
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center rounded-sm px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
+            onClick={() => stageFrameForSimulator(contextMenu.frame)}
+          >
+            Copy to Simulator TX
           </button>
           <div className="my-1 border-t" />
           <button
