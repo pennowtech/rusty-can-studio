@@ -47,7 +47,16 @@ export type WsPong = { type: "pong"; id: number };
 export type WsListIfaces = { type: "list_ifaces" };
 export type WsIfaces = { type: "ifaces"; items: string[] };
 
-export type WsSubscribe = { type: "subscribe"; ifaces: string[] };
+export type WsFrameFilter = {
+  iface?: string;
+  id?: number;
+  id_mask?: number;
+  is_fd?: boolean;
+  min_len?: number;
+  max_len?: number;
+};
+
+export type WsSubscribe = { type: "subscribe"; ifaces: string[]; filters?: WsFrameFilter[] };
 export type WsSubscribed = { type: "subscribed"; ifaces?: string[] };
 
 export type WsUnsubscribe = { type: "unsubscribe" };
@@ -63,7 +72,7 @@ export type WsSendFrame = {
   data_hex: string; // hex string, no 0x prefix (matches tests)
 };
 
-export type WsSendAck = { type: "send_ack"; ok: boolean; error?: string };
+export type WsSendAck = { type: "send_ack"; ok: boolean; error?: string; error_message?: string };
 
 export type WsFrame = {
   type: "frame";

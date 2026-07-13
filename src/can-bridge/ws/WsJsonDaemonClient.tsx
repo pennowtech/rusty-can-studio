@@ -31,6 +31,7 @@ import type {
   WsInbound,
   WsOutbound,
   WsFrame,
+  WsFrameFilter,
   WsHelloAck,
   WsIfaces,
   WsPong,
@@ -131,8 +132,8 @@ export class WsJsonDaemonClient {
     return this.waitFor((message): message is WsIfaces => message.type === "ifaces", timeoutMs);
   }
 
-  async subscribe(ifaces: string[], timeoutMs = 3000): Promise<WsSubscribed> {
-    this.send({ type: "subscribe", ifaces });
+  async subscribe(ifaces: string[], timeoutMs = 3000, filters?: WsFrameFilter[]): Promise<WsSubscribed> {
+    this.send({ type: "subscribe", ifaces, filters });
     return this.waitFor((message): message is WsSubscribed => message.type === "subscribed", timeoutMs);
   }
 

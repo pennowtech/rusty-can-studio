@@ -459,6 +459,14 @@ Trace retention is configured in Settings. The maximum row count applies to live
 Use a smaller live trace retention limit when the bus is very busy. It keeps decode, filtering, and row rendering responsive while still showing the newest traffic.
 :::
 
+The status bar Frames value is the total captured or loaded frame count. It does not shrink when a display filter is active or when live trace retention removes older rows. Table line numbers keep increasing during live capture, so removed rows do not cause reused sequence numbers.
+
+Use Log to export retained trace rows as standard candump text. Use CSV to export the current decoded table view with the active display filter, visible columns, and column order.
+
+:::note
+CSV export follows the table as currently configured. Hide columns or apply a display filter before exporting when you only need a focused subset.
+:::
+
 Field layout expressions can control how a payload value is displayed. Expressions are intentionally small: arithmetic, comparisons, ternary conditions, and quoted display strings are supported. Statements, loops, imports, global objects, and full JavaScript programs are not allowed.
 
 \`\`\`text
@@ -566,14 +574,180 @@ TX rows are color coded and can be filtered with \`txStatus\` and \`txError\`. R
 Cyclic TX repeatedly sends the current composer frame. Configure:
 
 - Period value and unit: \`ms\` or \`s\`.
-- Send mode: fire-and-forget, or wait for daemon ACK before scheduling the next frame.
-- Late ACK policy: skip the missed period, send the next frame immediately, or stop cyclic TX.
+- Send mode: fire-and-forget, wait for daemon ACK, or wait for CAN response before scheduling the next frame.
+- Expected response: any RX frame on the selected interface, or a response/event message derived from loaded profiles.
+- Response timeout: maximum time to wait for the selected response.
+- Late ACK/response policy: skip the missed period, send the next frame immediately, or stop cyclic TX.
 
-Fire-and-forget keeps the requested cadence and does not wait for acknowledgement before scheduling the next send. Wait-for-ACK avoids piling up sends when the daemon or bus is slow, and is the safer default when the target expects request pacing.
+Fire-and-forget keeps the requested cadence and does not wait for acknowledgement before scheduling the next send. Wait-for-ACK avoids piling up sends when the daemon or bus is slow. Wait-for-CAN-response waits until live capture receives the expected RX frame on the selected interface.
+
+Example workflow for periodically requesting \`on_off_cycles\`:
+
+1. Load a candump file or start live capture with a profile that decodes \`on_off_cycles\`.
+2. Find a known \`on_off_cycles.get_current_value.command\` or equivalent request row in CAN Monitor.
+3. Right click the row and choose Use in Transmit Composer. This copies CAN ID, payload, DLC, CAN-FD, and BRS settings into the composer.
+4. Open Cyclic TX in the transmit composer.
+5. Set Period and Unit, for example \`500 ms\`.
+6. Set Send mode to Wait for CAN response.
+7. In Expected response, select \`on_off_cycles.get_current_value.response\`.
+8. Set Response timeout to a value that fits the bus and device timing, for example \`1000 ms\`.
+9. Choose the late policy:
+   - Skip missed period: keep running, but wait until the next period after a timeout.
+   - Send next immediately: keep running and retry immediately after a late response.
+   - Stop cyclic TX: stop on the first missing or late response.
+10. Start cyclic TX and watch the monitor for \`TX:sent\` rows followed by the decoded response rows.
 
 :::warning
-The current daemon protocol acknowledges transmit acceptance only. It does not yet provide request/response correlation, so related RX responses are observed as normal received frames in the monitor.
+Wait-for-CAN-response depends on subscribed live capture. If the expected response is filtered out by the daemon or the wrong interface is selected, cyclic TX will time out.
 :::
+
+## Connection profiles
+
+Open Connect to create or edit connection profiles. Remote Daemon profiles can be saved without connecting, or saved and connected immediately. When the daemon is reachable, use Discover to load available CAN interfaces into a dropdown.
+
+Local CAN is shown separately from Remote Daemon. Direct Local CAN capture is not wired in this UI yet, so Save and Connect is disabled for Local CAN profiles.
+
+Remote Daemon connections retry automatically when Auto reconnect is enabled. The status bar reports only the connection state: Disconnected, Connecting, Connected, or Failed.
+
+## CAN bridge daemon
+
+The CAN bridge daemon is a separate Linux/WSL service that exposes SocketCAN interfaces to this desktop app. Run it where the CAN interfaces exist. For WSL workflows, the daemon runs inside WSL and the desktop app connects to it from Windows.
+
+### Recommended workflow
+
+1. Start or verify the CAN interface in Linux or WSL.
+2. Start the daemon with WebSocket JSON enabled.
+3. In this app, create a Remote Daemon connection profile.
+4. Use Discover in the connection dialog to list interfaces reported by the daemon.
+5. Select the interface, then Save and Connect.
+6. Use CAN Monitor for live RX/TX frames and Transmit Composer for manual or cyclic TX.
+
+### Prepare a virtual CAN interface
+
+\`\`\`bash
+sudo modprobe vcan
+sudo ip link add dev vcan0 type vcan
+sudo ip link set up vcan0
+ip link show vcan0
+\`\`\`
+
+For physical CAN, bring up the interface with the required bitrate:
+
+\`\`\`bash
+sudo ip link set can0 up type can bitrate 500000
+\`\`\`
+
+### Run the daemon
+
+Development run:
+
+\`\`\`bash
+cargo run -- --tcp-bind 0.0.0.0:9500 --ws-bind 0.0.0.0:9501 --grpc-bind 0.0.0.0:9502
+\`\`\`
+
+Run with fake frames when the bus is quiet:
+
+\`\`\`bash
+RUST_LOG=info cargo run -- --tcp-bind 0.0.0.0:9500 --ws-bind 0.0.0.0:9501 --grpc-bind 0.0.0.0:9502 --fake
+\`\`\`
+
+Use release mode when you need lower overhead:
+
+\`\`\`bash
+cargo build --release
+RUST_LOG=info ./target/release/can_bridge_daemon --tcp-bind 0.0.0.0:9500 --ws-bind 0.0.0.0:9501 --grpc-bind 0.0.0.0:9502
+\`\`\`
+
+### Transport options
+
+- WebSocket JSON: easiest option for this app and browser-like clients.
+- WebSocket binary: lower overhead for high-rate streaming clients.
+- TCP JSONL: good for shell tooling and line-oriented clients.
+- TCP binary: efficient for custom clients.
+- gRPC: typed API and streaming for generated clients.
+
+The current app connection flow uses WebSocket JSON.
+
+### Daemon operations used by the app
+
+- \`client_hello\`: starts the session.
+- \`list_ifaces\`: returns Linux CAN interfaces such as \`can0\` or \`vcan0\`.
+- \`subscribe\`: streams RX/TX frame events for selected interfaces.
+- \`unsubscribe\`: pauses live capture for the session.
+- \`send_frame\`: sends a CAN or CAN-FD frame through the selected interface.
+- \`send_ack\`: reports whether the daemon successfully handed the frame to the selected SocketCAN interface.
+
+### Capture filters
+
+Remote profiles can include a raw daemon-side filter. This reduces traffic before frames are forwarded to the app. Filters are intentionally protocol-agnostic and work on raw CAN properties:
+
+- CAN ID
+- CAN ID mask
+- interface
+- CAN-FD flag
+- payload length range
+
+Use profile-specific decoding in the app to decide which raw CAN ID/mask should be used. The daemon should not know service identifiers, source addresses, destination addresses, or any product-specific schema names.
+
+The filter compares this expression:
+
+\`\`\`text
+(incoming_can_id & mask) == (filter_can_id & mask)
+\`\`\`
+
+For service identifier \`810\`, the concrete comparison is:
+
+\`\`\`text
+(frame.id & 0x000003FF) == (0x0000032A & 0x000003FF)
+\`\`\`
+
+For profiles that use this 29-bit arbitration layout:
+
+\`\`\`text
+[29:26] command_class
+[25]    broadcast
+[24:19] destination_address
+[18:13] source_address
+[12]    start_of_transfer
+[11]    end_of_transfer
+[10]    toggle
+[9:0]   service_identifier
+\`\`\`
+
+Examples:
+
+| Goal | CAN ID value | Mask | Why |
+| --- | ---: | ---: | --- |
+| Only service identifier \`810\` (\`0x32A\`) | \`0000032A\` | \`000003FF\` | Service identifier occupies bits \`9:0\`, so the lower 10 bits are compared. |
+| Only responses for service \`810\` | \`1400032A\` | \`3C0003FF\` | \`command_class=5\` is placed in bits \`29:26\`, plus service bits \`9:0\`. |
+| Only traffic from source address \`1\` | \`00002000\` | \`0007E000\` | Source address occupies bits \`18:13\`; value \`1 << 13\` is \`0x2000\`. |
+| Only traffic to destination address \`5\` | \`00280000\` | \`01F80000\` | Destination address occupies bits \`24:19\`; value \`5 << 19\` is \`0x280000\`. |
+| Only command/request frames to destination \`5\` for service \`810\` | \`1828032A\` | \`3DF803FF\` | Combines command class bits, destination bits, broadcast bit, and service bits. |
+
+:::tip
+Start with a broad filter such as only service identifier, then add command class or address bits after confirming the monitor still receives the expected traffic.
+:::
+
+:::warning
+These examples assume the profile's CAN ID bit layout shown above. If another protocol uses a different arbitration ID layout, calculate the mask from that profile's own CAN ID fields instead.
+:::
+
+### TX acknowledgement
+
+\`TX\` in the monitor direction column means the frame was transmitted from the app toward the bus through the daemon. \`TX:pending\` means the app has staged the transmit request and is waiting for daemon acknowledgement. \`TX:sent\` means the daemon reported that the selected CAN interface accepted the frame send call. \`TX:failed\` means the daemon, connection, or selected interface rejected the frame.
+
+:::note
+\`TX:sent\` is not the same as an application-level response from the target device. Use cyclic Wait for CAN response when the next send should wait for a received response frame.
+:::
+
+### Limitations and planned improvements
+
+- Direct Local CAN from the desktop app is not wired yet; use Remote Daemon.
+- Daemon-side filters are raw CAN filters only. Higher-level profile fields must be translated to raw ID/mask filters by the app.
+- Response matching in cyclic TX is based on received frames and loaded profile definitions; there is no universal request/response correlation in raw CAN.
+- Interface discovery depends on Linux netlink and available SocketCAN interfaces.
+- Windows-native daemon builds are not supported because SocketCAN and netlink are Linux-specific.
+- Future improvements could include richer filter editing, named filter presets, per-profile response templates, better timeout visualization, and daemon-side metrics.
 
 :::danger
 Do not transmit frames on a physical bus unless you know the target system and arbitration impact. Incorrect frames can disturb diagnostics, flashing, or live control messages.

@@ -20,7 +20,7 @@ import { resolveProfileReferences, useProfileStore } from "@/profile-editor/stor
 import { DecodedField, DecodedFrame, decodeFrameWithProfiles } from "@/profile-editor/decodeProfile";
 import { DecodedPreviewColumnMenu, DecodedPreviewPanel } from "@/profile-editor/DecodedPreviewPanel";
 import { parseCandump } from "@/can/candump";
-import { Activity, Cable, Columns3, Eye, EyeOff, FileUp, Gauge, HelpCircle, Pause, Play, RadioTower, Search, Send, Trash2, X } from "lucide-react";
+import { Activity, Cable, Columns3, Download, Eye, EyeOff, FileUp, Gauge, HelpCircle, Pause, Play, RadioTower, Search, Send, Trash2, X } from "lucide-react";
 import { forwardRef, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { HTMLAttributes, MouseEvent } from "react";
 import { TableVirtuoso } from "react-virtuoso";
@@ -319,6 +319,7 @@ function buildTraceRow(frame: WsFrame, index: number, decoded: DecodedFrame | nu
       hasError,
       error: hasError ? `${decoded.errorCode != null ? `Error ${decoded.errorCode}` : "Error"} ${decoded.errorText ?? ""}`.trim() : undefined,
     };
+    values.payload = formatPayloadCell(frame, decoded);
     for (const [key, value] of Object.entries(metadata)) {
       if (value == null) continue;
       values[key] = String(value);
@@ -357,6 +358,20 @@ function formatCanMessage(frame: WsFrame) {
 
 function formatCandumpLine(frame: WsFrame) {
   return `(${(frame.ts_ms / 1000).toFixed(6)}) ${formatCanMessage(frame)}`;
+}
+
+function downloadTextFile(filename: string, contents: string, type: string) {
+  const blob = new Blob([contents], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvEscape(value: string) {
+  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, "\"\"")}"` : value;
 }
 
 type CellContextMenu = {
@@ -497,7 +512,6 @@ export function CanFdDashboard() {
     profiles,
     activeId,
     status,
-    statusMessage,
     subscribedIfaces,
     capturePaused,
     frames,
@@ -508,6 +522,7 @@ export function CanFdDashboard() {
     clearFrames,
     loadTraceFrames,
     sendFrame,
+    waitForFrame,
   } = useConnectionStore();
 
   const activeProfile = profiles.find((profile) => profile.id === activeId);
@@ -534,8 +549,10 @@ export function CanFdDashboard() {
   const [txRetryCount, setTxRetryCount] = useState("0");
   const [cyclicPeriod, setCyclicPeriod] = useState("100");
   const [cyclicUnit, setCyclicUnit] = useState<"ms" | "s">("ms");
-  const [cyclicMode, setCyclicMode] = useState<"fire-and-forget" | "wait-ack">("fire-and-forget");
+  const [cyclicMode, setCyclicMode] = useState<"fire-and-forget" | "wait-ack" | "wait-response">("fire-and-forget");
   const [cyclicLatePolicy, setCyclicLatePolicy] = useState<"send-anyway" | "skip" | "stop">("skip");
+  const [cyclicExpectedResponse, setCyclicExpectedResponse] = useState("__any_rx");
+  const [cyclicResponseTimeout, setCyclicResponseTimeout] = useState("1000");
   const [cyclicActive, setCyclicActive] = useState(false);
   const [contextMenu, setContextMenu] = useState<CellContextMenu | null>(null);
   const [headerContextMenu, setHeaderContextMenu] = useState<HeaderContextMenu | null>(null);
@@ -584,6 +601,22 @@ export function CanFdDashboard() {
   }, [profilesForDecode]);
 
   const payloadHeaderNames = useMemo(() => new Set(dynamicPayloadColumns.map((column) => column.label)), [dynamicPayloadColumns]);
+  const expectedResponseOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const profile of profilesForDecode) {
+      const schema = getProfileMessageSchema(profile);
+      for (const definition of schema?.messageDefinitions ?? []) {
+        const commandClass = definition.match?.canId?.command_class;
+        if (commandClass != null && !["3", "5", "response", "event", "event/notification"].includes(String(commandClass))) {
+          continue;
+        }
+        const id = definition.id ?? definition.name ?? definition.label;
+        if (!id) continue;
+        byId.set(id, definition.label ?? definition.name ?? definition.meaning ?? id);
+      }
+    }
+    return Array.from(byId.entries()).map(([id, label]) => ({ id, label }));
+  }, [profilesForDecode]);
   const showRawPayloadColumn = dynamicPayloadColumns.length === 0;
   const payloadColumnLabel = showRawPayloadColumn ? "Raw Payload" : "Payload Values";
   const allTraceColumns = useMemo<TraceColumn[]>(() => {
@@ -630,7 +663,11 @@ export function CanFdDashboard() {
   }, [profilesForDecode, selectedFrame]);
 
   const connected = status === "connected";
+  const connectionLabel =
+    status === "error" ? "Failed" : status === "connected" ? "Connected" : status === "connecting" ? "Connecting" : "Disconnected";
   const activeIface = subscribedIfaces[0] ?? activeProfile?.iface ?? "vcan0";
+  const txDisabledReason = connected ? undefined : "Connect to a CAN interface or remote bridge before sending frames.";
+  const cyclicDisabledReason = cyclicActive ? undefined : txDisabledReason;
   const visibleMonitorColumnCount =
     visibleTraceColumns.length;
 
@@ -670,14 +707,71 @@ export function CanFdDashboard() {
     setView("help");
   }
 
+  function exportCandumpLog() {
+    const source = traceSourceName?.replace(/\.[^.]+$/, "") || "can-capture";
+    downloadTextFile(`${source}.candump.log`, frames.map(formatCandumpLine).join("\n"), "text/plain");
+  }
+
+  function exportVisibleCsv() {
+    const headers = visibleTraceColumns.map((column) => column.label);
+    const rows = filteredRows.map((row) =>
+      visibleTraceColumns.map((column) => {
+        if (column.kind === "static") {
+          if (column.id === "line") return String(row.frame.line_no ?? row.numericValues.line);
+          if (column.id === "time") return formatTime(row.frame.ts_ms);
+          if (column.id === "iface") return row.frame.iface;
+          if (column.id === "canId") return formatCanId(row.frame.id);
+          if (column.id === "dir") return row.frame.dir.toUpperCase();
+          if (column.id === "len") return String(byteLength(row.frame.data_hex));
+          if (column.id === "mode") return row.frame.is_fd ? "CAN-FD" : "Classic";
+          if (column.id === "payload") {
+            return showRawPayloadColumn
+              ? formatPayloadCell(row.frame, row.decoded)
+              : formatPayloadValuesCell(row.frame, row.decoded, payloadHeaderNames);
+          }
+        }
+        return row.values[column.id] ?? "";
+      }),
+    );
+    downloadTextFile(
+      `${traceSourceName?.replace(/\.[^.]+$/, "") || "can-monitor-view"}.csv`,
+      [headers, ...rows].map((row) => row.map((cell) => csvEscape(String(cell))).join(",")).join("\n"),
+      "text/csv",
+    );
+  }
+
+  function openTransmitComposerHelp() {
+    window.location.hash = "transmit-composer";
+    setView("help");
+    window.setTimeout(() => document.getElementById("transmit-composer")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+  }
+
   function txPeriodMs() {
     const value = Math.max(1, Number(cyclicPeriod) || 1);
     return cyclicUnit === "s" ? value * 1000 : value;
   }
 
-  async function sendCurrentFrame() {
+  function decodedMatchesExpected(decoded: DecodedFrame | null, expected: string) {
+    if (expected === "__any_rx") return true;
+    if (!decoded) return false;
+    return [decoded.frameName, decoded.meaning, decoded.serviceName, decoded.attributeName, decoded.featureName].some((value) => value === expected);
+  }
+
+  async function waitForCanResponse(startedAfterMs: number) {
+    const timeoutMs = Math.max(1, Number(cyclicResponseTimeout) || 1000);
+    return waitForFrame((frame) => {
+      if (frame.dir !== "rx") return false;
+      if (frame.ts_ms < startedAfterMs) return false;
+      if (frame.iface !== activeIface) return false;
+      const decoded = decodeFrameWithProfiles(profilesForDecode, frame);
+      return decodedMatchesExpected(decoded, cyclicExpectedResponse);
+    }, timeoutMs);
+  }
+
+  async function sendCurrentFrame(options?: { waitForResponse?: boolean }) {
     const arbitrationId = parseCanId(txId);
     if (!Number.isFinite(arbitrationId)) return { ok: false, error: "Invalid CAN ID" };
+    const startedAfterMs = Date.now();
 
     const attempts = Math.max(1, Math.min(4, (Number(txRetryCount) || 0) + 1));
     let lastResult: { ok: boolean; error?: string } = { ok: false, error: "Not sent" };
@@ -689,7 +783,14 @@ export function CanFdDashboard() {
         brs: Number(txDlc) > 8,
         dataHex: txPayload,
       });
-      if (lastResult.ok) return lastResult;
+      if (lastResult.ok) break;
+    }
+    if (lastResult.ok && options?.waitForResponse) {
+      try {
+        await waitForCanResponse(startedAfterMs);
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : "Timed out waiting for CAN response" };
+      }
     }
     return lastResult;
   }
@@ -719,21 +820,34 @@ export function CanFdDashboard() {
         return;
       }
 
-      const result = await sendCurrentFrame();
+      const result = await sendCurrentFrame({ waitForResponse: cyclicMode === "wait-response" });
       if (!cyclicRunningRef.current) return;
       if (!result.ok) {
-        stopCyclicTx();
-        return;
-      }
-
-      const elapsed = performance.now() - started;
-      if (elapsed > period) {
-        if (cyclicLatePolicy === "stop") {
+        const isResponseTimeout = cyclicMode === "wait-response" && result.error?.toLowerCase().includes("timed out");
+        if (!isResponseTimeout || cyclicLatePolicy === "stop") {
           stopCyclicTx();
           return;
         }
         if (cyclicLatePolicy === "send-anyway") {
           cyclicTimerRef.current = window.setTimeout(tick, 0);
+          return;
+        }
+        cyclicTimerRef.current = window.setTimeout(tick, period);
+        return;
+      }
+
+      const elapsed = performance.now() - started;
+      if (elapsed > period) {
+        if (cyclicLatePolicy === "send-anyway") {
+          cyclicTimerRef.current = window.setTimeout(tick, 0);
+          return;
+        }
+        if (cyclicMode === "wait-response") {
+          cyclicTimerRef.current = window.setTimeout(tick, period);
+          return;
+        }
+        if (cyclicLatePolicy === "stop") {
+          stopCyclicTx();
           return;
         }
       }
@@ -1095,15 +1209,27 @@ export function CanFdDashboard() {
                     className={
                       connected
                         ? "h-8 gap-1 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+                        : status === "connecting"
+                          ? "h-8 gap-1 border-sky-500/40 text-sky-600 dark:text-sky-400"
+                          : status === "error"
+                            ? "h-8 gap-1 border-destructive/40 text-destructive"
                         : "h-8 gap-1 border-muted-foreground/40 text-muted-foreground"
                     }
                   >
                     <span className={connected ? "h-2 w-2 rounded-full bg-emerald-500" : "h-2 w-2 rounded-full bg-muted-foreground"} />
-                    {statusMessage}
+                    {connectionLabel}
                   </Badge>
                   <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => fileInputRef.current?.click()}>
                     <FileUp className="h-4 w-4" />
                     Open
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" disabled={!frames.length} title="Export raw candump log" onClick={exportCandumpLog}>
+                    <Download className="h-4 w-4" />
+                    Log
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" disabled={!filteredRows.length} title="Export current decoded table view as CSV" onClick={exportVisibleCsv}>
+                    <Download className="h-4 w-4" />
+                    CSV
                   </Button>
                   {connected ? (
                     <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => void disconnect()}>
@@ -1233,10 +1359,15 @@ export function CanFdDashboard() {
           {showTransmitComposer && (
           <Card className="min-w-0 shrink-0 rounded-lg border-border/70 shadow-sm">
             <CardHeader className="p-4 pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <RadioTower className="h-4 w-4" />
-                Transmit composer
-              </CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <RadioTower className="h-4 w-4" />
+                  Transmit composer
+                </CardTitle>
+                <Button variant="ghost" size="icon" className="h-7 w-7" title="Open transmit composer help" onClick={openTransmitComposerHelp}>
+                  <HelpCircle className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3 p-4 pt-0">
               <Tabs defaultValue="single">
@@ -1295,10 +1426,12 @@ export function CanFdDashboard() {
                       </SelectContent>
                     </Select>
                   </label>
-                  <Button className="w-full" disabled={!connected} onClick={() => void sendCurrentFrame()}>
-                    <Send className="h-4 w-4" />
-                    Send Frame
-                  </Button>
+                  <span className="block" title={txDisabledReason}>
+                    <Button className="w-full" disabled={!connected} onClick={() => void sendCurrentFrame()}>
+                      <Send className="h-4 w-4" />
+                      Send Frame
+                    </Button>
+                  </span>
                 </TabsContent>
                 <TabsContent value="cycle" className="space-y-3">
                   <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-2">
@@ -1321,18 +1454,43 @@ export function CanFdDashboard() {
                   </div>
                   <label className="space-y-1 text-xs font-medium">
                     Send mode
-                    <Select value={cyclicMode} onValueChange={(value) => setCyclicMode(value as "fire-and-forget" | "wait-ack")}>
+                    <Select value={cyclicMode} onValueChange={(value) => setCyclicMode(value as "fire-and-forget" | "wait-ack" | "wait-response")}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="fire-and-forget">Fire and forget</SelectItem>
                         <SelectItem value="wait-ack">Wait for daemon ACK</SelectItem>
+                        <SelectItem value="wait-response">Wait for CAN response</SelectItem>
                       </SelectContent>
                     </Select>
                   </label>
+                  {cyclicMode === "wait-response" && (
+                    <div className="grid gap-2">
+                      <label className="space-y-1 text-xs font-medium">
+                        Expected response
+                        <Select value={cyclicExpectedResponse} onValueChange={setCyclicExpectedResponse}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__any_rx">Any RX frame on selected interface</SelectItem>
+                            {expectedResponseOptions.map((option) => (
+                              <SelectItem key={option.id} value={option.id}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </label>
+                      <label className="space-y-1 text-xs font-medium">
+                        Response timeout ms
+                        <Input value={cyclicResponseTimeout} onChange={(event) => setCyclicResponseTimeout(event.target.value)} />
+                      </label>
+                    </div>
+                  )}
                   <label className="space-y-1 text-xs font-medium">
-                    If ACK is later than period
+                    If ACK/response is later than period
                     <Select value={cyclicLatePolicy} onValueChange={(value) => setCyclicLatePolicy(value as "send-anyway" | "skip" | "stop")} disabled={cyclicMode === "fire-and-forget"}>
                       <SelectTrigger>
                         <SelectValue />
@@ -1344,10 +1502,12 @@ export function CanFdDashboard() {
                       </SelectContent>
                     </Select>
                   </label>
-                  <Button variant={cyclicActive ? "destructive" : "outline"} className="w-full" disabled={!connected && !cyclicActive} onClick={cyclicActive ? stopCyclicTx : startCyclicTx}>
-                    {cyclicActive ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    {cyclicActive ? "Stop cyclic TX" : "Start cyclic TX"}
-                  </Button>
+                  <span className="block" title={cyclicDisabledReason}>
+                    <Button variant={cyclicActive ? "destructive" : "outline"} className="w-full" disabled={!connected && !cyclicActive} onClick={cyclicActive ? stopCyclicTx : startCyclicTx}>
+                      {cyclicActive ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      {cyclicActive ? "Stop cyclic TX" : "Start cyclic TX"}
+                    </Button>
+                  </span>
                 </TabsContent>
               </Tabs>
             </CardContent>

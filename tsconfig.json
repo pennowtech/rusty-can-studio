@@ -25,5 +25,6 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
+  "exclude": ["src/editor", "src/__tests__", "src/utils/derivedFieldUtils.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
