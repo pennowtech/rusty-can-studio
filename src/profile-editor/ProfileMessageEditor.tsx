@@ -10,7 +10,8 @@ import type { CanProfile, CompactProfileAttributeDef, CompactProfileOperationDef
 import { ProfileCanIdLayoutEditor } from "@/profile-editor/ProfileCanIdLayoutEditor";
 import { getProfileMessageSchema } from "@/profile-editor/profileAdapter";
 import { resolveProfileReferences, useProfileStore } from "@/profile-editor/store/profileStore";
-import { Binary, Braces, Cable, ChevronRight, GitBranch, Plus, Search, Settings2, Trash2 } from "lucide-react";
+import { useAppStore } from "@/store/appShellStore";
+import { Binary, Braces, Cable, ChevronDown, ChevronRight, GitBranch, HelpCircle, Plus, Search, Settings2, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type VariantKey = "command" | "response" | "event";
@@ -148,6 +149,7 @@ export function ProfileMessageEditor() {
   const loadedProfileLibrary = useProfileStore((s) => s.loadedProfiles);
   const selectedFramePayloadHex = useProfileStore((s) => s.selectedFramePayloadHex);
   const updateDraftProfile = useProfileStore((s) => s.updateDraftProfile);
+  const setView = useAppStore((s) => s.setView);
   const profile = useMemo(() => resolveProfileReferences(rawProfile, loadedProfileLibrary), [rawProfile, loadedProfileLibrary]);
   const draftProfile = useMemo(() => resolveProfileReferences(rawDraftProfile, loadedProfileLibrary), [rawDraftProfile, loadedProfileLibrary]);
   const activeProfile = draftProfile ?? profile;
@@ -156,6 +158,7 @@ export function ProfileMessageEditor() {
   const [search, setSearch] = useState("");
   const [hoveredField, setHoveredField] = useState<string | null>(null);
   const [activeField, setActiveField] = useState<string | null>(null);
+  const [expandedAttributes, setExpandedAttributes] = useState<Record<number, boolean>>({});
   const normalizedSearch = search.trim().toLowerCase();
   const bytes = useMemo(() => hexToBytes(selectedFramePayloadHex ?? ""), [selectedFramePayloadHex]);
 
@@ -188,6 +191,7 @@ export function ProfileMessageEditor() {
           })
         : buildCanIdFromFields(canIdLayout.fields, {
             service_identifier: activeProfile.service?.identifier ?? 0,
+            command_class: 6,
           });
 
     return decodeFrameWithProfile(activeProfile, {
@@ -212,6 +216,12 @@ export function ProfileMessageEditor() {
       ensureCompactProfile(draft);
       updater(draft);
     });
+  }
+
+  function openHelp(sectionId: string) {
+    window.location.hash = sectionId;
+    setView("help");
+    window.setTimeout(() => document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
   }
 
   function updateService(patch: Partial<NonNullable<CanProfile["service"]>>) {
@@ -285,7 +295,10 @@ export function ProfileMessageEditor() {
 
   function addOperation(attributeIndex: number) {
     updateProfile((draft) => {
-      const operations = draft.attributes?.[attributeIndex]?.operations;
+      const attribute = draft.attributes?.[attributeIndex];
+      if (!attribute) return;
+      attribute.operations ??= [];
+      const operations = attribute.operations;
       if (!operations) return;
       const index = operations.length;
       operations.push({
@@ -294,6 +307,7 @@ export function ProfileMessageEditor() {
         variants: { command: [] },
       });
       setSelectedNode({ kind: "operation", attributeIndex, operationIndex: index });
+      setExpandedAttributes((state) => ({ ...state, [attributeIndex]: true }));
     });
   }
 
@@ -328,6 +342,9 @@ export function ProfileMessageEditor() {
         length: 8,
         type: "uint",
       });
+      if (selectedNode.kind === "variant") {
+        setExpandedAttributes((state) => ({ ...state, [selectedNode.attributeIndex]: true }));
+      }
     });
   }
 
@@ -368,42 +385,57 @@ export function ProfileMessageEditor() {
               <OutlineButton node={{ kind: "payload-header" }} icon={<Braces className="h-4 w-4" />} title="Payload header" detail={`${currentProfile.payloadHeader?.fields?.length ?? 0} fields`} />
               {attributes.map((attribute, attributeIndex) => {
                 if (!nodeMatches(normalizedSearch, attribute.name, attribute.address)) return null;
+                const expanded = normalizedSearch ? true : expandedAttributes[attributeIndex] ?? false;
                 return (
                   <div key={`${attribute.name}-${attributeIndex}`} className="space-y-1">
-                    <OutlineButton
-                      node={{ kind: "attribute", attributeIndex }}
-                      icon={<GitBranch className="h-4 w-4" />}
-                      title={attribute.name}
-                      detail={`address ${attribute.address}`}
-                    />
-                    <div className="ml-4 space-y-1 border-l pl-2">
-                      {(attribute.operations ?? []).map((operation, operationIndex) => (
-                        <div key={`${operation.type}-${operationIndex}`} className="space-y-1">
-                          <OutlineButton
-                            node={{ kind: "operation", attributeIndex, operationIndex }}
-                            icon={<Settings2 className="h-4 w-4" />}
-                            title={operation.type}
-                            detail={`feature ${operation.featureIndex}`}
-                          />
-                          <div className="ml-4 flex flex-wrap gap-1">
-                            {(["command", "response", "event"] as VariantKey[]).map((variant) =>
-                              variant in (operation.variants ?? {}) ? (
-                                <button
-                                  key={variant}
-                                  type="button"
-                                  onClick={() => setSelectedNode({ kind: "variant", attributeIndex, operationIndex, variant })}
-                                  className={`rounded border px-2 py-1 text-[11px] hover:bg-muted ${
-                                    nodeKey(selectedNode) === nodeKey({ kind: "variant", attributeIndex, operationIndex, variant }) ? "border-primary bg-muted" : ""
-                                  }`}
-                                >
-                                  {variantLabels[variant]} ({operation.variants?.[variant]?.length ?? 0})
-                                </button>
-                              ) : null,
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                    <div className="flex items-stretch gap-1">
+                      <button
+                        type="button"
+                        className="rounded-md border px-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        title={expanded ? "Collapse attribute" : "Expand attribute"}
+                        onClick={() => setExpandedAttributes((state) => ({ ...state, [attributeIndex]: !expanded }))}
+                      >
+                        {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <OutlineButton
+                          node={{ kind: "attribute", attributeIndex }}
+                          icon={<GitBranch className="h-4 w-4" />}
+                          title={attribute.name}
+                          detail={`address ${attribute.address}`}
+                        />
+                      </div>
                     </div>
+                    {expanded && (
+                      <div className="ml-7 space-y-1 border-l pl-2">
+                        {(attribute.operations ?? []).map((operation, operationIndex) => (
+                          <div key={`${operation.type}-${operationIndex}`} className="space-y-1">
+                            <OutlineButton
+                              node={{ kind: "operation", attributeIndex, operationIndex }}
+                              icon={<Settings2 className="h-4 w-4" />}
+                              title={operation.type}
+                              detail={`feature ${operation.featureIndex}`}
+                            />
+                            <div className="ml-4 flex flex-wrap gap-1">
+                              {(["command", "response", "event"] as VariantKey[]).map((variant) =>
+                                variant in (operation.variants ?? {}) ? (
+                                  <button
+                                    key={variant}
+                                    type="button"
+                                    onClick={() => setSelectedNode({ kind: "variant", attributeIndex, operationIndex, variant })}
+                                    className={`rounded border px-2 py-1 text-[11px] hover:bg-muted ${
+                                      nodeKey(selectedNode) === nodeKey({ kind: "variant", attributeIndex, operationIndex, variant }) ? "border-primary bg-muted" : ""
+                                    }`}
+                                  >
+                                    {variantLabels[variant]} ({operation.variants?.[variant]?.length ?? 0})
+                                  </button>
+                                ) : null,
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -686,7 +718,12 @@ export function ProfileMessageEditor() {
               <CardTitle className="mt-1 text-sm">{definitionTitle(currentProfile, selectedNode)}</CardTitle>
               <p className="mt-1 text-xs text-muted-foreground">{definitionNote(selectedNode)}</p>
             </div>
-            {!editable && <Badge variant="outline">Read only</Badge>}
+            <div className="flex items-center gap-2">
+              {!editable && <Badge variant="outline">Read only</Badge>}
+              <Button variant="ghost" size="icon" className="h-8 w-8" title="Open profile editor help" onClick={() => openHelp("profile-editor")}>
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="min-h-0 flex-1 overflow-auto p-4 pb-8">

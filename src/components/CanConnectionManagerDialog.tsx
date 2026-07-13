@@ -27,8 +27,9 @@ import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
 import { useConnectionStore } from "@/store/connectionStore";
 import { CanConnectDialog } from "./CanConnectDialog";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { Copy, Pencil, Trash2, Plus } from "lucide-react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { v4 as uuid } from "uuid";
 
 export function CanConnectionManagerDialog({
   open,
@@ -37,7 +38,7 @@ export function CanConnectionManagerDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { profiles, activeId, connect, deleteProfile, cleanupProfiles } = useConnectionStore();
+  const { profiles, activeId, connect, deleteProfile, cleanupProfiles, addProfile } = useConnectionStore();
 
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -80,6 +81,20 @@ export function CanConnectionManagerDialog({
                 </div>
 
                 <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="Copy profile"
+                    onClick={() =>
+                      addProfile({
+                        ...structuredClone(p),
+                        id: uuid(),
+                        name: `${p.name} Copy`,
+                      })
+                    }
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
                   <Button size="icon" variant="ghost" onClick={() => setEditingProfileId(p.id)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -109,11 +124,26 @@ export function CanConnectionManagerDialog({
       </Dialog>
 
       {/* Reuse ConnectDialog for NEW */}
-      <CanConnectDialog open={showNew} onOpenChange={setShowNew} />
+      <CanConnectDialog
+        open={showNew}
+        onOpenChange={setShowNew}
+        onConnected={() => {
+          setShowNew(false);
+          onOpenChange(false);
+        }}
+      />
 
       {/* Reuse ConnectDialog for EDIT */}
       {editingProfileId && (
-        <CanConnectDialog open={true} onOpenChange={() => setEditingProfileId(null)} editProfileId={editingProfileId} />
+        <CanConnectDialog
+          open={true}
+          onOpenChange={() => setEditingProfileId(null)}
+          editProfileId={editingProfileId}
+          onConnected={() => {
+            setEditingProfileId(null);
+            onOpenChange(false);
+          }}
+        />
       )}
     </>
   );

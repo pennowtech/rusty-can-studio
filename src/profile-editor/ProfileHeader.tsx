@@ -12,12 +12,7 @@ export function ProfileHeader() {
   if (!meta) return null;
 
   return (
-    <div className="flex items-center justify-between border-b pb-3">
-      <div>
-        <h1 className="text-xl font-semibold">{meta.name}</h1>
-        {meta.description && <p className="text-sm text-muted-foreground">{meta.description}</p>}
-      </div>
-
+    <div className="flex items-center justify-end border-b pb-3">
       <div className="flex gap-2">
         <ToggleGroup
           type="single"

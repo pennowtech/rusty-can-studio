@@ -18,14 +18,6 @@ import { AppCommand } from "./types";
 
 export const commandRegistry: AppCommand[] = [
   {
-    id: "app.commandPalette",
-    title: "Open Command Panel",
-    description: "Search commands, navigation, connection actions, and help.",
-    category: "Application",
-    keywords: ["command", "palette", "control", "panel"],
-    handler: ({ openPalette }) => openPalette(),
-  },
-  {
     id: "can.connect",
     title: "CAN: Connect",
     description: "Open the connection dialog for local or remote capture.",

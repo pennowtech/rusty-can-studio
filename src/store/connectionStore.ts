@@ -6,6 +6,13 @@ import { create } from "zustand";
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
+type FrameWaiter = {
+  matches: (frame: WsFrame) => boolean;
+  resolve: (frame: WsFrame) => void;
+  reject: (error: Error) => void;
+  timeoutId: number;
+};
+
 type ConnectionState = {
   profiles: ConnectionProfile[];
   activeId?: string;
@@ -16,16 +23,20 @@ type ConnectionState = {
   subscribedIfaces: string[];
   capturePaused: boolean;
   frames: WsFrame[];
+  totalFrames: number;
+  nextLineNumber: number;
   traceSourceName?: string;
   traceFrameLimit: number;
 
   connect: (id: string) => Promise<void>;
+  discoverRemoteIfaces: (profile: ConnectionProfile) => Promise<string[]>;
   disconnect: () => Promise<void>;
   pauseCapture: () => Promise<void>;
   resumeCapture: () => Promise<void>;
   clearFrames: () => void;
   loadTraceFrames: (name: string, frames: WsFrame[]) => void;
   sendFrame: (params: { iface: string; arbitrationId: number; isFd: boolean; brs?: boolean; dataHex: string }) => Promise<{ ok: boolean; error?: string }>;
+  waitForFrame: (matches: (frame: WsFrame) => boolean, timeoutMs: number) => Promise<WsFrame>;
   setTraceFrameLimit: (limit: number) => void;
 
   addProfile: (p: ConnectionProfile) => void;
@@ -37,6 +48,7 @@ type ConnectionState = {
 let activeClient: WsJsonDaemonClient | null = null;
 let frameBuffer: WsFrame[] = [];
 let frameFlushTimer: number | null = null;
+let frameWaiters: FrameWaiter[] = [];
 
 const FRAME_FLUSH_MS = 100;
 const DEFAULT_TRACE_FRAME_LIMIT = 500;
@@ -64,6 +76,31 @@ function saveTraceFrameLimit(frameLimit: number) {
 
 function limitFrames(frames: WsFrame[], limit: number) {
   return frames.slice(Math.max(0, frames.length - limit));
+}
+
+function notifyFrameWaiters(frames: WsFrame[]) {
+  for (const frame of frames) {
+    for (let index = 0; index < frameWaiters.length; index++) {
+      const waiter = frameWaiters[index];
+      if (!waiter.matches(frame)) continue;
+      frameWaiters.splice(index, 1);
+      window.clearTimeout(waiter.timeoutId);
+      waiter.resolve(frame);
+      index--;
+    }
+  }
+}
+
+function assignLineNumbers(frames: WsFrame[], start: number) {
+  let next = start;
+  const numbered = frames.map((frame) => {
+    if (frame.line_no != null) {
+      next = Math.max(next, frame.line_no + 1);
+      return frame;
+    }
+    return { ...frame, line_no: next++ };
+  });
+  return { numbered, next };
 }
 
 function profileKey(profile: ConnectionProfile) {
@@ -128,6 +165,11 @@ async function closeActiveClient() {
 
   activeClient.close();
   activeClient = null;
+  for (const waiter of frameWaiters) {
+    window.clearTimeout(waiter.timeoutId);
+    waiter.reject(new Error("Connection closed"));
+  }
+  frameWaiters = [];
   frameBuffer = [];
   if (frameFlushTimer !== null) {
     window.clearTimeout(frameFlushTimer);
@@ -145,6 +187,8 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   subscribedIfaces: [],
   capturePaused: false,
   frames: [],
+  totalFrames: 0,
+  nextLineNumber: 1,
   traceSourceName: undefined,
   traceFrameLimit: loadTraceFrameLimit(),
 
@@ -166,13 +210,15 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       subscribedIfaces: [],
       capturePaused: false,
       frames: [],
+      totalFrames: 0,
+      nextLineNumber: 1,
       traceSourceName: undefined,
     });
 
     if (profile.mode !== "remote") {
       set({
         status: "error",
-        statusMessage: "Local SocketCAN requires the daemon bridge. Create a remote daemon profile for WSL.",
+        statusMessage: "Local CAN direct capture is not implemented. Use Remote Daemon for WSL.",
       });
       return;
     }
@@ -185,60 +231,92 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       return;
     }
 
-    const client = new WsJsonDaemonClient(buildWsJsonUrl(profile));
-    activeClient = client;
-    client.setFrameHandler((frame) => {
-      frameBuffer.push(frame);
-      if (frameFlushTimer !== null) return;
+    const attempts = profile.autoReconnect ? 3 : 1;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      set({
+        status: "connecting",
+        statusMessage: attempts > 1 ? `Connecting to ${profile.name} (${attempt}/${attempts})` : `Connecting to ${profile.name}`,
+      });
 
-      frameFlushTimer = window.setTimeout(() => {
-        const batch = frameBuffer.splice(0);
-        frameFlushTimer = null;
-        if (!batch.length) return;
+      const client = new WsJsonDaemonClient(buildWsJsonUrl(profile));
+      activeClient = client;
+      client.setFrameHandler((frame) => {
+        frameBuffer.push(frame);
+        if (frameFlushTimer !== null) return;
 
-        set((state) => ({
-          frames: limitFrames([...state.frames, ...batch], state.traceFrameLimit),
-        }));
-      }, FRAME_FLUSH_MS);
-    });
+        frameFlushTimer = window.setTimeout(() => {
+          const batch = frameBuffer.splice(0);
+          frameFlushTimer = null;
+          if (!batch.length) return;
 
-    try {
-      const daemonInfo = await client.connect({ clientName: "cansim-app-rust", timeoutMs: 5000 });
-      const ifacesResponse = await client.listIfaces(5000);
-      const requestedIface = profile.iface?.trim();
-      const subscribedIfaces =
-        requestedIface && ifacesResponse.items.includes(requestedIface)
-          ? [requestedIface]
-          : ifacesResponse.items.length
-            ? [ifacesResponse.items[0]]
-            : [];
+          set((state) => {
+            const { numbered, next } = assignLineNumbers(batch, state.nextLineNumber);
+            notifyFrameWaiters(numbered);
+            return {
+              frames: limitFrames([...state.frames, ...numbered], state.traceFrameLimit),
+              totalFrames: state.totalFrames + numbered.length,
+              nextLineNumber: next,
+            };
+          });
+        }, FRAME_FLUSH_MS);
+      });
 
-      if (!subscribedIfaces.length) {
-        throw new Error("Daemon reported no CAN interfaces. Bring up can0 or vcan0 in WSL and reconnect.");
+      try {
+        const daemonInfo = await client.connect({ clientName: "cansim-app-rust", timeoutMs: 5000 });
+        const ifacesResponse = await client.listIfaces(5000);
+        const requestedIface = profile.iface?.trim();
+        const subscribedIfaces =
+          requestedIface && ifacesResponse.items.includes(requestedIface)
+            ? [requestedIface]
+            : ifacesResponse.items.length
+              ? [ifacesResponse.items[0]]
+              : [];
+
+        if (!subscribedIfaces.length) {
+          throw new Error("Daemon reported no CAN interfaces. Bring up can0 or vcan0 in WSL and reconnect.");
+        }
+
+        await client.subscribe(subscribedIfaces, 5000, profile.captureFilters);
+
+        set({
+          status: "connected",
+          statusMessage: "Connected",
+          daemonInfo,
+          availableIfaces: ifacesResponse.items,
+          subscribedIfaces,
+          capturePaused: false,
+        });
+        return;
+      } catch (error) {
+        lastError = error;
+        client.close();
+        if (activeClient === client) activeClient = null;
+        if (attempt < attempts) {
+          await new Promise((resolve) => window.setTimeout(resolve, Math.min(1000 * attempt, 3000)));
+        }
       }
+    }
 
-      await client.subscribe(subscribedIfaces, 5000);
+    set({
+      status: "error",
+      statusMessage: lastError instanceof Error ? lastError.message : "Remote daemon connection failed",
+      daemonInfo: undefined,
+      availableIfaces: [],
+      subscribedIfaces: [],
+      capturePaused: false,
+    });
+  },
 
-      set({
-        status: "connected",
-        statusMessage: `Subscribed to ${subscribedIfaces.join(", ")}`,
-        daemonInfo,
-        availableIfaces: ifacesResponse.items,
-        subscribedIfaces,
-        capturePaused: false,
-      });
-    } catch (error) {
+  discoverRemoteIfaces: async (profile) => {
+    if (profile.mode !== "remote") return [];
+    const client = new WsJsonDaemonClient(buildWsJsonUrl(profile));
+    try {
+      await client.connect({ clientName: "cansim-app-rust-discovery", timeoutMs: 3000 });
+      const response = await client.listIfaces(3000);
+      return response.items;
+    } finally {
       client.close();
-      if (activeClient === client) activeClient = null;
-
-      set({
-        status: "error",
-        statusMessage: error instanceof Error ? error.message : "Remote daemon connection failed",
-        daemonInfo: undefined,
-        availableIfaces: [],
-        subscribedIfaces: [],
-        capturePaused: false,
-      });
     }
   },
 
@@ -284,34 +362,39 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       return;
     }
 
-    await activeClient.subscribe(subscribedIfaces, 3000);
+    await activeClient.subscribe(subscribedIfaces, 3000, profile?.captureFilters);
     set({
       subscribedIfaces,
       capturePaused: false,
       status: "connected",
-      statusMessage: `Subscribed to ${subscribedIfaces.join(", ")}`,
+      statusMessage: "Connected",
     });
   },
 
   clearFrames: () =>
     set((state) => ({
       frames: [],
+      totalFrames: 0,
+      nextLineNumber: 1,
       traceSourceName: undefined,
       statusMessage:
         state.status === "connected"
-          ? state.subscribedIfaces.length
-            ? `Subscribed to ${state.subscribedIfaces.join(", ")}`
-            : "Connected"
+          ? "Connected"
           : state.status === "disconnected"
             ? "Disconnected"
             : state.statusMessage,
     })),
 
   loadTraceFrames: (name, frames) =>
-    set({
-      frames,
+    set(() => {
+      const { numbered, next } = assignLineNumbers(frames, 1);
+      return {
+      frames: numbered,
+      totalFrames: numbered.length,
+      nextLineNumber: next,
       traceSourceName: name,
       statusMessage: `Loaded ${name}`,
+    };
     }),
 
   sendFrame: async (params) => {
@@ -328,8 +411,14 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       tx_sequence: ++txSequence,
     };
 
+    const stateBeforeTx = get();
+    const { numbered } = assignLineNumbers([txFrame], stateBeforeTx.nextLineNumber);
+    const txFrameWithLine = numbered[0];
+
     set((state) => ({
-      frames: limitFrames([...state.frames, txFrame], state.traceFrameLimit),
+      frames: limitFrames([...state.frames, txFrameWithLine], state.traceFrameLimit),
+      totalFrames: state.totalFrames + 1,
+      nextLineNumber: Math.max(state.nextLineNumber, (txFrameWithLine.line_no ?? state.nextLineNumber) + 1),
       traceSourceName: undefined,
     }));
 
@@ -337,7 +426,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       set({ status: "error", statusMessage: "No remote daemon connection is active" });
       set((state) => ({
         frames: state.frames.map((frame) =>
-          frame.tx_sequence === txFrame.tx_sequence ? { ...frame, tx_status: "failed", tx_error: "No remote daemon connection is active" } : frame,
+          frame.tx_sequence === txFrameWithLine.tx_sequence ? { ...frame, tx_status: "failed", tx_error: "No remote daemon connection is active" } : frame,
         ),
       }));
       return { ok: false, error: "No remote daemon connection is active" };
@@ -355,26 +444,35 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       set((state) => ({
         frames: state.frames.map((frame) =>
           frame.tx_sequence === txFrame.tx_sequence
-            ? { ...frame, tx_status: ack.ok ? "sent" : "failed", tx_error: ack.ok ? undefined : ack.error ?? "Daemon rejected CAN frame" }
+            ? { ...frame, tx_status: ack.ok ? "sent" : "failed", tx_error: ack.ok ? undefined : ack.error ?? ack.error_message ?? "Daemon rejected CAN frame" }
             : frame,
         ),
         status: ack.ok ? state.status : "error",
-        statusMessage: ack.ok ? `Sent ${txFrame.iface} ${txFrame.id.toString(16).toUpperCase()}` : ack.error ?? "Daemon rejected CAN frame",
+        statusMessage: ack.ok ? state.statusMessage : ack.error ?? ack.error_message ?? "Daemon rejected CAN frame",
       }));
 
-      return { ok: ack.ok, error: ack.error };
+      return { ok: ack.ok, error: ack.error ?? ack.error_message };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to send CAN frame";
       set((state) => ({
         status: "error",
         statusMessage: message,
         frames: state.frames.map((frame) =>
-          frame.tx_sequence === txFrame.tx_sequence ? { ...frame, tx_status: "failed", tx_error: message } : frame,
+          frame.tx_sequence === txFrameWithLine.tx_sequence ? { ...frame, tx_status: "failed", tx_error: message } : frame,
         ),
       }));
       return { ok: false, error: message };
     }
   },
+
+  waitForFrame: (matches, timeoutMs) =>
+    new Promise((resolve, reject) => {
+      const timeoutId = window.setTimeout(() => {
+        frameWaiters = frameWaiters.filter((waiter) => waiter.timeoutId !== timeoutId);
+        reject(new Error("Timed out waiting for CAN response"));
+      }, timeoutMs);
+      frameWaiters.push({ matches, resolve, reject, timeoutId });
+    }),
 
   setTraceFrameLimit: (limit) => {
     const traceFrameLimit = clampTraceLimit(limit);

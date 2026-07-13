@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { commandRegistry } from "@/commands/registry";
@@ -32,13 +31,12 @@ export function CommandPalette() {
           <DialogDescription>Search and run application commands.</DialogDescription>
         </VisuallyHidden>
         <Command className="bg-background">
-          <div className="border-b bg-muted/30 px-4 py-3">
+          <div className="border-b bg-muted/30 px-4 py-3 pr-12">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">Command Panel</div>
                 <div className="text-xs text-muted-foreground">Run actions, switch views, and open help surfaces.</div>
               </div>
-              <Badge variant="outline">{displayShortcut(shortcuts, "app.commandPalette")}</Badge>
             </div>
           </div>
           <CommandInput placeholder="Search commands, views, help, or connection actions" />

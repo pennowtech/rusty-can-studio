@@ -44,6 +44,11 @@ export function useCommandPaletteHotkey() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (isEditableTarget(e.target) && !paletteOpen) return;
+      if (shortcutMatches(e, shortcuts["app.commandPalette"] ?? defaultShortcuts["app.commandPalette"])) {
+        e.preventDefault();
+        openPalette();
+        return;
+      }
       const command = commandRegistry.find((cmd) => shortcutMatches(e, shortcuts[cmd.id] ?? defaultShortcuts[cmd.id] ?? cmd.shortcut ?? ""));
       if (!command) return;
 

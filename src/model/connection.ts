@@ -21,6 +21,15 @@ export type TransportProtocol = "ws-json" | "ws-binary" | "tcp-jsonl" | "tcp-bin
 
 export type ConnectionMode = "local" | "remote";
 
+export type RawCanFrameFilter = {
+  iface?: string;
+  id?: number;
+  id_mask?: number;
+  is_fd?: boolean;
+  min_len?: number;
+  max_len?: number;
+};
+
 export type ConnectionProfile = {
   id: string;
   name: string;
@@ -36,4 +45,5 @@ export type ConnectionProfile = {
   protocol?: TransportProtocol;
 
   autoReconnect: boolean;
+  captureFilters?: RawCanFrameFilter[];
 };
