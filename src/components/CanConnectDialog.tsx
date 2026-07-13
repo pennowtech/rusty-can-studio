@@ -21,6 +21,15 @@ function parseOptionalHex(value: string) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function bitrateValue(value: number | undefined) {
+  return value == null ? "" : String(value);
+}
+
+function parseBitrate(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : undefined;
+}
+
 export function CanConnectDialog({
   open,
   onOpenChange,
@@ -64,6 +73,9 @@ export function CanConnectDialog({
       host: "127.0.0.1",
       port: 9501,
       protocol: "ws-json",
+      fdEnabled: true,
+      nominalBitrate: 500000,
+      dataBitrate: 2000000,
       autoReconnect: true,
     };
     setProfile(nextProfile);
@@ -77,6 +89,9 @@ export function CanConnectDialog({
     if (nextProfile.mode === "local" && !nextProfile.iface?.trim()) {
       return "Interface is required";
     }
+
+    if (nextProfile.nominalBitrate != null && nextProfile.nominalBitrate <= 0) return "Nominal bitrate must be greater than zero";
+    if (nextProfile.fdEnabled && nextProfile.dataBitrate != null && nextProfile.dataBitrate <= 0) return "Data bitrate must be greater than zero";
 
     if (nextProfile.mode === "remote") {
       if (!nextProfile.iface?.trim()) return "Daemon CAN interface is required";
@@ -166,6 +181,9 @@ export function CanConnectDialog({
                 host: profile.host ?? "127.0.0.1",
                 port: profile.port ?? 9501,
                 protocol: profile.protocol ?? "ws-json",
+                fdEnabled: profile.fdEnabled ?? true,
+                nominalBitrate: profile.nominalBitrate ?? 500000,
+                dataBitrate: profile.dataBitrate ?? 2000000,
               })
             }
           >
@@ -179,6 +197,40 @@ export function CanConnectDialog({
                 <Label>Interface</Label>
                 <Input value={profile.iface ?? ""} onChange={(e) => setProfile({ ...profile, iface: e.target.value })} />
                 <p className="text-xs text-muted-foreground">Local CAN direct capture is not wired yet. Use Remote Daemon for WSL.</p>
+              </div>
+              <div className="rounded-md border bg-muted/20 p-3">
+                <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">CAN timing metadata</div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    checked={profile.fdEnabled ?? true}
+                    onCheckedChange={(value) => setProfile({ ...profile, fdEnabled: Boolean(value), dataBitrate: Boolean(value) ? (profile.dataBitrate ?? 2000000) : undefined })}
+                  />
+                  <Label>CAN-FD interface</Label>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Nominal bitrate</Label>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="500000"
+                      value={bitrateValue(profile.nominalBitrate)}
+                      onChange={(event) => setProfile({ ...profile, nominalBitrate: parseBitrate(event.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Data bitrate</Label>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="2000000"
+                      disabled={!profile.fdEnabled}
+                      value={bitrateValue(profile.dataBitrate)}
+                      onChange={(event) => setProfile({ ...profile, dataBitrate: parseBitrate(event.target.value) })}
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Saved with the profile. Direct Local CAN is not wired yet, so this does not configure the interface from the app.
+                </p>
               </div>
             </TabsContent>
 
@@ -253,6 +305,41 @@ export function CanConnectDialog({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">Only WebSocket JSON is connected in the UI right now.</p>
+              </div>
+
+              <div className="rounded-md border bg-muted/20 p-3">
+                <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">CAN timing metadata</div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    checked={profile.fdEnabled ?? true}
+                    onCheckedChange={(value) => setProfile({ ...profile, fdEnabled: Boolean(value), dataBitrate: Boolean(value) ? (profile.dataBitrate ?? 2000000) : undefined })}
+                  />
+                  <Label>CAN-FD interface</Label>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Nominal bitrate</Label>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="500000"
+                      value={bitrateValue(profile.nominalBitrate)}
+                      onChange={(event) => setProfile({ ...profile, nominalBitrate: parseBitrate(event.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Data bitrate</Label>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="2000000"
+                      disabled={!profile.fdEnabled}
+                      value={bitrateValue(profile.dataBitrate)}
+                      onChange={(event) => setProfile({ ...profile, dataBitrate: parseBitrate(event.target.value) })}
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Saved for documentation and profile selection. The SocketCAN interface must already be configured with these rates on the daemon host.
+                </p>
               </div>
 
               <div className="rounded-md border bg-muted/20 p-3">

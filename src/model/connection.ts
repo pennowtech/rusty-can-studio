@@ -38,6 +38,9 @@ export type ConnectionProfile = {
 
   // Local
   iface?: string; // e.g. can0
+  nominalBitrate?: number;
+  dataBitrate?: number;
+  fdEnabled?: boolean;
 
   // Remote
   host?: string;

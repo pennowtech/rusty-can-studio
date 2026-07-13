@@ -741,6 +741,18 @@ Local CAN is shown separately from Remote Daemon. Direct Local CAN capture is no
 
 Remote Daemon connections retry automatically when Auto reconnect is enabled. The status bar reports only the connection state: Disconnected, Connecting, Connected, or Failed.
 
+Connection profiles can also store CAN timing metadata:
+
+- CAN-FD enabled or disabled
+- nominal bitrate for the arbitration phase
+- data bitrate for the CAN-FD payload phase
+
+These values are saved with the profile and shown in the Connection Profiles dialog. They are useful when you keep several remote daemon profiles for different buses or test benches.
+
+:::warning
+The bitrate fields document the expected interface timing. The current desktop app and WebSocket JSON daemon path do not reconfigure SocketCAN timing. Bring the interface up with matching \`ip link\` settings on the daemon host before connecting.
+:::
+
 ## CAN bridge daemon
 
 The CAN bridge daemon is a separate Linux/WSL service that exposes SocketCAN interfaces to this desktop app. Run it where the CAN interfaces exist. For WSL workflows, the daemon runs inside WSL and the desktop app connects to it from Windows.
