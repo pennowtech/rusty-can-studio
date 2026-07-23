@@ -56,9 +56,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     }),
 
   importJson: async () => {
-    const jsonText = await openJsonFile();
-    if (!jsonText) return;
     try {
+      const jsonText = await openJsonFile();
+      if (!jsonText) return;
+
       const jsonParsed = JSON.parse(jsonText);
       const errors = validateProfile(jsonParsed);
       if (errors.length > 0) {
