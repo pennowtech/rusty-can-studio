@@ -57,7 +57,45 @@ function parseProfileJson(jsonText: string) {
 }
 
 export function resolveProfileReferences(profile: ProfileDocument | null): ProfileDocument | null {
-  return profile;
+  if (!profile) return null;
+  
+  try {
+    const state = useProfileStore.getState();
+    const loadedProfiles = state.loadedProfiles;
+    
+    // Create a resolved copy of the profile
+    const resolved = structuredClone(profile);
+    
+    // Merge dictionaries from other loaded profiles
+    resolved.dictionaries ??= {};
+    for (const loaded of loadedProfiles) {
+      if (loaded.meta.id === resolved.meta.id) continue;
+      if (loaded.dictionaries) {
+        for (const [key, dict] of Object.entries(loaded.dictionaries)) {
+          if (!resolved.dictionaries[key]) {
+            resolved.dictionaries[key] = dict;
+          }
+        }
+      }
+    }
+    
+    // Merge errors from other loaded profiles
+    resolved.errors ??= [];
+    for (const loaded of loadedProfiles) {
+      if (loaded.meta.id === resolved.meta.id) continue;
+      if (loaded.errors) {
+        for (const error of loaded.errors) {
+          if (!resolved.errors.some(e => e.id === error.id)) {
+            resolved.errors.push(error);
+          }
+        }
+      }
+    }
+    
+    return resolved;
+  } catch {
+    return profile;
+  }
 }
 
 interface ProfileState {
@@ -84,6 +122,7 @@ interface ProfileState {
   updateDraftFromJson: (jsonText: string) => void;
   selectLoadedProfile: (index: number) => void;
   unloadLoadedProfile: (index: number) => void;
+  addNewProfile: (profile?: CanonicalProfile) => void;
 
   enterEditMode: () => void;
   editFrameFromTrace: (frame: WsFrame) => void;
@@ -312,6 +351,24 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
         selectedFramePayloadHex: undefined,
       };
     }),
+
+  addNewProfile: (profile) => {
+    const newProfile = (profile ?? createEmptyProfile()) as ProfileDocument;
+    const loadedProfiles = [...get().loadedProfiles, newProfile];
+    set({
+      loadedProfiles,
+      activeProfileIndex: loadedProfiles.length - 1,
+      profile: newProfile,
+      draftProfile: null,
+      viewMode: "edit",
+      selectedFrameKey: undefined,
+      selectedMessageDefinitionId: firstMessageDefinitionId(newProfile),
+      selectedFramePayloadHex: undefined,
+      jsonError: undefined,
+      validationErrors: [],
+      hasBlockingErrors: false,
+    });
+  },
 
   clear: () => set({ profile: null, loadedProfiles: [], activeProfileIndex: -1, draftProfile: null, viewMode: "json", jsonError: undefined }),
 }));

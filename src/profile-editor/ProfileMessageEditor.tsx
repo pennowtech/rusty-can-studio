@@ -116,6 +116,7 @@ export function ProfileMessageEditor() {
   const selectedMessageDefinitionId = useProfileStore((s) => s.selectedMessageDefinitionId);
   const selectedFramePayloadHex = useProfileStore((s) => s.selectedFramePayloadHex);
   const updateDraftProfile = useProfileStore((s) => s.updateDraftProfile);
+  const validationErrors = useProfileStore((s) => s.validationErrors);
   const setView = useAppStore((s) => s.setView);
   const profile = useMemo(() => {
     return resolveProfileReferences(rawProfile);
@@ -128,6 +129,42 @@ export function ProfileMessageEditor() {
   const [selectedNode, setSelectedNode] = useState<ProfileNode>({ kind: "messages" });
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ layouts: true, messages: true });
+  const [localDictRows, setLocalDictRows] = useState<{ code: string; label: string }[]>([]);
+  const [lastSelectedDictKey, setLastSelectedDictKey] = useState<string | null>(null);
+
+  const dictKey = selectedNode.kind === "dictionary" ? selectedNode.key : null;
+
+  useEffect(() => {
+    if (selectedNode.kind === "dictionary") {
+      const data = activeProfile?.dictionaries?.[selectedNode.key] ?? {};
+      const entries = Object.entries(data);
+      
+      const keyChanged = selectedNode.key !== lastSelectedDictKey;
+      
+      const localKeys = new Set(localDictRows.map(r => r.code));
+      const storeKeys = new Set(entries.map(([code]) => code));
+      
+      let isSetDifferent = false;
+      if (localKeys.size !== storeKeys.size) {
+        isSetDifferent = true;
+      } else {
+        for (const [code, label] of entries) {
+          const localRow = localDictRows.find(r => r.code === code);
+          if (!localRow || localRow.label !== label) {
+            isSetDifferent = true;
+            break;
+          }
+        }
+      }
+
+      if (keyChanged || isSetDifferent) {
+        setLocalDictRows(entries.map(([code, label]) => ({ code, label })));
+        setLastSelectedDictKey(selectedNode.key);
+      }
+    } else {
+      setLastSelectedDictKey(null);
+    }
+  }, [selectedNode, activeProfile, lastSelectedDictKey, localDictRows]);
 
   useEffect(() => {
     if (selectedMessageDefinitionId) {
@@ -220,6 +257,74 @@ export function ProfileMessageEditor() {
     });
   }
 
+  function updateLocalDictRow(index: number, patch: Partial<{ code: string; label: string }>) {
+    const nextRows = [...localDictRows];
+    nextRows[index] = { ...nextRows[index], ...patch };
+    setLocalDictRows(nextRows);
+
+    if (dictKey) {
+      updateProfile((draft) => {
+        if (!draft.dictionaries) draft.dictionaries = {};
+        const newDict: Record<string, string> = {};
+        nextRows.forEach((row) => {
+          newDict[row.code] = row.label;
+        });
+        draft.dictionaries[dictKey] = newDict;
+      });
+    }
+  }
+
+  function addLocalDictEntry() {
+    let codeNum = 0;
+    while (localDictRows.some((row) => row.code === String(codeNum))) {
+      codeNum++;
+    }
+    const nextRows = [...localDictRows, { code: String(codeNum), label: "New Value" }];
+    setLocalDictRows(nextRows);
+
+    if (dictKey) {
+      updateProfile((draft) => {
+        if (!draft.dictionaries) draft.dictionaries = {};
+        const newDict: Record<string, string> = {};
+        nextRows.forEach((row) => {
+          newDict[row.code] = row.label;
+        });
+        draft.dictionaries[dictKey] = newDict;
+      });
+    }
+  }
+
+  function deleteLocalDictEntry(index: number) {
+    const nextRows = localDictRows.filter((_, i) => i !== index);
+    setLocalDictRows(nextRows);
+
+    if (dictKey) {
+      updateProfile((draft) => {
+        if (!draft.dictionaries) draft.dictionaries = {};
+        const newDict: Record<string, string> = {};
+        nextRows.forEach((row) => {
+          newDict[row.code] = row.label;
+        });
+        draft.dictionaries[dictKey] = newDict;
+      });
+    }
+  }
+
+  function addDictionary() {
+    updateProfile((draft) => {
+      draft.dictionaries ??= {};
+      let index = 1;
+      let name = `dictionary_${index}`;
+      while (draft.dictionaries[name]) {
+        index++;
+        name = `dictionary_${index}`;
+      }
+      draft.dictionaries[name] = { "0": "Value 0" };
+      setSelectedNode({ kind: "dictionary", key: name });
+      setExpanded((state) => ({ ...state, dictionaries: true }));
+    });
+  }
+
   function deleteMessage(messageId: string) {
     updateProfile((draft) => {
       draft.messages = draft.messages.filter((message) => message.id !== messageId);
@@ -309,6 +414,9 @@ export function ProfileMessageEditor() {
             "dictionaries",
             "Dictionaries",
             dictionaries.length ? dictionaries.map(([key, values]) => renderOutlineButton({ kind: "dictionary", key }, key, `${Object.keys(values).length} values`, <Database className="h-4 w-4" />)) : <div className="px-2 py-1 text-xs text-muted-foreground">No dictionaries</div>,
+            <Button variant="ghost" size="icon" className="h-7 w-7" disabled={!editable} title="Add dictionary" onClick={addDictionary}>
+              <Plus className="h-4 w-4" />
+            </Button>,
           )}
           {renderGroup(
             "errors",
@@ -354,7 +462,7 @@ export function ProfileMessageEditor() {
             </thead>
             <tbody>
               {fields.map((field, index) => (
-                <tr key={`${field.name}-${index}`} className="border-b border-border/60 last:border-0 hover:bg-muted/30">
+                <tr key={index} className="border-b border-border/60 last:border-0 hover:bg-muted/30">
                   <td className="px-2 py-1.5">
                     <Input className="h-8 border-transparent bg-transparent shadow-none hover:bg-background focus-visible:border-ring" value={field.name} disabled={!editable} onChange={(event) => onChange(index, { name: event.target.value })} />
                   </td>
@@ -380,7 +488,46 @@ export function ProfileMessageEditor() {
                     </Select>
                   </td>
                   <td className="px-2 py-1.5">
-                    <Input className="h-8 border-transparent bg-transparent shadow-none hover:bg-background focus-visible:border-ring" value={field.dictionary ?? ""} disabled={!editable} onChange={(event) => onChange(index, { dictionary: event.target.value || undefined })} />
+                    <Select
+                      value={field.dictionary ?? "__none__"}
+                      disabled={!editable}
+                      onValueChange={(val) => {
+                        if (val === "__none__") {
+                          onChange(index, { dictionary: undefined });
+                        } else if (val === "__create_new__") {
+                          const name = window.prompt("Enter new dictionary name:");
+                          if (name) {
+                            const cleanName = name.trim().replace(/[^a-zA-Z0-9_]/g, "_");
+                            if (cleanName) {
+                              updateProfile((draft) => {
+                                draft.dictionaries ??= {};
+                                if (!draft.dictionaries[cleanName]) {
+                                  draft.dictionaries[cleanName] = { "0": "Value 0" };
+                                }
+                              });
+                              onChange(index, { dictionary: cleanName });
+                            }
+                          }
+                        } else {
+                          onChange(index, { dictionary: val });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-8 border-transparent bg-transparent shadow-none hover:bg-background focus:ring-1">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {Object.keys(activeProfile.dictionaries ?? {}).map((name) => (
+                          <SelectItem key={name} value={name}>
+                            {name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__create_new__" className="text-primary font-medium">
+                          + Create New...
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </td>
                   <td className="px-2 py-1.5">
                     <Input className="h-8 border-transparent bg-transparent shadow-none hover:bg-background focus-visible:border-ring" type="number" value={field.factor ?? ""} disabled={!editable} onChange={(event) => onChange(index, { factor: event.target.value === "" ? undefined : Number(event.target.value) })} />
@@ -427,8 +574,8 @@ export function ProfileMessageEditor() {
           </Button>
         </div>
         <div className="space-y-1">
-          {rows.map(([key, value]) => (
-            <div key={key} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+          {rows.map(([key, value], idx) => (
+            <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2">
               <Input
                 className="h-8"
                 value={key}
@@ -654,15 +801,147 @@ export function ProfileMessageEditor() {
     }
 
     if (selectedNode.kind === "dictionary") {
-      const values = activeProfile.dictionaries?.[selectedNode.key] ?? {};
+      const dictKey = selectedNode.key;
       return (
-        <section className="space-y-3">
-          <div className="rounded-md border bg-muted/30 p-3">
-            <div className="text-sm font-medium">{selectedNode.key}</div>
-            <div className="text-xs text-muted-foreground">{Object.keys(values).length} values</div>
+        <div className="space-y-4">
+          <div className="grid gap-3 lg:grid-cols-2">
+            <label className="space-y-1 text-xs font-medium">
+              Dictionary Name
+              <Input
+                value={dictKey}
+                disabled={!editable}
+                onChange={(event) => {
+                  const newKey = event.target.value.trim().replace(/[^a-zA-Z0-9_]/g, "_");
+                  if (!newKey || newKey === dictKey) return;
+                  updateProfile((draft) => {
+                    if (!draft.dictionaries) return;
+                    // Rename dictionary in dictionaries object
+                    draft.dictionaries[newKey] = draft.dictionaries[dictKey];
+                    delete draft.dictionaries[dictKey];
+
+                    // Helper to update field dictionary references
+                    const renameInFields = (fields: CanonicalField[]) => {
+                      for (const field of fields) {
+                        if (field.dictionary === dictKey) {
+                          field.dictionary = newKey;
+                        }
+                      }
+                    };
+
+                    // Rename references in layouts
+                    if (draft.layouts?.canId?.fields) {
+                      renameInFields(draft.layouts.canId.fields);
+                    }
+                    if (draft.layouts?.payloadHeader?.fields) {
+                      renameInFields(draft.layouts.payloadHeader.fields);
+                    }
+                    // Rename references in messages payload fields
+                    for (const msg of draft.messages) {
+                      if (msg.payload?.fields) {
+                        renameInFields(msg.payload.fields);
+                      }
+                    }
+                  });
+                  setSelectedNode({ kind: "dictionary", key: newKey });
+                }}
+              />
+            </label>
           </div>
-          <pre className="max-h-[520px] overflow-auto rounded-md border bg-background p-3 text-xs">{JSON.stringify(values, null, 2)}</pre>
-        </section>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium">Entries</div>
+                <div className="text-xs text-muted-foreground">Map raw numeric codes to text labels.</div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!editable}
+                onClick={addLocalDictEntry}
+              >
+                <Plus className="h-4 w-4" />
+                Add Entry
+              </Button>
+            </div>
+            
+            <div className="overflow-auto rounded-md border bg-background">
+              <table className="w-full table-auto text-xs">
+                <thead className="border-b bg-muted/40 uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium w-32">Raw Code (Key)</th>
+                    <th className="px-3 py-2 text-left font-medium">Label (Value)</th>
+                    <th className="px-3 py-2 w-12" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {localDictRows.map((row, idx) => (
+                    <tr key={idx} className="border-b border-border/60 last:border-0 hover:bg-muted/30">
+                      <td className="px-3 py-1.5">
+                        <Input
+                          className="h-8 border-transparent bg-transparent shadow-none hover:bg-background focus-visible:border-ring font-mono"
+                          value={row.code}
+                          disabled={!editable}
+                          onChange={(event) => {
+                            updateLocalDictRow(idx, { code: event.target.value });
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <Input
+                          className="h-8 border-transparent bg-transparent shadow-none hover:bg-background focus-visible:border-ring"
+                          value={row.label}
+                          disabled={!editable}
+                          onChange={(event) => {
+                            updateLocalDictRow(idx, { label: event.target.value });
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-1.5 text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          disabled={!editable}
+                          onClick={() => deleteLocalDictEntry(idx)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                  {localDictRows.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-3 py-4 text-center text-muted-foreground">
+                        No entries. Click 'Add Entry' to add one.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-muted-foreground hover:text-destructive"
+              disabled={!editable}
+              onClick={() => {
+                updateProfile((draft) => {
+                  if (draft.dictionaries) {
+                    delete draft.dictionaries[dictKey];
+                  }
+                });
+                setSelectedNode({ kind: "dictionaries" });
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Dictionary
+            </Button>
+          </div>
+        </div>
       );
     }
 
@@ -701,7 +980,22 @@ export function ProfileMessageEditor() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="min-h-0 flex-1 overflow-auto p-4 pb-8">{renderDefinition()}</CardContent>
+        <CardContent className="min-h-0 flex-1 overflow-auto p-4 pb-8">
+          {validationErrors.length > 0 && (
+            <div className="mb-4 rounded-md border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20 p-3 text-sm text-red-800 dark:text-red-200">
+              <div className="font-semibold flex items-center gap-1.5">
+                <CircleAlert className="h-4 w-4 text-red-600 dark:text-red-400" />
+                Validation Errors (Saving is Disabled):
+              </div>
+              <ul className="list-inside list-disc mt-1 space-y-1 pl-1 text-xs">
+                {validationErrors.map((err, i) => (
+                  <li key={i}>{err.message}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {renderDefinition()}
+        </CardContent>
       </Card>
       <Card className="flex min-h-0 w-[360px] min-w-[300px] flex-col rounded-lg shadow-sm">
         <CardHeader className="p-4 pb-2">

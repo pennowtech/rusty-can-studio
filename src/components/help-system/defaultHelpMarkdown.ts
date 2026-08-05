@@ -576,6 +576,16 @@ For reference-drive analysis, useful checks include:
 - retrigger_reference_drive requests and responses
 - movement_aborted events
 
+### Shared definitions (Common profiles)
+
+In large-scale CAN networks, message profiles often share node addresses, error codes, and common status enums. To avoid duplicating dictionaries or error rules in every single file:
+
+1. **Create a Common Profile**: Define a JSON profile containing only the reusable \`dictionaries\` and \`errors\` sections (layouts and messages can remain empty).
+2. **Load Multiple Profiles**: Load both your service-specific profile and the common profile into the Profile Library.
+3. **Automatic Resolution**: Any field in your active profile referencing a dictionary or error rule that it does not define will check other active profiles dynamically.
+4. **Visual Editing**: The **Dictionary** select dropdown in the visual editor will automatically include all dictionaries defined across *all loaded profiles*.
+5. **Clean Export**: When saving, your service profile keeps the reference but does not include the dictionary values directly, preventing data duplication.
+
 ## CAN Monitor display filters
 
 The CAN Monitor display filter is placed directly above the captured or loaded log table. It works across static columns, decoded CAN ID fields, decoded payload header fields, payload values, TX status fields, and raw payload text. It accepts simple Wireshark-style conditions and validates the expression while you type.

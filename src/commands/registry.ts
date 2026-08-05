@@ -14,9 +14,21 @@
  * - Commands should not directly manipulate UI components.
  */
 
+import { useProfileStore } from "@/profile-editor/store/profileStore";
 import { AppCommand } from "./types";
 
 export const commandRegistry: AppCommand[] = [
+  {
+    id: "profile.createNew",
+    title: "Profile: Create New Blank Profile",
+    description: "Create and edit a new, empty CAN message profile.",
+    category: "Profile",
+    keywords: ["profile", "create", "new", "empty", "blank"],
+    handler: (ctx) => {
+      ctx.setView("profile-editor");
+      useProfileStore.getState().addNewProfile();
+    },
+  },
   {
     id: "can.connect",
     title: "CAN: Connect",

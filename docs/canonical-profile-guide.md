@@ -348,3 +348,74 @@ The visual editor can be generic if it follows only this schema:
 | `display` | Show monitor/editor display preferences. |
 
 The visual editor should not branch on protocol names or alternate profile shapes. It should render this canonical schema only.
+
+## Shared Definitions (Common Profiles)
+
+### Significance
+In complex networks with multiple ECUs (Electronic Control Units) and services, different message profiles often share identical enums (e.g., node addresses, hardware status codes) and error rules. Redundant copies of these structures inside every profile file lead to:
+- **Maintenance Overhead**: Updating a dictionary or code mapping requires editing every profile file manually.
+- **File Bloat**: Identical dictionaries and rule trees duplicate data inside each service JSON.
+- **Inconsistency**: Different profiles might define slightly mismatched versions of the same shared enums.
+
+By isolating reusable enums and rules into a **Common Profile** (e.g., `common_definitions.json`), you establish a single source of truth. Your specific service profiles remain lightweight, referencing the common enums by name.
+
+### How it Works
+The application resolves references dynamically using the **Profile Reference Resolver**:
+1. **In-Memory Resolution**: When you load multiple profiles into the app, any profile referencing a dictionary or error rule that it does not define will check other active profiles. If a match is found, it dynamically imports it.
+2. **Visual Editor Integration**: The dropdown under the **Dictionary** column in layout/payload editors will list all dictionaries defined across *all loaded profiles*, enabling quick reuse.
+3. **Clean Save / Export**: When you save or export your active profile, the shared definitions are **not** written into your specific profile JSON. The file references the shared dictionary by name (`"dictionary": "node_address"`), preventing data duplication.
+
+### Step-by-Step Usage
+
+#### Step 1: Create a Common Profile
+Create a profile containing only your reusable dictionaries and errors. Since layouts and messages are required sections, you can leave them empty:
+```json
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "id": "common_shared_definitions",
+    "name": "Common Shared Definitions",
+    "version": "1.0.0"
+  },
+  "bus": { "type": "can-fd", "idFormat": "extended", "byteOrder": "little" },
+  "layouts": {
+    "canId": { "bitLength": 29, "fields": [] }
+  },
+  "dictionaries": {
+    "node_addresses": {
+      "1": "PC",
+      "4": "LCU",
+      "8": "SensorModule"
+    },
+    "axis_errors": {
+      "0": "No Error",
+      "1": "Limit Exceeded",
+      "2": "Thermal Overload"
+    }
+  },
+  "errors": [
+    {
+      "id": "hardware_axis_error",
+      "when": "message_good == 0",
+      "source": { "startBit": 16, "bitLength": 32, "type": "uint", "byteOrder": "little" },
+      "dictionary": "axis_errors",
+      "display": "Hardware Error ${raw}: ${text}"
+    }
+  ],
+  "messages": []
+}
+```
+
+#### Step 2: Load the Profiles
+1. Open the **Profile Editor** view.
+2. Click **Load Profile JSON** (or press `Ctrl+Shift+P` and choose `Profile: Load Profile JSON`).
+3. Select both your service profile (e.g., `k2_light_control_profile.json`) and your common definitions profile (`common_definitions.json`).
+
+#### Step 3: Reuse Enums and Errors
+- Select your service profile in the active profile dropdown.
+- Go to the visual editor and change any field's type to `enum`.
+- Open the **Dictionary** dropdown for that field. You will see both local dictionaries and shared dictionaries (like `node_addresses` and `axis_errors`) from the other loaded profile.
+- Choose your shared dictionary.
+
+#### Step 4: Save
+Click **Save JSON** on your service profile. Only your service profile's layout and messages will be written out to the file, but it will maintain the correct dictionary links.

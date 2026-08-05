@@ -369,8 +369,11 @@ def main() -> int:
         print("Either --output or --split-dir is required.", file=sys.stderr)
         return 2
     profile = canonical_profile(args.xml[0])
-    args.output.write_text(json.dumps(profile, indent=2), encoding="utf-8")
-    print(f"Wrote {args.output}")
+    output_path = args.output
+    if output_path.is_dir():
+        output_path = output_path / f"{args.xml[0].stem}_profile.json"
+    output_path.write_text(json.dumps(profile, indent=2), encoding="utf-8")
+    print(f"Wrote {output_path}")
     print(f"Messages: {len(profile['messages'])}")
     return 0
 

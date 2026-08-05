@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProfileStore } from "@/profile-editor/store/profileStore";
-import { Download, Trash2, Upload } from "lucide-react";
+import { Download, Trash2, Upload, Plus } from "lucide-react";
 import { useRef } from "react";
 
 function downloadJson(filename: string, contents: string) {
@@ -18,6 +18,7 @@ export function ProfileToolbar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importJsonTexts = useProfileStore((s) => s.importJsonTexts);
   const exportJson = useProfileStore((s) => s.exportJson);
+  const addNewProfile = useProfileStore((s) => s.addNewProfile);
   const activeProfile = useProfileStore((s) => s.draftProfile ?? s.profile);
   const loadedProfiles = useProfileStore((s) => s.loadedProfiles);
   const activeProfileIndex = useProfileStore((s) => s.activeProfileIndex);
@@ -43,6 +44,10 @@ export function ProfileToolbar() {
       <Button onClick={() => fileInputRef.current?.click()}>
         <Upload className="mr-1 h-4 w-4" />
         Load Profile JSON
+      </Button>
+      <Button variant="outline" onClick={() => addNewProfile()}>
+        <Plus className="mr-1 h-4 w-4" />
+        New Profile
       </Button>
       <input
         ref={fileInputRef}
