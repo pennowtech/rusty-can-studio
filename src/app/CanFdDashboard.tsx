@@ -21,7 +21,8 @@ import { resolveProfileReferences, useProfileStore } from "@/profile-editor/stor
 import { DecodedField, DecodedFrame, decodeFrameWithProfiles } from "@/profile-editor/decodeProfile";
 import { DecodedPreviewColumnMenu, DecodedPreviewPanel } from "@/profile-editor/DecodedPreviewPanel";
 import { parseCandump } from "@/can/candump";
-import { Activity, ArrowDown, ArrowUp, Cable, Columns3, Download, Eye, EyeOff, FileUp, Gauge, HelpCircle, Pause, Play, RadioTower, Search, Send, Trash2, X } from "lucide-react";
+import { Activity, ArrowDown, ArrowUp, Cable, Columns3, Download, Eye, EyeOff, FileDown, FileSpreadsheet, FolderOpen, BellPlus, Gauge, HelpCircle, Pause, Play, RadioTower, Search, Send, Trash2, Unplug, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { forwardRef, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { HTMLAttributes, KeyboardEvent, MouseEvent } from "react";
 import { TableVirtuoso } from "react-virtuoso";
@@ -543,12 +544,19 @@ function TraceColumnMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs">
-          <Columns3 className="h-4 w-4" />
-          Columns
-        </Button>
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Columns3 className="h-4 w-4" />
+              <span className="sr-only">Columns</span>
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Columns</p>
+        </TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" className="w-40">
         <DropdownMenuLabel>Trace columns</DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -731,28 +739,6 @@ export function CanFdDashboard() {
       setSelectedFrameKey(visibleRows[0].key);
     }
   }, [loadedPageSize, loadedTracePaginationEnabled, safeLoadedPageIndex, selectedFrameKey, setSelectedFrameKey, visibleRows]);
-  const traceStats = useMemo(() => {
-    const total = filteredRows.length;
-    const rx = filteredRows.filter((row) => row.frame.dir === "rx").length;
-    const tx = filteredRows.filter((row) => row.frame.dir === "tx").length;
-    const errors = filteredRows.filter((row) => row.hasError).length;
-    const txFailed = filteredRows.filter((row) => row.frame.tx_status === "failed").length;
-    const byCanId = new Map<string, number>();
-    for (const row of filteredRows) {
-      const id = formatCanId(row.frame.id);
-      byCanId.set(id, (byCanId.get(id) ?? 0) + 1);
-    }
-    const topIds = Array.from(byCanId.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    return {
-      total,
-      rx,
-      tx,
-      errors,
-      txFailed,
-      uniqueIds: byCanId.size,
-      topIds,
-    };
-  }, [filteredRows]);
 
   const dynamicCanIdColumns = useMemo<DynamicMonitorColumn[]>(() => {
     const byId = new Map<string, DynamicMonitorColumn>();
@@ -847,14 +833,25 @@ export function CanFdDashboard() {
     return null;
   }, [selectedFrame, selectedFrameKey, traceRows]);
 
+  useEffect(() => {
+    if (selectedFrameKey) {
+      const row = traceRows.find((r) => r.key === selectedFrameKey);
+      if (row) {
+        const frame = row.frame;
+        setTxId(formatCanId(frame.id));
+        setTxPayload(formatPayloadBytes(frame.data_hex));
+        setTxDlc(String(byteLength(frame.data_hex)));
+        stageSharedTransmitDraft(frame);
+      }
+    }
+  }, [selectedFrameKey, traceRows, stageSharedTransmitDraft]);
+
   const selectedDecodedFrame = useMemo(() => {
     const frame = selectedFrame;
     return frame ? decodeFrameWithProfiles(profilesForDecode, frame) : null;
   }, [profilesForDecode, selectedFrame]);
 
   const connected = status === "connected";
-  const connectionLabel =
-    status === "error" ? "Failed" : status === "connected" ? "Connected" : status === "connecting" ? "Connecting" : "Disconnected";
   const activeIface = subscribedIfaces[0] ?? activeProfile?.iface ?? "vcan0";
   const txDisabledReason = connected ? undefined : "Connect to a CAN interface or remote bridge before sending frames.";
   const cyclicDisabledReason = cyclicActive ? undefined : txDisabledReason;
@@ -1290,6 +1287,10 @@ export function CanFdDashboard() {
   }
 
   function addAlertRuleFromCurrentFilter() {
+    if (alertRules.length >= 5) {
+      window.alert("Maximum of 5 alert rules allowed. Delete an existing rule to add a new one.");
+      return;
+    }
     const expression = draftSearch.trim();
     if (!expression) return;
     const parsed = parseFilter(expression);
@@ -1613,80 +1614,164 @@ export function CanFdDashboard() {
                   <span className="truncate">Frame trace</span>
                 </CardTitle>
                 <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
-                  <Badge
-                    variant="outline"
-                    className={
-                      connected
-                        ? "h-8 gap-1 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
-                        : status === "connecting"
-                          ? "h-8 gap-1 border-sky-500/40 text-sky-600 dark:text-sky-400"
-                          : status === "error"
-                            ? "h-8 gap-1 border-destructive/40 text-destructive"
-                        : "h-8 gap-1 border-muted-foreground/40 text-muted-foreground"
-                    }
-                  >
-                    <span className={connected ? "h-2 w-2 rounded-full bg-emerald-500" : "h-2 w-2 rounded-full bg-muted-foreground"} />
-                    {connectionLabel}
-                  </Badge>
-                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => fileInputRef.current?.click()}>
-                    <FileUp className="h-4 w-4" />
-                    Open
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" disabled={!frames.length} title="Export raw candump log" onClick={exportCandumpLog}>
-                    <Download className="h-4 w-4" />
-                    Log
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" disabled={!filteredRows.length} title="Export current decoded table view as CSV" onClick={exportVisibleCsv}>
-                    <Download className="h-4 w-4" />
-                    CSV
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="inline-block">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => fileInputRef.current?.click()}>
+                          <FolderOpen className="h-4 w-4" />
+                          <span className="sr-only">Open log file</span>
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>Open candump log file (.log, .txt, .candump)</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="inline-block">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!frames.length} onClick={exportCandumpLog}>
+                          <FileDown className="h-4 w-4" />
+                          <span className="sr-only">Export candump log</span>
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>{!frames.length ? "No frames to export" : "Export raw candump log"}</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="inline-block">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!filteredRows.length} onClick={exportVisibleCsv}>
+                          <FileSpreadsheet className="h-4 w-4" />
+                          <span className="sr-only">Export CSV</span>
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>{!filteredRows.length ? "No filtered frames to export" : "Export current decoded table view as CSV"}</TooltipContent>
+                  </Tooltip>
+
                   {connected ? (
-                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => void disconnect()}>
-                      Disconnect
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="inline-block">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => void disconnect()}>
+                            <Unplug className="h-4 w-4" />
+                            <span className="sr-only">Disconnect</span>
+                          </Button>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>Disconnect CAN bridge daemon</TooltipContent>
+                    </Tooltip>
                   ) : (
-                    <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={openConnectionManager}>
-                      <Cable className="h-4 w-4" />
-                      Connect
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="inline-block">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openConnectionManager}>
+                            <Cable className="h-4 w-4" />
+                            <span className="sr-only">Connect</span>
+                          </Button>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>Connect to CAN interface / remote bridge daemon</TooltipContent>
+                    </Tooltip>
                   )}
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="inline-block">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-amber-600 dark:text-amber-400 disabled:opacity-40"
+                          disabled={!draftSearch.trim() || alertRules.length >= 5}
+                          onClick={addAlertRuleFromCurrentFilter}
+                        >
+                          <BellPlus className="h-4 w-4" />
+                          <span className="sr-only">Add alert from filter</span>
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {!draftSearch.trim()
+                        ? "Enter a display filter first to create an alert rule (Max 5 rules)"
+                        : alertRules.length >= 5
+                          ? "Maximum of 5 alert rules reached. Delete a rule to add another."
+                          : `Create alert rule from filter: "${draftSearch.trim()}" (Max 5 rules)`}
+                    </TooltipContent>
+                  </Tooltip>
+
                   <TraceColumnMenu
                     canIdColumns={dynamicCanIdColumns}
                     payloadColumns={dynamicPayloadColumns}
                   />
-                  <Button
-                    variant={showDecodedPreview ? "secondary" : "ghost"}
-                    size="sm"
-                    className="h-8 px-2 text-xs"
-                    onClick={() => setShowDecodedPreview(!showDecodedPreview)}
-                    title={showDecodedPreview ? "Hide decoded preview" : "Show decoded preview"}
-                  >
-                    {showDecodedPreview ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                    Decode
-                  </Button>
-                  <Button
-                    variant={showTransmitComposer ? "secondary" : "ghost"}
-                    size="sm"
-                    className="h-8 px-2 text-xs"
-                    onClick={() => setShowTransmitComposer(!showTransmitComposer)}
-                    title={showTransmitComposer ? "Hide transmit composer" : "Show transmit composer"}
-                  >
-                    {showTransmitComposer ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                    TX
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFrames}>
-                    <Trash2 className="h-4 w-4" />
-                    Clear
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    disabled={!connected}
-                    title={capturePaused ? "Resume capture" : "Pause capture"}
-                    onClick={() => void (capturePaused ? resumeCapture() : pauseCapture())}
-                  >
-                    {capturePaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-                  </Button>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="inline-block">
+                        <Button
+                          variant={showDecodedPreview ? "secondary" : "ghost"}
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setShowDecodedPreview(!showDecodedPreview)}
+                        >
+                          {showDecodedPreview ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                          <span className="sr-only">Decode</span>
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>{showDecodedPreview ? "Hide decoded preview" : "Show decoded preview"}</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="inline-block">
+                        <Button
+                          variant={showTransmitComposer ? "secondary" : "ghost"}
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setShowTransmitComposer(!showTransmitComposer)}
+                        >
+                          <RadioTower className="h-4 w-4" />
+                          <span className="sr-only">TX</span>
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>{showTransmitComposer ? "Hide transmit composer" : "Show transmit composer"}</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="inline-block">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearFrames}>
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Clear</span>
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>Clear all captured/loaded frames</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="inline-block">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          disabled={!connected}
+                          onClick={() => void (capturePaused ? resumeCapture() : pauseCapture())}
+                        >
+                          {capturePaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                          <span className="sr-only">{capturePaused ? "Resume capture" : "Pause capture"}</span>
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {!connected
+                        ? "Connect to a CAN interface to pause/resume capture"
+                        : capturePaused ? "Resume capture" : "Pause capture"}
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </CardHeader>
               <div className="border-b border-sky-500/20 bg-sky-500/10 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)] dark:bg-sky-400/10">
@@ -1815,71 +1900,25 @@ export function CanFdDashboard() {
                   </Button>
                 </div>
               </div>
-              <div className="border-b bg-muted/20 px-3 py-2">
-                <div className="grid gap-2 text-xs md:grid-cols-[repeat(6,minmax(0,1fr))]">
-                  {[
-                    ["Frames", traceStats.total],
-                    ["RX", traceStats.rx],
-                    ["TX", traceStats.tx],
-                    ["Decoded errors", traceStats.errors],
-                    ["TX failed", traceStats.txFailed],
-                    ["Unique IDs", traceStats.uniqueIds],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-md border bg-background px-2 py-1.5">
-                      <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
-                      <div className="mt-0.5 font-mono text-sm font-semibold">{value}</div>
-                    </div>
+              {alertRules.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 border-b bg-background px-3 py-2 text-xs">
+                  <span className="font-medium text-muted-foreground">Alerts</span>
+                  {alertRules.map((rule) => (
+                    <span key={rule.id} className="inline-flex items-center gap-1 rounded-md border bg-muted/30 px-2 py-1">
+                      <button type="button"
+                        className={rule.enabled ? "font-medium text-amber-600 dark:text-amber-300 hover:underline" : "text-muted-foreground hover:underline"}
+                        title={rule.expression}
+                        onClick={() => toggleAlertRule(rule.id)}
+                      >
+                        {rule.enabled ? "🔔 On" : "🔕 Off"}: {rule.name}
+                      </button>
+                      <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => deleteAlertRule(rule.id)} title="Delete alert">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
                   ))}
                 </div>
-                {traceStats.topIds.length > 0 && (
-                  <div className="mt-2 grid gap-1 md:grid-cols-5">
-                    {traceStats.topIds.map(([id, count]) => {
-                      const width = traceStats.total ? Math.max(4, Math.round((count / traceStats.total) * 100)) : 0;
-                      return (
-                        <div key={id} className="min-w-0">
-                          <div className="mb-1 flex justify-between gap-2 font-mono text-[11px]">
-                            <span className="truncate">{id}</span>
-                            <span className="text-muted-foreground">{count}</span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-muted">
-                            <div className="h-1.5 rounded-full bg-primary" style={{ width: `${width}%` }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                <div className="mt-2 flex flex-wrap items-center gap-2 border-t pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    disabled={!draftSearch.trim()}
-                    title="Create an alert rule from the current display filter"
-                    onClick={addAlertRuleFromCurrentFilter}
-                  >
-                    Add alert from filter
-                  </Button>
-                  {alertRules.length === 0 ? (
-                    <span className="text-xs text-muted-foreground">No alert rules</span>
-                  ) : (
-                    alertRules.map((rule) => (
-                      <span key={rule.id} className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs">
-                        <button type="button"
-                          className={rule.enabled ? "font-medium text-amber-600 dark:text-amber-300" : "text-muted-foreground"}
-                          title={rule.expression}
-                          onClick={() => toggleAlertRule(rule.id)}
-                        >
-                          {rule.enabled ? "On" : "Off"}: {rule.name}
-                        </button>
-                        <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => deleteAlertRule(rule.id)} title="Delete alert">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))
-                  )}
-                </div>
-              </div>
+              )}
               <CardContent className="min-h-0 min-w-0 flex-1 p-0">
                 <TableVirtuoso
                   ref={tableVirtuosoRef}

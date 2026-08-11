@@ -51,7 +51,7 @@ const defaultDecodedPreviewColumns: Record<DecodedPreviewColumnId, boolean> = {
 };
 
 const defaultColumnOrder: string[] = ["line", "time", "iface", "canId", "dir", "len", "mode", "payload"];
-const defaultLoadedPageSize = 100;
+const defaultLoadedPageSize = 1000;
 
 function normalizePageSize(value: unknown) {
   const numeric = Number(value);

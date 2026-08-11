@@ -67,7 +67,7 @@ let frameWaiters: FrameWaiter[] = [];
 const FRAME_FLUSH_MS = 100;
 const DEFAULT_TRACE_FRAME_LIMIT = 500;
 const MIN_TRACE_FRAME_LIMIT = 50;
-const MAX_TRACE_FRAME_LIMIT = 50000;
+const MAX_TRACE_FRAME_LIMIT = 100000;
 let txSequence = 0;
 
 function clampTraceLimit(limit: number) {

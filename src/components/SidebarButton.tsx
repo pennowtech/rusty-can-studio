@@ -35,6 +35,8 @@
  *
  */
 
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+
 export function SidebarButton({
   icon: Icon,
   label,
@@ -48,18 +50,41 @@ export function SidebarButton({
   collapsed: boolean;
   onClick: () => void;
 }) {
-  return (
+  const buttonEl = (
     <button type="button"
       onClick={onClick}
-      title={collapsed ? label : undefined}
       className={`
-         group flex w-full items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors
-         ${active ? "border-primary/30 bg-primary/10 font-medium text-primary shadow-sm" : "border-transparent text-muted-foreground hover:bg-background hover:text-foreground"}
-         ${collapsed ? "justify-center px-2" : ""}
+         relative group flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200
+         ${active 
+           ? "bg-primary/10 text-primary border border-primary/20 shadow-sm" 
+           : "border border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+         }
+         ${collapsed ? "justify-center px-0 h-9 w-9 mx-auto" : "h-9"}
        `}
     >
-      <Icon className={`h-4 w-4 shrink-0 ${active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`} />
+      {/* Active left indicator line */}
+      {active && !collapsed && (
+        <span className="absolute left-0.5 top-2 bottom-2 w-0.75 rounded-full bg-primary" style={{ width: "3px" }} />
+      )}
+      <Icon className={`h-4 w-4 shrink-0 transition-transform duration-200 group-hover:scale-110 ${active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`} />
       {!collapsed && <span className="truncate">{label}</span>}
     </button>
   );
+
+  if (collapsed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex justify-center">
+            {buttonEl}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={12}>
+          <p>{label}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return buttonEl;
 }

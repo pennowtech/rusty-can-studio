@@ -58,6 +58,25 @@ export function CanConnectionManagerDialog({
 
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
+
+  const handleConnect = async (profileId: string, profileName: string) => {
+    setConnectingId(profileId);
+    try {
+      await connect(profileId);
+      const connectionStore = useConnectionStore.getState();
+      if (connectionStore.status === "connected") {
+        window.alert(`Successfully connected to "${profileName}"!`);
+        onOpenChange(false);
+      } else {
+        window.alert(`Connection to "${profileName}" failed:\n${connectionStore.statusMessage}`);
+      }
+    } catch (err: any) {
+      window.alert(`Connection to "${profileName}" failed with error:\n${err.message || err}`);
+    } finally {
+      setConnectingId(null);
+    }
+  };
 
   useEffect(() => {
     if (open) cleanupProfiles();
@@ -83,13 +102,20 @@ export function CanConnectionManagerDialog({
                 key={p.id}
                 className={`flex items-center justify-between rounded-md border p-3 cursor-pointer ${
                   p.id === activeId ? "bg-muted" : "hover:bg-muted/50"
-                }`}
-                onClick={() => void connect(p.id)}
+                } ${connectingId === p.id ? "border-sky-500 bg-sky-500/5 dark:bg-sky-500/10" : ""} ${connectingId ? "pointer-events-none opacity-60" : ""}`}
+                onClick={() => {
+                  if (!connectingId) void handleConnect(p.id, p.name);
+                }}
               >
                 <div>
                   <div className="font-medium flex items-center gap-2">
                     {p.name}
                     {p.id === activeId && <Badge variant="default">Active</Badge>}
+                    {connectingId === p.id && (
+                      <Badge variant="outline" className="animate-pulse border-sky-500/40 text-sky-600 dark:text-sky-400">
+                        Connecting...
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {p.mode === "local" ? `Local (${p.iface})` : `Remote (${p.protocol}://${p.host}:${p.port})`}
@@ -103,6 +129,7 @@ export function CanConnectionManagerDialog({
                     size="icon"
                     variant="ghost"
                     title="Copy profile"
+                    disabled={connectingId !== null}
                     onClick={() =>
                       addProfile({
                         ...structuredClone(p),
@@ -113,12 +140,13 @@ export function CanConnectionManagerDialog({
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => setEditingProfileId(p.id)}>
+                  <Button size="icon" variant="ghost" disabled={connectingId !== null} onClick={() => setEditingProfileId(p.id)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
                     size="icon"
                     variant="ghost"
+                    disabled={connectingId !== null}
                     onClick={() => {
                       if (confirm(`Delete connection "${p.name}"?`)) {
                         deleteProfile(p.id);

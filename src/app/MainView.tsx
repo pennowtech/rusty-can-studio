@@ -43,6 +43,7 @@ import { useTraceArchiveStore } from "@/store/traceArchiveStore";
 import { parseCandump } from "@/can/candump";
 import { ProfileMainShell } from "@/profile-editor/ProfileMainShell";
 import { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, Info, Keyboard, Monitor, Palette, RotateCcw, Rows3, ShieldCheck } from "lucide-react";
 // import { EditorShell } from "@/editor/EditorShell";
 
@@ -253,281 +254,315 @@ App version: 0.2.0
 
   return (
     <div className="h-full overflow-auto p-6">
-      <div className="max-w-3xl space-y-4">
+      <div className="max-w-4xl space-y-6">
         <div>
-          <h1 className="text-lg font-semibold">{t("settings.title")}</h1>
+          <h1 className="text-xl font-bold tracking-tight">{t("settings.title")}</h1>
           <p className="text-sm text-muted-foreground">{t("settings.subtitle")}</p>
         </div>
-        <Card className="rounded-lg">
-          <CardHeader>
-            <CardTitle className="text-sm">{t("settings.localization")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-3">
-              <label className="space-y-1 text-xs font-medium">
-                {t("settings.language")}
-                <Select value={locale} onValueChange={(value) => setLocale(value as typeof locale)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {localeOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </label>
-              <div className="rounded-md border bg-muted/20 p-3">
-                <div className="text-[11px] uppercase text-muted-foreground">Number</div>
-                <div className="mt-1 font-mono text-sm">{formatNumber(1234567.89)}</div>
-              </div>
-              <div className="rounded-md border bg-muted/20 p-3">
-                <div className="text-[11px] uppercase text-muted-foreground">Date and time</div>
-                <div className="mt-1 font-mono text-sm">{formatDateTime(Date.now())}</div>
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground">{t("settings.localizationDescription")}</p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-lg">
-          <CardHeader>
-            <CardTitle className="text-sm">{t("settings.appearance")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-3">
-              <label className="space-y-1 text-xs font-medium">
-                Mode
-                <Select value={theme} onValueChange={(value) => setTheme(value as Theme)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="system">System</SelectItem>
-                    <SelectItem value="light">Light</SelectItem>
-                    <SelectItem value="dark">Dark</SelectItem>
-                  </SelectContent>
-                </Select>
-              </label>
-              <label className="space-y-1 text-xs font-medium">
-                Color theme
-                <Select value={palette} onValueChange={(value) => setPalette(value as ThemePalette)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="default">Default</SelectItem>
-                    <SelectItem value="graphite">Graphite</SelectItem>
-                    <SelectItem value="zeiss-blue">Zeiss Blue</SelectItem>
-                    <SelectItem value="high-contrast">High Contrast</SelectItem>
-                    <SelectItem value="terminal">Terminal Trace</SelectItem>
-                    <SelectItem value="warm-neutral">Warm Neutral</SelectItem>
-                  </SelectContent>
-                </Select>
-              </label>
-              <label className="space-y-1 text-xs font-medium">
-                Density
-                <Select value={density} onValueChange={(value) => setDensity(value as ThemeDensity)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="comfortable">Comfortable</SelectItem>
-                    <SelectItem value="compact">Compact</SelectItem>
-                    <SelectItem value="dense">Dense</SelectItem>
-                  </SelectContent>
-                </Select>
-                <span className="block text-[11px] font-normal text-muted-foreground">{densityDescription}</span>
-              </label>
-            </div>
 
-            <div className="rounded-lg border bg-card p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-sm font-medium">Theme preview</div>
-                  <div className="text-xs text-muted-foreground">Monitor states, decoded values, and controls use the selected palette immediately. Current density shows {densityPreviewRows} on a typical monitor.</div>
-                </div>
-                <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400">Connected</Badge>
-              </div>
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
-                <div className="overflow-hidden rounded-md border">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-muted text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2">Line</th>
-                        <th className="px-3 py-2">Dir</th>
-                        <th className="px-3 py-2">CAN ID</th>
-                        <th className="px-3 py-2">Payload</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-t">
-                        <td className="px-3 py-2 font-mono">128</td>
-                        <td className="px-3 py-2"><Badge variant="secondary">RX</Badge></td>
-                        <td className="px-3 py-2 font-mono">18203C01</td>
-                        <td className="px-3 py-2 font-mono">message_good=good</td>
-                      </tr>
-                      <tr className="border-t bg-sky-500/10">
-                        <td className="px-3 py-2 font-mono">129</td>
-                        <td className="px-3 py-2"><Badge>TX:sent</Badge></td>
-                        <td className="px-3 py-2 font-mono">14089C01</td>
-                        <td className="px-3 py-2 font-mono">01 01 07 00 00 00</td>
-                      </tr>
-                      <tr className="border-t bg-destructive/10 text-destructive">
-                        <td className="px-3 py-2 font-mono">130</td>
-                        <td className="px-3 py-2"><Badge variant="destructive">TX:failed</Badge></td>
-                        <td className="px-3 py-2 font-mono">0C08FC01</td>
-                        <td className="px-3 py-2 font-mono">Daemon rejected frame</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-                  <div className="text-xs font-medium uppercase text-muted-foreground">Decoded preview</div>
-                  <div className="rounded border bg-background p-2">
-                    <div className="text-xs text-muted-foreground">command_class</div>
-                    <div className="text-sm font-medium">command/request (6)</div>
+        <Tabs defaultValue="general" className="flex flex-col lg:grid lg:grid-cols-[200px_1fr] gap-6 items-start">
+          <TabsList className="flex flex-row lg:flex-col items-stretch w-full bg-muted/30 p-1.5 rounded-lg shrink-0 gap-1 h-auto">
+            <TabsTrigger value="general" className="justify-start px-3 py-2 text-xs md:text-sm font-medium">
+              General
+            </TabsTrigger>
+            <TabsTrigger value="appearance" className="justify-start px-3 py-2 text-xs md:text-sm font-medium">
+              Appearance
+            </TabsTrigger>
+            <TabsTrigger value="traces" className="justify-start px-3 py-2 text-xs md:text-sm font-medium">
+              Trace Storage
+            </TabsTrigger>
+            <TabsTrigger value="diagnostics" className="justify-start px-3 py-2 text-xs md:text-sm font-medium">
+              Diagnostics
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="flex-1 w-full space-y-6 min-w-0">
+            <TabsContent value="general" className="space-y-4 outline-none mt-0">
+              <Card className="rounded-lg">
+                <CardHeader>
+                  <CardTitle className="text-sm">{t("settings.localization")}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <label className="space-y-1 text-xs font-medium">
+                      {t("settings.language")}
+                      <Select value={locale} onValueChange={(value) => setLocale(value as typeof locale)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {localeOptions.map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </label>
+                    <div className="rounded-md border bg-muted/20 p-3">
+                      <div className="text-[11px] uppercase text-muted-foreground">Number</div>
+                      <div className="mt-1 font-mono text-sm">{formatNumber(1234567.89)}</div>
+                    </div>
+                    <div className="rounded-md border bg-muted/20 p-3">
+                      <div className="text-[11px] uppercase text-muted-foreground">Date and time</div>
+                      <div className="mt-1 font-mono text-sm">{formatDateTime(Date.now())}</div>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" className="flex-1">Apply</Button>
-                    <Button size="sm" variant="outline" className="flex-1">Cancel</Button>
+                  <p className="text-sm text-muted-foreground">{t("settings.localizationDescription")}</p>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-lg">
+                <CardHeader>
+                  <CardTitle className="text-sm">{t("settings.backup")}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Export local app settings to a JSON file, or restore them on another installation. This includes appearance, shortcuts,
+                    monitor preferences, connection profiles, trace retention, custom help text, and CAN Simulator sequences.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" onClick={() => void exportSettingsBackup()}>Export settings</Button>
+                    <Button variant="outline" onClick={() => void importSettingsBackup()}>Import settings</Button>
                   </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="rounded-lg">
-          <CardHeader>
-            <CardTitle className="text-sm">CAN Monitor trace retention</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Keep the newest rows in the trace table and discard older rows automatically. Latest live frames stay at the bottom.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-              <label className="space-y-1 text-xs font-medium">
-                Maximum rows
-                <Input
-                  type="number"
-                  min={50}
-                  max={50000}
-                  step={50}
-                  value={draftLimit}
-                  onChange={(event) => setDraftLimit(event.target.value)}
-                />
-              </label>
-              <div className="flex items-end">
-                <Button onClick={saveTraceLimit}>Save</Button>
-              </div>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Current trace: {frames.length} rows. Saved limit: {traceFrameLimit} rows.
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="rounded-lg">
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <CardTitle className="text-sm">Historical traces</CardTitle>
-              <Badge variant="outline">{formatNumber(traceArchive.length)} saved</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Save the current retained trace as candump text for later inspection. Archived traces can be loaded back into CAN Monitor, exported, or deleted.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" disabled={!frames.length} onClick={saveCurrentTraceToArchive}>Save current trace</Button>
-              <Button variant="outline" disabled={!traceArchive.length} onClick={clearArchivedTraces}>Clear archive</Button>
-            </div>
-            <div className="max-h-72 overflow-auto rounded-md border bg-muted/20">
-              {traceArchive.length ? (
-                traceArchive.map((entry) => (
-                  <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 last:border-0">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">{entry.name}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        {formatNumber(entry.frameCount)} frames, saved {formatDateTime(entry.createdAt)}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-lg">
+                <CardHeader>
+                  <CardTitle className="text-sm">Feedback</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Use this when something feels confusing, slow, broken, or missing. The issue template includes the basic details that make feedback easier to act on.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" onClick={openFeedbackIssue}>Open feedback issue</Button>
+                    <Button variant="outline" onClick={copyFeedbackTemplate}>Copy template</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="appearance" className="space-y-4 outline-none mt-0">
+              <Card className="rounded-lg">
+                <CardHeader>
+                  <CardTitle className="text-sm">{t("settings.appearance")}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <label className="space-y-1 text-xs font-medium">
+                      Mode
+                      <Select value={theme} onValueChange={(value) => setTheme(value as Theme)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="system">System</SelectItem>
+                          <SelectItem value="light">Light</SelectItem>
+                          <SelectItem value="dark">Dark</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </label>
+                    <label className="space-y-1 text-xs font-medium">
+                      Color theme
+                      <Select value={palette} onValueChange={(value) => setPalette(value as ThemePalette)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="default">Default</SelectItem>
+                          <SelectItem value="graphite">Graphite</SelectItem>
+                          <SelectItem value="zeiss-blue">Zeiss Blue</SelectItem>
+                          <SelectItem value="high-contrast">High Contrast</SelectItem>
+                          <SelectItem value="terminal">Terminal Trace</SelectItem>
+                          <SelectItem value="warm-neutral">Warm Neutral</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </label>
+                    <label className="space-y-1 text-xs font-medium">
+                      Density
+                      <Select value={density} onValueChange={(value) => setDensity(value as ThemeDensity)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="comfortable">Comfortable</SelectItem>
+                          <SelectItem value="compact">Compact</SelectItem>
+                          <SelectItem value="dense">Dense</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="block text-[11px] font-normal text-muted-foreground">{densityDescription}</span>
+                    </label>
+                  </div>
+
+                  <div className="rounded-lg border bg-card p-3">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-sm font-medium">Theme preview</div>
+                        <div className="text-xs text-muted-foreground">Monitor states, decoded values, and controls use the selected palette immediately. Current density shows {densityPreviewRows} on a typical monitor.</div>
+                      </div>
+                      <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400">Connected</Badge>
+                    </div>
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+                      <div className="overflow-hidden rounded-md border">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-muted text-muted-foreground">
+                            <tr>
+                              <th className="px-3 py-2">Line</th>
+                              <th className="px-3 py-2">Dir</th>
+                              <th className="px-3 py-2">CAN ID</th>
+                              <th className="px-3 py-2">Payload</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-t">
+                              <td className="px-3 py-2 font-mono">128</td>
+                              <td className="px-3 py-2"><Badge variant="secondary">RX</Badge></td>
+                              <td className="px-3 py-2 font-mono">18203C01</td>
+                              <td className="px-3 py-2 font-mono">message_good=good</td>
+                            </tr>
+                            <tr className="border-t bg-sky-500/10">
+                              <td className="px-3 py-2 font-mono">129</td>
+                              <td className="px-3 py-2"><Badge>TX:sent</Badge></td>
+                              <td className="px-3 py-2 font-mono">14089C01</td>
+                              <td className="px-3 py-2 font-mono">01 01 07 00 00 00</td>
+                            </tr>
+                            <tr className="border-t bg-destructive/10 text-destructive">
+                              <td className="px-3 py-2 font-mono">130</td>
+                              <td className="px-3 py-2"><Badge variant="destructive">TX:failed</Badge></td>
+                              <td className="px-3 py-2 font-mono">0C08FC01</td>
+                              <td className="px-3 py-2 font-mono">Daemon rejected frame</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                        <div className="text-xs font-medium uppercase text-muted-foreground">Decoded preview</div>
+                        <div className="rounded border bg-background p-2">
+                          <div className="text-xs text-muted-foreground">command_class</div>
+                          <div className="text-sm font-medium">command/request (6)</div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" className="flex-1">Apply</Button>
+                          <Button size="sm" variant="outline" className="flex-1">Cancel</Button>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex shrink-0 gap-2">
-                      <Button variant="outline" size="sm" onClick={() => loadArchivedTrace(entry.id)}>Load</Button>
-                      <Button variant="ghost" size="sm" onClick={() => exportArchivedTrace(entry.id)}>Export</Button>
-                      <Button variant="ghost" size="sm" onClick={() => deleteArchivedTrace(entry.id)}>Delete</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="traces" className="space-y-4 outline-none mt-0">
+              <Card className="rounded-lg">
+                <CardHeader>
+                  <CardTitle className="text-sm">CAN Monitor trace retention</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Keep the newest rows in the trace table and discard older rows automatically. Latest live frames stay at the bottom.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <label className="space-y-1 text-xs font-medium">
+                      Maximum rows
+                      <Input
+                        type="number"
+                        min={50}
+                        max={100000}
+                        step={50}
+                        value={draftLimit}
+                        onChange={(event) => setDraftLimit(event.target.value)}
+                      />
+                      <span className="text-[10px] text-muted-foreground block pt-1 font-normal">
+                        Specify a retention limit between 50 and 100,000 rows.
+                      </span>
+                    </label>
+                    <div className="flex items-end">
+                      <Button onClick={saveTraceLimit}>Save</Button>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="p-4 text-sm text-muted-foreground">No archived traces yet.</div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="rounded-lg">
-          <CardHeader>
-              <CardTitle className="text-sm">{t("settings.backup")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Export local app settings to a JSON file, or restore them on another installation. This includes appearance, shortcuts,
-              monitor preferences, connection profiles, trace retention, custom help text, and CAN Simulator sequences.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => void exportSettingsBackup()}>Export settings</Button>
-              <Button variant="outline" onClick={() => void importSettingsBackup()}>Import settings</Button>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="rounded-lg">
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <CardTitle className="text-sm">{t("settings.diagnostics")}</CardTitle>
-              <Badge variant="outline">{formatNumber(diagnostics.length)} entries</Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Connection attempts, daemon errors, transmit failures, and profile import or validation errors are recorded here for troubleshooting.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" disabled={!diagnostics.length} onClick={() => void exportDiagnostics()}>Export diagnostics</Button>
-              <Button variant="outline" disabled={!diagnostics.length} onClick={clearDiagnosticsWithConfirmation}>Clear diagnostics</Button>
-            </div>
-            <div className="max-h-72 overflow-auto rounded-md border bg-muted/20">
-              {diagnostics.length ? (
-                diagnostics.slice().reverse().map((entry) => (
-                  <div key={entry.id} className="border-b p-3 last:border-0">
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="font-mono text-muted-foreground">{formatDateTime(entry.time)}</span>
-                      <span className={`font-semibold uppercase ${diagnosticLevelClass(entry.level)}`}>{entry.level}</span>
-                      <span className="rounded border bg-background px-1.5 py-0.5 font-medium">{entry.source}</span>
-                    </div>
-                    <div className="mt-1 text-sm">{entry.message}</div>
-                    {entry.detail && <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">{entry.detail}</pre>}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-lg">
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="text-sm">Historical traces</CardTitle>
+                    <Badge variant="outline">{formatNumber(traceArchive.length)} saved</Badge>
                   </div>
-                ))
-              ) : (
-                <div className="p-4 text-sm text-muted-foreground">No diagnostics recorded yet.</div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="rounded-lg">
-          <CardHeader>
-            <CardTitle className="text-sm">Feedback</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Use this when something feels confusing, slow, broken, or missing. The issue template includes the basic details that make feedback easier to act on.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={openFeedbackIssue}>Open feedback issue</Button>
-              <Button variant="outline" onClick={copyFeedbackTemplate}>Copy template</Button>
-            </div>
-          </CardContent>
-        </Card>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Save the current retained trace as candump text for later inspection. Archived traces can be loaded back into CAN Monitor, exported, or deleted.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" disabled={!frames.length} onClick={saveCurrentTraceToArchive}>Save current trace</Button>
+                    <Button variant="outline" disabled={!traceArchive.length} onClick={clearArchivedTraces}>Clear archive</Button>
+                  </div>
+                  <div className="max-h-72 overflow-auto rounded-md border bg-muted/20">
+                    {traceArchive.length ? (
+                      traceArchive.map((entry) => (
+                        <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 last:border-0">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium">{entry.name}</div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">
+                              {formatNumber(entry.frameCount)} frames, saved {formatDateTime(entry.createdAt)}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <Button variant="outline" size="sm" onClick={() => loadArchivedTrace(entry.id)}>Load</Button>
+                            <Button variant="ghost" size="sm" onClick={() => exportArchivedTrace(entry.id)}>Export</Button>
+                            <Button variant="ghost" size="sm" onClick={() => deleteArchivedTrace(entry.id)}>Delete</Button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-4 text-sm text-muted-foreground">No archived traces yet.</div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="diagnostics" className="space-y-4 outline-none mt-0">
+              <Card className="rounded-lg">
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="text-sm">{t("settings.diagnostics")}</CardTitle>
+                    <Badge variant="outline">{formatNumber(diagnostics.length)} entries</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Connection attempts, daemon errors, transmit failures, and profile import or validation errors are recorded here for troubleshooting.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" disabled={!diagnostics.length} onClick={() => void exportDiagnostics()}>Export diagnostics</Button>
+                    <Button variant="outline" disabled={!diagnostics.length} onClick={clearDiagnosticsWithConfirmation}>Clear diagnostics</Button>
+                  </div>
+                  <div className="max-h-[500px] overflow-auto rounded-md border bg-muted/20">
+                    {diagnostics.length ? (
+                      diagnostics.slice().reverse().map((entry) => (
+                        <div key={entry.id} className="border-b p-3 last:border-0">
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <span className="font-mono text-muted-foreground">{formatDateTime(entry.time)}</span>
+                            <span className={`font-semibold uppercase ${diagnosticLevelClass(entry.level)}`}>{entry.level}</span>
+                            <span className="rounded border bg-background px-1.5 py-0.5 font-medium">{entry.source}</span>
+                          </div>
+                          <div className="mt-1 text-sm">{entry.message}</div>
+                          {entry.detail && <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">{entry.detail}</pre>}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-4 text-sm text-muted-foreground">No diagnostics recorded yet.</div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </div>
+        </Tabs>
       </div>
     </div>
   );

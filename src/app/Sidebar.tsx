@@ -28,6 +28,7 @@
 import { SidebarButton } from "@/components/SidebarButton";
 import { useI18nStore } from "@/i18n/i18nStore";
 import { useAppStore } from "@/store/appShellStore";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   Activity,
   Terminal,
@@ -60,17 +61,26 @@ export function Sidebar() {
   return (
     <div
       className={`
-         flex min-h-0 flex-col border-r bg-muted/20 p-2 transition-all
+         flex min-h-0 flex-col border-r bg-muted/10 backdrop-blur-md p-2 transition-all duration-300 ease-in-out
          ${collapsed ? "w-14" : "w-56"}
        `}
     >
-      <button type="button"
-        onClick={toggleSidebarMode}
-        className="mb-3 flex w-full items-center justify-center rounded-md border border-transparent p-2 text-muted-foreground hover:bg-background hover:text-foreground"
-        title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-      >
-        {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex justify-center">
+            <button type="button"
+              onClick={toggleSidebarMode}
+              className="mb-3 flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-all duration-200"
+            >
+              {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+              <span className="sr-only">{collapsed ? "Expand Sidebar" : "Collapse Sidebar"}</span>
+            </button>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="right" sideOffset={12}>
+          <p>{collapsed ? "Expand Sidebar" : "Collapse Sidebar"}</p>
+        </TooltipContent>
+      </Tooltip>
 
       <nav className="flex min-h-0 flex-1 flex-col gap-4">
         <div className="space-y-1">

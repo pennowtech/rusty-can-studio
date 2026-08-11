@@ -20,11 +20,14 @@
 import { AppShell } from "@/app/AppShell";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export default function App() {
   return (
     <ThemeProvider>
-      <AppShell />
+      <TooltipProvider>
+        <AppShell />
+      </TooltipProvider>
       <Toaster richColors />
     </ThemeProvider>
   );

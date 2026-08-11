@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bg-grad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </radialGradient>
+    
+    <!-- Rust/Copper Gradient -->
+    <linearGradient id="rust-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff7b47" />
+      <stop offset="50%" stop-color="#ea580c" />
+      <stop offset="100%" stop-color="#c2410c" />
+    </linearGradient>
+
+    <!-- Highlight/Glow -->
+    <linearGradient id="glow-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fdba74" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#ea580c" stop-opacity="0" />
+    </linearGradient>
+
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <!-- Outer Rounded Container (standard App Icon shape) -->
+  <rect width="512" height="512" rx="112" fill="url(#bg-grad)" />
+  
+  <!-- Outer metallic-like accent ring -->
+  <rect x="12" y="12" width="488" height="488" rx="100" fill="none" stroke="#334155" stroke-width="6" stroke-opacity="0.5" />
+
+  <!-- Rust Gear & CAN Network Node Emblem Group -->
+  <g filter="url(#shadow)">
+    <!-- Rust Gear Outer Ring -->
+    <path fill="url(#rust-grad)" d="
+      M 256 120 
+      L 276 120 L 282 150 A 110 110 0 0 1 315 169 L 342 153 L 356 167 L 340 194 A 110 110 0 0 1 359 227 L 389 233 L 389 253 L 389 273 L 359 279 A 110 110 0 0 1 340 312 L 356 339 L 342 353 L 315 337 A 110 110 0 0 1 282 356 L 276 386 L 256 386 L 236 386 L 230 356 A 110 110 0 0 1 197 337 L 170 353 L 156 339 L 172 312 A 110 110 0 0 1 153 279 L 123 273 L 123 253 L 123 233 L 153 227 A 110 110 0 0 1 172 194 L 156 167 L 170 153 L 197 169 A 110 110 0 0 1 230 150 L 236 120 Z
+      M 256 165 
+      A 91 91 0 1 0 256 347 A 91 91 0 1 0 256 165 Z" 
+    />
+    
+    <!-- Central CAN Bus Network Diagram -->
+    <circle cx="256" cy="256" r="75" fill="#0f172a" />
+
+    <!-- CAN Differential twisted pair signals -->
+    <path d="M 200 236 Q 228 200 256 236 T 312 236" fill="none" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" opacity="0.8" />
+    <path d="M 200 276 Q 228 312 256 276 T 312 276" fill="none" stroke="#f472b6" stroke-width="5" stroke-linecap="round" opacity="0.8" />
+
+    <!-- Network nodes & interconnecting links -->
+    <!-- Left Node -->
+    <circle cx="206" cy="256" r="14" fill="#38bdf8" />
+    <circle cx="206" cy="256" r="8" fill="#ffffff" />
+    
+    <!-- Center-Top Node -->
+    <circle cx="256" cy="216" r="14" fill="#fb923c" />
+    <circle cx="256" cy="216" r="8" fill="#ffffff" />
+
+    <!-- Right Node -->
+    <circle cx="306" cy="256" r="14" fill="#38bdf8" />
+    <circle cx="306" cy="256" r="8" fill="#ffffff" />
+    
+    <!-- Center-Bottom Node -->
+    <circle cx="256" cy="296" r="14" fill="#f472b6" />
+    <circle cx="256" cy="296" r="8" fill="#ffffff" />
+
+    <!-- Interconnecting lines -->
+    <line x1="206" y1="256" x2="256" y2="216" stroke="#ffffff" stroke-width="3" stroke-opacity="0.6" />
+    <line x1="256" y1="216" x2="306" y2="256" stroke="#ffffff" stroke-width="3" stroke-opacity="0.6" />
+    <line x1="306" y1="256" x2="256" y2="296" stroke="#ffffff" stroke-width="3" stroke-opacity="0.6" />
+    <line x1="256" y1="296" x2="206" y2="256" stroke="#ffffff" stroke-width="3" stroke-opacity="0.6" />
+    
+    <line x1="206" y1="256" x2="306" y2="256" stroke="#ffffff" stroke-width="3" stroke-opacity="0.4" stroke-dasharray="4 4" />
+  </g>
+  
+  <!-- Sleek overlay highlight/sheen -->
+  <path d="M 12 256 A 244 244 0 0 1 500 256 L 500 112 A 100 100 0 0 0 400 12 L 112 12 A 100 100 0 0 0 12 112 Z" fill="url(#glow-grad)" opacity="0.15" pointer-events="none" />
+</svg>
