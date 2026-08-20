@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   tauri-release:
-    name: Build and publish ${{ matrix.platform }}
+    name: Build and publish (${{ matrix.platform }})
     runs-on: ${{ matrix.platform }}
     strategy:
       fail-fast: false
@@ -33,6 +33,11 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-latest'
         run: |
@@ -52,6 +57,6 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Rusty CAN Studio ${{ github.ref_name }}"
-          releaseBody: "Release build for ${{ github.ref_name }}."
+          releaseBody: "Release build for ${{ github.ref_name }} (.exe, .dmg, .deb)."
           releaseDraft: false
           prerelease: false
