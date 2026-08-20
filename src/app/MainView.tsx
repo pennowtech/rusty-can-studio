@@ -42,7 +42,7 @@ import { DiagnosticLevel, useDiagnosticsStore } from "@/store/diagnosticsStore";
 import { useTraceArchiveStore } from "@/store/traceArchiveStore";
 import { parseCandump } from "@/can/candump";
 import { ProfileMainShell } from "@/profile-editor/ProfileMainShell";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, Info, Keyboard, Monitor, Palette, RotateCcw, Rows3, ShieldCheck } from "lucide-react";
 // import { EditorShell } from "@/editor/EditorShell";
@@ -66,8 +66,15 @@ function SettingsView() {
   const { theme, palette, density, setTheme, setPalette, setDensity } = useTheme();
   const [draftLimit, setDraftLimit] = useState(String(traceFrameLimit));
 
+  useEffect(() => {
+    setDraftLimit(String(traceFrameLimit));
+  }, [traceFrameLimit]);
+
   function saveTraceLimit() {
-    setTraceFrameLimit(Number(draftLimit));
+    const num = Number(draftLimit);
+    if (!isNaN(num) && num >= 50 && num <= 100000) {
+      setTraceFrameLimit(num);
+    }
   }
 
   const backupKeys = [
@@ -472,7 +479,14 @@ App version: 0.2.0
                         max={100000}
                         step={50}
                         value={draftLimit}
-                        onChange={(event) => setDraftLimit(event.target.value)}
+                        onChange={(event) => {
+                          const val = event.target.value;
+                          setDraftLimit(val);
+                          const num = Number(val);
+                          if (!isNaN(num) && num >= 50 && num <= 100000) {
+                            setTraceFrameLimit(num);
+                          }
+                        }}
                       />
                       <span className="text-[10px] text-muted-foreground block pt-1 font-normal">
                         Specify a retention limit between 50 and 100,000 rows.

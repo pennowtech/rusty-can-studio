@@ -1,15 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Eye, EyeOff, RotateCcw, Save, Undo2 } from "lucide-react";
+import { Eye, Pencil, GitCompare, RotateCcw, Save, Undo2 } from "lucide-react";
 import { useHelpStore } from "@/components/help-system/store/helpStore";
 import { HelpSearchInput } from "@/components/help-system/HelpSearchInput";
 import { useHelpContentStore } from "./store/helpContentStore";
 import { HelpSearchResults } from "./HelpSearchResults";
 import { forwardRef } from "react";
+import clsx from "clsx";
 
 export const HelpToolbar = forwardRef<HTMLInputElement>(function HelpToolbar(_, searchRef) {
-  const previewEnabled = useHelpStore((s) => s.showPreview);
-  const togglePreview = useHelpStore((s) => s.togglePreview);
+  const mode = useHelpStore((s) => s.mode);
+  const setMode = useHelpStore((s) => s.setMode);
 
   const isDirty = useHelpContentStore((s) => s.isDirty);
   const isSaving = useHelpContentStore((s) => s.isSaving);
@@ -34,31 +35,101 @@ export const HelpToolbar = forwardRef<HTMLInputElement>(function HelpToolbar(_, 
   }
 
   return (
-    <div className="flex flex-col border-b">
-      <div className="flex min-h-11 flex-wrap items-center gap-2 px-2 py-2">
+    <div className="flex flex-col border-b bg-card">
+      <div className="flex min-h-11 flex-wrap items-center justify-between gap-2 px-3 py-2">
         <HelpSearchInput ref={searchRef} />
 
-        <Separator orientation="vertical" className="mx-1 hidden h-6 sm:block" />
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Mode Action Segmented Buttons with Icons */}
+          <div className="flex items-center rounded-lg border bg-muted/40 p-0.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setMode("view")}
+              title="View Mode (v)"
+              className={clsx(
+                "h-7 gap-1.5 px-2.5 text-xs font-medium transition-all",
+                mode === "view" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              <span>View</span>
+            </Button>
 
-        <Button variant="ghost" size="icon" onClick={togglePreview} title={previewEnabled ? "Hide Preview" : "Show Preview"}>
-          {previewEnabled ? <EyeOff size={16} /> : <Eye size={16} />}
-        </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setMode("edit")}
+              title="Edit Mode (e)"
+              className={clsx(
+                "h-7 gap-1.5 px-2.5 text-xs font-medium transition-all",
+                mode === "edit" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              <span>Edit</span>
+            </Button>
 
-        <Button variant="ghost" size="icon" onClick={confirmSave} disabled={!isDirty || isSaving} title="Save chapter">
-          <Save size={16} />
-        </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setMode("diff")}
+              title="Diff Mode (d)"
+              className={clsx(
+                "h-7 gap-1.5 px-2.5 text-xs font-medium transition-all",
+                mode === "diff" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <GitCompare className="h-3.5 w-3.5" />
+              <span>Diff</span>
+            </Button>
+          </div>
 
-        <Button variant="ghost" size="icon" onClick={confirmResetChapter} disabled={!isDirty} title="Reset chapter">
-          <Undo2 size={16} />
-        </Button>
+          <Separator orientation="vertical" className="mx-1 h-5" />
 
-        <Button variant="ghost" size="icon" onClick={confirmReset} disabled={!isDirty} title="Reset all help">
-          <RotateCcw size={16} />
-        </Button>
+          {/* Action Buttons */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={confirmSave}
+            disabled={!isDirty || isSaving}
+            title="Save chapter"
+          >
+            <Save className="h-4 w-4" />
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={confirmResetChapter}
+            disabled={!isDirty}
+            title="Reset chapter"
+          >
+            <Undo2 className="h-4 w-4" />
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={confirmReset}
+            disabled={!isDirty}
+            title="Reset all help"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <HelpSearchResults />
     </div>
   );
 });
-

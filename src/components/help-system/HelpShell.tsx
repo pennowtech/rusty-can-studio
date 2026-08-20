@@ -1,28 +1,28 @@
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { HelpTOC } from "./HelpTOC";
 import { HelpEditor } from "./HelpEditor";
 import { HelpPreview } from "./HelpPreview";
 import { HelpDiff } from "./HelpDiff";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useHelpStore } from "@/components/help-system/store/helpStore";
 import { HelpToolbar } from "./HelpToolbar";
 import { useHelpContentStore } from "./store/helpContentStore";
 import { HelpChapterList } from "./HelpChapterList";
 
-type HelpMode = "view" | "edit" | "diff";
+function isInputFocused() {
+  const active = document.activeElement;
+  if (!active) return false;
+  const tag = active.tagName.toLowerCase();
+  return tag === "input" || tag === "textarea" || active.getAttribute("contenteditable") === "true";
+}
 
 export function HelpShell() {
-  const [mode, setMode] = useState<HelpMode>("view");
+  const mode = useHelpStore((s) => s.mode);
+  const setMode = useHelpStore((s) => s.setMode);
   const searchRef = useRef<HTMLInputElement>(null);
   const moveActive = useHelpStore((s) => s.moveActive);
   const clearSearch = useHelpStore((s) => s.clearSearch);
   const loadHelpContent = useHelpContentStore((s) => s.loadHelp);
   const selectedChapterId = useHelpContentStore((s) => s.selectedChapterId);
-
-  useEffect(() => {
-    searchRef.current?.focus();
-  }, []);
 
   useEffect(() => {
     loadHelpContent();
@@ -51,39 +51,62 @@ export function HelpShell() {
         return;
       }
 
-      if (e.key === "F3") {
+      if (e.key === "Escape") {
+        clearSearch();
+        if (isInputFocused()) {
+          (document.activeElement as HTMLElement)?.blur();
+        }
+        return;
+      }
+
+      if (isInputFocused()) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      if (key === "n" || e.key === "F3") {
         e.preventDefault();
         moveActive(e.shiftKey ? -1 : 1);
         return;
       }
 
-      if (e.key === "Escape") {
-        clearSearch();
+      if (key === "p") {
+        e.preventDefault();
+        moveActive(-1);
+        return;
+      }
+
+      if (key === "v") {
+        e.preventDefault();
+        setMode("view");
+        return;
+      }
+
+      if (key === "e") {
+        e.preventDefault();
+        setMode("edit");
+        return;
+      }
+
+      if (key === "d") {
+        e.preventDefault();
+        setMode("diff");
+        return;
       }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [moveActive, clearSearch]);
+  }, [moveActive, clearSearch, setMode]);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <header className="border-b px-4 py-3">
         <h1 className="text-lg font-semibold">Help and Documentation</h1>
-        <p className="text-sm text-muted-foreground">CAN-FD workflow guidance, editable markdown, search, and table of contents.</p>
+        <p className="text-sm text-muted-foreground">(Editable markdown)</p>
       </header>
 
       <HelpToolbar ref={searchRef} />
-
-      <Tabs value={mode} onValueChange={(value) => setMode(value as HelpMode)} className="border-b px-2 py-2">
-        <TabsList className="grid w-full grid-cols-3 sm:w-auto">
-          <TabsTrigger value="view">View</TabsTrigger>
-          <TabsTrigger value="edit">Edit</TabsTrigger>
-          <TabsTrigger value="diff">Diff</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <Separator />
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <HelpChapterList />

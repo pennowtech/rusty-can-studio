@@ -44,19 +44,51 @@ export function HelpPreview() {
     return () => window.cancelAnimationFrame(frame);
   }, [markdownSource, setToc]);
 
+  const chapters = useHelpContentStore((s) => s.chapters);
+  const selectedChapterId = useHelpContentStore((s) => s.selectedChapterId);
+  const selectChapter = useHelpContentStore((s) => s.selectChapter);
+
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const trimmedQuery = searchQuery.trim().toLowerCase();
+    if (trimmedQuery) {
+      const currentHasMatch = markdownSource.toLowerCase().includes(trimmedQuery);
+      if (!currentHasMatch && chapters.length > 0) {
+        const firstMatchingChapter = chapters.find((c) =>
+          c.markdown.toLowerCase().includes(trimmedQuery) || c.title.toLowerCase().includes(trimmedQuery)
+        );
+        if (firstMatchingChapter && firstMatchingChapter.id !== selectedChapterId) {
+          selectChapter(firstMatchingChapter.id);
+          return;
+        }
+      }
+    }
+
     const found = applyHighlights(containerRef.current, searchQuery);
     setResults(found);
-  }, [markdownSource, searchQuery, setResults]);
+  }, [markdownSource, searchQuery, setResults, chapters, selectedChapterId, selectChapter]);
 
   useEffect(() => {
-    if (!results.length || activeIndex < 0) return;
+    if (!results.length || activeIndex < 0 || activeIndex >= results.length) return;
+
+    const el = results[activeIndex];
+    if (!el || !el.isConnected || !containerRef.current) return;
 
     activateMatch(results, activeIndex);
-    results[activeIndex]?.scrollIntoView({
-      block: "center",
+
+    const container = containerRef.current;
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+
+    if (elRect.width === 0 && elRect.height === 0) return;
+
+    const relativeTop = elRect.top - containerRect.top + container.scrollTop;
+    const targetScrollTop = relativeTop - container.clientHeight / 2 + elRect.height / 2;
+    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+
+    container.scrollTo({
+      top: Math.max(0, Math.min(maxScrollTop, targetScrollTop)),
       behavior: "smooth",
     });
   }, [results, activeIndex]);

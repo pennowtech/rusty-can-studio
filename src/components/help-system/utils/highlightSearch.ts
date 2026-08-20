@@ -3,9 +3,11 @@ const ATTR = "data-help-search";
 
 export function clearHighlights(container: HTMLElement) {
   container.querySelectorAll(`${MARK_TAG}[${ATTR}]`).forEach((m) => {
-    const parent = m.parentNode!;
-    parent.replaceChild(document.createTextNode(m.textContent || ""), m);
-    parent.normalize();
+    const parent = m.parentNode;
+    if (parent) {
+      parent.replaceChild(document.createTextNode(m.textContent || ""), m);
+      parent.normalize();
+    }
   });
 }
 
@@ -15,15 +17,27 @@ export function applyHighlights(container: HTMLElement, query: string): HTMLElem
   if (!normalizedQuery) return [];
 
   const regex = new RegExp(normalizedQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-
   const matches: HTMLElement[] = [];
 
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+  const textNodes: Node[] = [];
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => {
+      const parent = n.parentElement;
+      if (parent && (parent.tagName.toLowerCase() === "script" || parent.tagName.toLowerCase() === "style")) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
 
   let node: Node | null;
   while ((node = walker.nextNode())) {
-    const text = node.nodeValue;
-    if (!text?.trim()) continue;
+    textNodes.push(node);
+  }
+
+  for (const textNode of textNodes) {
+    const text = textNode.nodeValue;
+    if (!text || !regex.test(text)) continue;
 
     regex.lastIndex = 0;
     const parts: Node[] = [];
@@ -43,14 +57,15 @@ export function applyHighlights(container: HTMLElement, query: string): HTMLElem
       lastIndex = match.index + match[0].length;
     }
 
-    if (!parts.length) continue;
     if (lastIndex < text.length) {
       parts.push(document.createTextNode(text.slice(lastIndex)));
     }
 
-    const frag = document.createDocumentFragment();
-    parts.forEach((part) => frag.appendChild(part));
-    node.parentNode!.replaceChild(frag, node);
+    if (parts.length > 0 && textNode.parentNode) {
+      const frag = document.createDocumentFragment();
+      parts.forEach((part) => frag.appendChild(part));
+      textNode.parentNode.replaceChild(frag, textNode);
+    }
   }
 
   return matches;

@@ -208,15 +208,32 @@
 }
 
 .help-markdown mark[data-help-search] {
-    background-color: hsl(48 96% 60% / 0.45);
-    color: hsl(var(--foreground));
-    padding: 0.05em 0.15em;
-    border-radius: 3px;
+    background-color: #fef08a;
+    color: #1e1b4b;
+    padding: 0.1em 0.25em;
+    border-radius: 4px;
+    font-weight: 500;
+    box-shadow: 0 0 0 1px #fde047;
 }
 
 .help-markdown mark[data-help-search].active {
-    background-color: hsl(48 96% 52% / 0.9);
-    color: hsl(0 0% 10%);
+    background-color: #eab308;
+    color: #000000;
+    font-weight: 700;
+    box-shadow: 0 0 0 2px #ca8a04;
+}
+
+.dark .help-markdown mark[data-help-search] {
+    background-color: #854d0e;
+    color: #fef08a;
+    box-shadow: 0 0 0 1px #a16207;
+}
+
+.dark .help-markdown mark[data-help-search].active {
+    background-color: #facc15;
+    color: #000000;
+    font-weight: 700;
+    box-shadow: 0 0 0 2px #fef08a;
 }
 
 .help-markdown .prose a.heading-anchor {
