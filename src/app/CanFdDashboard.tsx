@@ -727,52 +727,6 @@ export function CanFdDashboard() {
     [frames, profilesForDecode],
   );
 
-  useEffect(() => {
-    if (!traceRows.length) {
-      setColumnMinWidths({});
-      return;
-    }
-
-    setColumnMinWidths((prev) => {
-      const next = { ...prev };
-      let changed = false;
-
-      for (const column of visibleTraceColumns) {
-        const baseWidth = getColumnBaseWidth(column);
-        let maxObserved = prev[column.id] ?? baseWidth;
-
-        for (let i = 0; i < traceRows.length; i++) {
-          const row = traceRows[i];
-          let cellText = "";
-          if (column.kind === "canId") {
-            const fieldName = column.id.slice("canId:".length);
-            const field = row.decoded?.canIdFields.find((item) => item.name === fieldName);
-            cellText = field ? formatDecodedValue(field) : "-";
-          } else if (column.kind === "payloadHeader") {
-            const fieldName = column.id.slice("payload:".length);
-            const field = row.decoded?.payloadDecodedFields.find((item) => item.name === fieldName);
-            cellText = field ? formatDecodedValue(field) : "-";
-          } else {
-            cellText = row.values[column.id] ?? "";
-          }
-
-          const required = Math.max(baseWidth, cellText.length * 8 + 32);
-          if (required > maxObserved) {
-            maxObserved = required;
-          }
-        }
-
-        maxObserved = Math.min(800, maxObserved);
-
-        if (prev[column.id] !== maxObserved) {
-          next[column.id] = maxObserved;
-          changed = true;
-        }
-      }
-
-      return changed ? next : prev;
-    });
-  }, [traceRows, visibleTraceColumns]);
 
   const filteredRows = useMemo(() => traceRows.filter((row) => rowMatchesFilter(row, parsedFilter)), [parsedFilter, traceRows]);
   const sortedRows = useMemo(() => sortTraceRows(filteredRows, sortRules), [filteredRows, sortRules]);
@@ -861,6 +815,53 @@ export function CanFdDashboard() {
       }),
     [allTraceColumns, dynamicMonitorColumns, monitorColumns],
   );
+
+  useEffect(() => {
+    if (!traceRows.length) {
+      setColumnMinWidths({});
+      return;
+    }
+
+    setColumnMinWidths((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      for (const column of visibleTraceColumns) {
+        const baseWidth = getColumnBaseWidth(column);
+        let maxObserved = prev[column.id] ?? baseWidth;
+
+        for (let i = 0; i < traceRows.length; i++) {
+          const row = traceRows[i];
+          let cellText = "";
+          if (column.kind === "canId") {
+            const fieldName = column.id.slice("canId:".length);
+            const field = row.decoded?.canIdFields.find((item) => item.name === fieldName);
+            cellText = field ? formatDecodedValue(field) : "-";
+          } else if (column.kind === "payloadHeader") {
+            const fieldName = column.id.slice("payload:".length);
+            const field = row.decoded?.payloadDecodedFields.find((item) => item.name === fieldName);
+            cellText = field ? formatDecodedValue(field) : "-";
+          } else {
+            cellText = row.values[column.id] ?? "";
+          }
+
+          const required = Math.max(baseWidth, cellText.length * 8 + 32);
+          if (required > maxObserved) {
+            maxObserved = required;
+          }
+        }
+
+        maxObserved = Math.min(800, maxObserved);
+
+        if (prev[column.id] !== maxObserved) {
+          next[column.id] = maxObserved;
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [traceRows, visibleTraceColumns]);
 
   useEffect(() => {
     setDynamicMonitorColumns([...dynamicCanIdColumns, ...dynamicPayloadColumns].map((column) => column.id));
