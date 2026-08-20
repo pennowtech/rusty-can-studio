@@ -29,9 +29,8 @@ export function HelpSearchResults() {
         <div className="flex items-center gap-1 overflow-x-auto py-0.5">
           <span className="text-[11px] text-muted-foreground">Chapters:</span>
           {matchingChapters.map((chapter) => (
-            <button
+            <button type="button"
               key={chapter.id}
-              type="button"
               onClick={() => selectChapter(chapter.id)}
               className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition-all ${
                 chapter.id === selectedChapterId

@@ -106,8 +106,7 @@ export function HelpChapterList() {
 
       <nav className="flex flex-col gap-1 overflow-y-auto p-2 min-h-0 flex-1 w-full">
         {visibleChapters.map((chapter) => (
-          <button
-            type="button"
+          <button type="button"
             key={chapter.id}
             onClick={() => selectChapter(chapter.id)}
             className={clsx(

@@ -88,8 +88,7 @@ export function HelpTOC() {
 
       <nav className="flex flex-col space-y-1 overflow-y-auto w-full min-h-0 flex-1">
         {toc.map((item) => (
-          <button
-            type="button"
+          <button type="button"
             key={item.id}
             onClick={() => scrollTo(item.id)}
             className={clsx(
