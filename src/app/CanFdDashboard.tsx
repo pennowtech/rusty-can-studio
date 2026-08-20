@@ -659,6 +659,7 @@ export function CanFdDashboard() {
     sendFrame,
     waitForFrame,
   } = useConnectionStore();
+  const traceFrameLimit = useConnectionStore((s) => s.traceFrameLimit);
 
   const activeProfile = profiles.find((profile) => profile.id === activeId);
   const search = useMonitorPreferencesStore((s) => s.search);
@@ -731,7 +732,48 @@ export function CanFdDashboard() {
   );
 
 
-  const filteredRows = useMemo(() => traceRows.filter((row) => rowMatchesFilter(row, parsedFilter)), [parsedFilter, traceRows]);
+  const isFilterActive = parsedFilter.valid && parsedFilter.clauses.length > 0;
+  const [accumulatedFilteredRows, setAccumulatedFilteredRows] = useState<TraceRow[]>([]);
+  const lastProcessedLineRef = useRef<number>(0);
+  const lastFilterKeyRef = useRef<string>("");
+
+  const currentFilterKey = `${appliedSearch}-${profilesForDecode.map((p) => p.meta.name).join(",")}`;
+
+  useEffect(() => {
+    if (!isFilterActive) {
+      setAccumulatedFilteredRows([]);
+      lastProcessedLineRef.current = 0;
+      lastFilterKeyRef.current = "";
+      return;
+    }
+
+    if (lastFilterKeyRef.current !== currentFilterKey) {
+      lastFilterKeyRef.current = currentFilterKey;
+      const initialMatches = traceRows.filter((row) => rowMatchesFilter(row, parsedFilter));
+      setAccumulatedFilteredRows(initialMatches.slice(Math.max(0, initialMatches.length - traceFrameLimit)));
+      lastProcessedLineRef.current = traceRows.length > 0 ? (traceRows[traceRows.length - 1].frame.line_no ?? 0) : 0;
+      return;
+    }
+
+    const newRows = traceRows.filter((row) => (row.frame.line_no ?? 0) > lastProcessedLineRef.current);
+    if (newRows.length > 0) {
+      lastProcessedLineRef.current = Math.max(lastProcessedLineRef.current, newRows[newRows.length - 1].frame.line_no ?? 0);
+      const matchingNew = newRows.filter((row) => rowMatchesFilter(row, parsedFilter));
+      if (matchingNew.length > 0) {
+        setAccumulatedFilteredRows((prev) => {
+          const combined = [...prev, ...matchingNew];
+          return combined.slice(Math.max(0, combined.length - traceFrameLimit));
+        });
+      }
+    }
+  }, [currentFilterKey, isFilterActive, parsedFilter, traceRows, traceFrameLimit]);
+
+  const filteredRows = useMemo(() => {
+    if (isFilterActive) {
+      return accumulatedFilteredRows;
+    }
+    return traceRows;
+  }, [accumulatedFilteredRows, isFilterActive, traceRows]);
   const sortedRows = useMemo(() => sortTraceRows(filteredRows, sortRules), [filteredRows, sortRules]);
   const loadedTracePaginationEnabled = Boolean(traceSourceName);
   const loadedTracePageCount = loadedTracePaginationEnabled ? Math.max(1, Math.ceil(sortedRows.length / loadedPageSize)) : 1;

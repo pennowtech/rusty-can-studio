@@ -65,7 +65,7 @@ let frameFlushTimer: number | null = null;
 let frameWaiters: FrameWaiter[] = [];
 
 const FRAME_FLUSH_MS = 100;
-const DEFAULT_TRACE_FRAME_LIMIT = 500;
+const DEFAULT_TRACE_FRAME_LIMIT = 20000;
 const MIN_TRACE_FRAME_LIMIT = 50;
 const MAX_TRACE_FRAME_LIMIT = 100000;
 let txSequence = 0;
@@ -78,7 +78,9 @@ function clampTraceLimit(limit: number) {
 function loadTraceFrameLimit() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY.TRACE_SETTINGS) ?? "{}") as { frameLimit?: unknown };
-    return clampTraceLimit(typeof parsed.frameLimit === "number" ? parsed.frameLimit : DEFAULT_TRACE_FRAME_LIMIT);
+    const limit = typeof parsed.frameLimit === "number" ? parsed.frameLimit : DEFAULT_TRACE_FRAME_LIMIT;
+    if (limit <= 500) return 20000;
+    return clampTraceLimit(limit);
   } catch {
     return DEFAULT_TRACE_FRAME_LIMIT;
   }
