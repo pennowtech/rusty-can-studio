@@ -518,7 +518,7 @@ export function ProfileMessageEditor() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">None</SelectItem>
-                        {Object.keys(activeProfile.dictionaries ?? {}).map((name) => (
+                        {Object.keys(activeProfile?.dictionaries ?? {}).map((name) => (
                           <SelectItem key={name} value={name}>
                             {name}
                           </SelectItem>

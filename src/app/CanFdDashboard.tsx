@@ -21,7 +21,7 @@ import { resolveProfileReferences, useProfileStore } from "@/profile-editor/stor
 import { DecodedField, DecodedFrame, decodeFrameWithProfiles } from "@/profile-editor/decodeProfile";
 import { DecodedPreviewColumnMenu, DecodedPreviewPanel } from "@/profile-editor/DecodedPreviewPanel";
 import { parseCandump } from "@/can/candump";
-import { Activity, ArrowDown, ArrowUp, Cable, Columns3, Download, Eye, EyeOff, FileDown, FileSpreadsheet, FolderOpen, BellPlus, Gauge, HelpCircle, Pause, Play, RadioTower, Search, Send, Trash2, Unplug, X } from "lucide-react";
+import { Activity, ArrowDown, ArrowUp, Cable, Columns3, Eye, EyeOff, FileDown, FileSpreadsheet, FolderOpen, BellPlus, Gauge, HelpCircle, Pause, Play, RadioTower, Search, Send, Trash2, Unplug, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { forwardRef, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { HTMLAttributes, KeyboardEvent, MouseEvent } from "react";
@@ -823,15 +823,14 @@ export function CanFdDashboard() {
   }, [alertRules, traceRows]);
 
   const selectedFrame = useMemo(() => {
-    const selected = selectedFrameKey ? sortedRows.find((row) => row.key === selectedFrameKey)?.frame : undefined;
-    return selected ?? sortedRows[sortedRows.length - 1]?.frame ?? frames[frames.length - 1];
-  }, [frames, selectedFrameKey, sortedRows]);
+    if (!selectedFrameKey) return undefined;
+    return sortedRows.find((row) => row.key === selectedFrameKey)?.frame;
+  }, [selectedFrameKey, sortedRows]);
 
   const selectedTraceRow = useMemo(() => {
-    if (selectedFrameKey) return traceRows.find((row) => row.key === selectedFrameKey) ?? null;
-    if (selectedFrame) return traceRows.find((row) => row.frame === selectedFrame) ?? null;
-    return null;
-  }, [selectedFrame, selectedFrameKey, traceRows]);
+    if (!selectedFrameKey) return null;
+    return traceRows.find((row) => row.key === selectedFrameKey) ?? null;
+  }, [selectedFrameKey, traceRows]);
 
   useEffect(() => {
     if (selectedFrameKey) {

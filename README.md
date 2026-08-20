@@ -20,6 +20,8 @@ The current focus is CAN-FD workflows with remote SocketCAN access through `can_
 - Edit profiles visually or directly as JSON.
 - Use built-in Help, keyboard shortcuts, themes, and density settings.
 
+---
+
 ## How The Pieces Fit Together
 
 The desktop app does not talk to Linux SocketCAN directly from Windows. For live capture and transmit, run `can_bridge_daemon` where the CAN interfaces exist, usually Linux or WSL. The daemon forwards frames to the app over WebSocket and accepts transmit requests back from the app.
