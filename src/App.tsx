@@ -28,7 +28,7 @@ export default function App() {
       <TooltipProvider>
         <AppShell />
       </TooltipProvider>
-      <Toaster richColors />
+      <Toaster position="top-center" richColors closeButton />
     </ThemeProvider>
   );
 }

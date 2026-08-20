@@ -963,6 +963,8 @@ export function CanFdDashboard() {
         if (!parsed.valid || !rowMatchesFilter(row, parsed)) continue;
         toast.warning(rule.name, {
           description: `${formatCanId(row.frame.id)} ${formatPayloadBytes(row.frame.data_hex)}`.trim(),
+          position: "top-center",
+          closeButton: true,
         });
       }
     }
