@@ -62,6 +62,24 @@ function parseCanId(value: string) {
 
 const monitorColumnOrder: MonitorColumnId[] = ["line", "time", "iface", "canId", "dir", "len", "mode", "payload"];
 
+const defaultColumnWidths: Record<string, number> = {
+  line: 68,
+  time: 110,
+  iface: 72,
+  canId: 88,
+  dir: 60,
+  len: 54,
+  mode: 72,
+  payload: 180,
+};
+
+function getColumnBaseWidth(column: TraceColumn): number {
+  if (column.kind === "static" && defaultColumnWidths[column.id]) {
+    return defaultColumnWidths[column.id];
+  }
+  return Math.max(80, column.label.length * 9 + 40);
+}
+
 type DynamicMonitorColumn = {
   id: string;
   label: string;
@@ -682,6 +700,7 @@ export function CanFdDashboard() {
   const [selectedSortPresetId, setSelectedSortPresetId] = useState("");
   const [alertRules, setAlertRules] = useState<MonitorAlertRule[]>(loadMonitorAlertRules);
   const lastTraceSourceNameRef = useRef<string | undefined>(traceSourceName);
+  const [columnMinWidths, setColumnMinWidths] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setDraftSearch(search);
@@ -707,6 +726,53 @@ export function CanFdDashboard() {
       }),
     [frames, profilesForDecode],
   );
+
+  useEffect(() => {
+    if (!traceRows.length) {
+      setColumnMinWidths({});
+      return;
+    }
+
+    setColumnMinWidths((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      for (const column of visibleTraceColumns) {
+        const baseWidth = getColumnBaseWidth(column);
+        let maxObserved = prev[column.id] ?? baseWidth;
+
+        for (let i = 0; i < traceRows.length; i++) {
+          const row = traceRows[i];
+          let cellText = "";
+          if (column.kind === "canId") {
+            const fieldName = column.id.slice("canId:".length);
+            const field = row.decoded?.canIdFields.find((item) => item.name === fieldName);
+            cellText = field ? formatDecodedValue(field) : "-";
+          } else if (column.kind === "payloadHeader") {
+            const fieldName = column.id.slice("payload:".length);
+            const field = row.decoded?.payloadDecodedFields.find((item) => item.name === fieldName);
+            cellText = field ? formatDecodedValue(field) : "-";
+          } else {
+            cellText = row.values[column.id] ?? "";
+          }
+
+          const required = Math.max(baseWidth, cellText.length * 8 + 32);
+          if (required > maxObserved) {
+            maxObserved = required;
+          }
+        }
+
+        maxObserved = Math.min(800, maxObserved);
+
+        if (prev[column.id] !== maxObserved) {
+          next[column.id] = maxObserved;
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [traceRows, visibleTraceColumns]);
 
   const filteredRows = useMemo(() => traceRows.filter((row) => rowMatchesFilter(row, parsedFilter)), [parsedFilter, traceRows]);
   const sortedRows = useMemo(() => sortTraceRows(filteredRows, sortRules), [filteredRows, sortRules]);
@@ -1403,7 +1469,17 @@ export function CanFdDashboard() {
       Scroller: forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>((props, ref) => (
         <div {...props} ref={ref} className="h-full overflow-auto" />
       )),
-      Table: (props) => <table {...props} className="w-full table-auto text-left text-sm" />,
+      Table: (props) => (
+        <table {...props} className="w-full table-auto text-left text-sm">
+          <colgroup>
+            {visibleTraceColumns.map((col) => {
+              const width = columnMinWidths[col.id] ?? getColumnBaseWidth(col);
+              return <col key={col.id} style={{ minWidth: `${width}px`, width: `${width}px` }} />;
+            })}
+          </colgroup>
+          {props.children}
+        </table>
+      ),
       TableHead: forwardRef<HTMLTableSectionElement, HTMLAttributes<HTMLTableSectionElement>>((props, ref) => (
         <thead {...props} ref={ref} className="sticky top-0 z-10 border-y bg-background text-xs uppercase text-muted-foreground shadow-sm" />
       )),
@@ -1425,7 +1501,7 @@ export function CanFdDashboard() {
         </tbody>
       ),
     }),
-    [appliedSearch, connected, filteredRows.length, frames.length, parsedFilter.error, parsedFilter.valid, selectedFrameKey, visibleMonitorColumnCount],
+    [appliedSearch, columnMinWidths, connected, filteredRows.length, frames.length, parsedFilter.error, parsedFilter.valid, selectedFrameKey, visibleMonitorColumnCount, visibleTraceColumns],
   );
 
   function fixedHeaderContent() {
@@ -1457,10 +1533,12 @@ export function CanFdDashboard() {
   function renderTraceHeader(column: TraceColumn) {
     const sortIndex = sortRules.findIndex((rule) => rule.columnId === column.id);
     const sortRule = sortIndex >= 0 ? sortRules[sortIndex] : undefined;
+    const width = columnMinWidths[column.id] ?? getColumnBaseWidth(column);
     return (
       <th
         key={column.id}
         draggable
+        style={{ minWidth: `${width}px` }}
         onDragStart={(event) => {
           event.dataTransfer.setData("text/plain", column.id);
           event.dataTransfer.effectAllowed = "move";
@@ -1489,12 +1567,15 @@ export function CanFdDashboard() {
 
   function renderTraceCell(column: TraceColumn, row: TraceRow) {
     const { frame, key: rowKey, decoded: decodedFrame } = row;
+    const width = columnMinWidths[column.id] ?? getColumnBaseWidth(column);
+    const cellStyle = { minWidth: `${width}px` };
+
     if (column.kind === "canId") {
       const fieldName = column.id.slice("canId:".length);
       const field = decodedFrame?.canIdFields.find((item) => item.name === fieldName);
       const value = field ? formatDecodedValue(field) : "-";
       return (
-        <td key={column.id} className="px-4 py-3 font-mono text-xs" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, column.id, value, field)}>
+        <td key={column.id} style={cellStyle} className="px-4 py-3 font-mono text-xs" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, column.id, value, field)}>
           {value}
         </td>
       );
@@ -1505,7 +1586,7 @@ export function CanFdDashboard() {
       const field = decodedFrame?.payloadDecodedFields.find((item) => item.name === fieldName);
       const value = field ? formatDecodedValue(field) : "-";
       return (
-        <td key={column.id} className="px-4 py-3 font-mono text-xs" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, column.id, value, field)}>
+        <td key={column.id} style={cellStyle} className="px-4 py-3 font-mono text-xs" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, column.id, value, field)}>
           {value}
         </td>
       );
@@ -1517,6 +1598,7 @@ export function CanFdDashboard() {
         return (
           <td
             key={column.id}
+            style={cellStyle}
             className="px-3 py-3 text-right font-mono text-xs text-muted-foreground"
             onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "line", String(lineNumber))}
           >
@@ -1526,25 +1608,25 @@ export function CanFdDashboard() {
       }
       case "time":
         return (
-          <td key={column.id} className="px-4 py-3 font-mono text-xs" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "time", formatTime(frame.ts_ms))}>
+          <td key={column.id} style={cellStyle} className="px-4 py-3 font-mono text-xs" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "time", formatTime(frame.ts_ms))}>
             {formatTime(frame.ts_ms)}
           </td>
         );
       case "iface":
         return (
-          <td key={column.id} className="px-4 py-3" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "iface", frame.iface)}>
+          <td key={column.id} style={cellStyle} className="px-4 py-3" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "iface", frame.iface)}>
             {frame.iface}
           </td>
         );
       case "canId":
         return (
-          <td key={column.id} className="px-4 py-3 font-mono" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "canId", formatCanId(frame.id))}>
+          <td key={column.id} style={cellStyle} className="px-4 py-3 font-mono" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "canId", formatCanId(frame.id))}>
             {formatCanId(frame.id)}
           </td>
         );
       case "dir":
         return (
-          <td key={column.id} className="px-4 py-3" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "dir", frame.dir.toUpperCase())}>
+          <td key={column.id} style={cellStyle} className="px-4 py-3" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "dir", frame.dir.toUpperCase())}>
             <Badge
               variant={frame.dir === "tx" ? "default" : "secondary"}
               title={frame.tx_status ? `TX ${frame.tx_status}${frame.tx_error ? `: ${frame.tx_error}` : ""}` : undefined}
@@ -1557,13 +1639,13 @@ export function CanFdDashboard() {
         );
       case "len":
         return (
-          <td key={column.id} className="px-4 py-3" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "len", String(byteLength(frame.data_hex)))}>
+          <td key={column.id} style={cellStyle} className="px-4 py-3" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "len", String(byteLength(frame.data_hex)))}>
             {byteLength(frame.data_hex)}
           </td>
         );
       case "mode":
         return (
-          <td key={column.id} className="px-4 py-3 text-muted-foreground" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "mode", frame.is_fd ? "CAN-FD" : "Classic")}>
+          <td key={column.id} style={cellStyle} className="px-4 py-3 text-muted-foreground" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "mode", frame.is_fd ? "CAN-FD" : "Classic")}>
             {frame.is_fd ? "CAN-FD" : "Classic"}
           </td>
         );
@@ -1572,7 +1654,7 @@ export function CanFdDashboard() {
           ? formatPayloadCell(frame, decodedFrame)
           : formatPayloadValuesCell(frame, decodedFrame, payloadHeaderNames);
         return (
-          <td key={column.id} className="max-w-96 truncate px-4 py-3 font-mono text-xs" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "payload", value)}>
+          <td key={column.id} style={cellStyle} className="max-w-96 truncate px-4 py-3 font-mono text-xs" onContextMenu={(event) => openCellContextMenu(event, frame, rowKey, "payload", value)}>
             {value}
           </td>
         );
