@@ -9,15 +9,7 @@ const examplesHelpMarkdown = examplesMarkdown
   })
   .join("\n");
 
-export const defaultHelpMarkdown = `# CAN-FD Workbench Help
-
-This help system explains how to use the CAN-FD workbench, how the documentation is structured, and how to edit this content safely.
-
-:::note
-CAN-FD supports payloads up to 64 bytes and can use separate nominal and data phase bitrates. The UI keeps those settings visible because they affect decoding, filtering, and transmission.
-:::
-
-## Getting started
+export const defaultHelpMarkdown = `# 1. Getting Started & User Examples
 
 Use the left navigation to switch between the monitor, simulator, profile editor, settings, and help views.
 
@@ -100,28 +92,14 @@ For WSL testing, create \`vcan0\` first with \`sudo modprobe vcan\`, \`sudo ip l
 ### Example 6: create a simulator sequence
 
 1. Open CAN Simulator.
-2. Add a sequence.
-3. Add Send Once, Wait For Response, and Send Cyclic steps.
-4. Define the success condition, response timeout, and stop policy.
-5. Run the sequence and inspect the run log.
-
-Example flow:
-
-\`\`\`text
-1. Send start command once.
-2. Wait for start response with message_good == 1.
-3. Send status request cyclically every 100 ms.
-4. Stop when the expected status response arrives.
-\`\`\`
-
-:::tip
-Keep the transmit composer for quick manual sends. Use CAN Simulator when a workflow needs multiple dependent steps.
-:::
+2. Create a sequence with Send frame steps, Wait steps, or Wait for CAN response steps.
+3. Run the sequence.
+4. Watch step highlights, run log entries, and CAN Monitor rows.
 
 ### Example 7: save work for later
 
-1. Export raw candump logs for replayable evidence.
-2. Export decoded CSV for spreadsheet analysis.
+1. Open Connection Profiles to save remote daemon endpoints.
+2. Open Profile Editor to save updated canonical profiles.
 3. Save display filter and sort presets for repeated investigations.
 4. Export settings when moving the same setup to another installation.
 
@@ -175,106 +153,34 @@ Use the end-user guide as the task-oriented reference for normal operation. It c
 Do not transmit on a physical bus unless you understand the target system. Incorrect frames can disturb diagnostics, flashing, or control traffic.
 :::
 
-## Developer guide
-
-The developer guide describes the internal architecture for contributors extending the app.
-
-Main areas:
-
-| Area | Reference |
-| --- | --- |
-| Candump parsing | \`src/can/candump.ts\` |
-| Daemon transport | \`src/can-bridge/ws/WsJsonDaemonClient.tsx\` and \`types.ts\` |
-| Connection state | \`src/store/connectionStore.ts\` |
-| Profile model | \`src/profile-editor/model/profile.ts\` |
-| Profile decoding | \`src/profile-editor/decodeProfile.ts\` |
-| Help content | \`src/components/help-system/defaultHelpMarkdown.ts\` |
-| Quality scripts | \`scripts/*.ps1\` |
-
-Extension rules:
-
-1. Keep protocol-specific meaning in profile JSON.
-2. Keep raw frame parsing separate from profile decoding.
-3. Add typed daemon messages before using them in stores or UI.
-4. Use timeouts for request/response transport operations.
-5. Update Help and docs when behavior changes.
-6. Run \`npm run quality:check\` before pushing larger changes.
-
-:::tip
-Use \`docs/developer-guide.md\` for the fuller API reference, including WebSocket message types, frame fields, connection store actions, and profile model notes.
-:::
-
-## Examples overview
-
-Use the examples guide when you need copyable filters, sample candump rows, or sequence JSON.
-
-Common examples:
-
-| Scenario | Starting point |
-| --- | --- |
-| Load a small candump | \`examples/sample-candump.log\` |
-| Filter by service bits | \`service_identifier == 810\` or raw ID/mask |
-| Find bad responses | \`error\`, \`hasError == true\`, \`errorText contains POSITION\` |
-| Stage TX from monitor | Right click row, Use in Transmit Composer |
-| Run a sequence | \`examples/start-then-poll.sequence.json\` |
-
-Daemon-side filter example for a service identifier in CAN ID bits \`9:0\`:
-
-\`\`\`text
-CAN ID: 0000032A
-Mask:   000003FF
-\`\`\`
-
-Equivalent expression:
-
-\`\`\`text
-(frame.id & 0x000003FF) == (0x0000032A & 0x000003FF)
-\`\`\`
-
-:::tip
-Use \`docs/examples.md\` for the complete example workflows and copyable sequence JSON.
-:::
-
 ${examplesHelpMarkdown}
 
-## Remote daemon connection
+# 2. CAN Monitor & Display Filters
 
-To monitor CAN or CAN-FD traffic from WSL, run can-bridge-daemon in the WSL environment where the SocketCAN interfaces exist. The daemon forwards packets from interfaces such as \`vcan0\` or \`can0\` to this UI over WebSocket JSON.
+The CAN Monitor display filter is placed directly above the captured or loaded log table. It works across static columns, decoded CAN ID fields, decoded payload header fields, payload values, TX status fields, and raw payload text. It accepts simple Wireshark-style conditions and validates the expression while you type.
 
-Run the daemon from the \`can_bridge_daemon\` project in WSL:
+The filter box changes color:
 
-\`\`\`bash
-cargo run -- \
-  --tcp-bind 0.0.0.0:9500 \
-  --ws-bind 0.0.0.0:9501 \
-  --grpc-bind 0.0.0.0:9502
-\`\`\`
+- Neutral: no filter is active.
+- Green: the filter syntax is valid.
+- Red: the filter syntax is invalid, and the message below the box explains where parsing failed.
 
-Then connect from this app:
+Filtering is deferred while typing so the input stays responsive on large traces. The table is virtualized, so only visible rows are rendered even when the trace contains many frames.
 
-1. Open CAN Monitor.
-2. Click Connect.
-3. Create or select a Remote Daemon profile.
-4. Use host \`127.0.0.1\`, port \`9501\`, protocol \`WebSocket JSON\`, and interface \`vcan0\` or \`can0\`.
-5. Click Save and Connect.
-6. Watch Live frame trace for packets forwarded by the daemon.
+## Filter examples
 
-:::note
-The app uses the WebSocket JSON endpoint at \`ws://HOST:PORT/ws/text\`. With the default settings above, that resolves to \`ws://127.0.0.1:9501/ws/text\`.
-:::
-
-:::warning
-The selected interface must already exist and be up inside WSL. For development, create \`vcan0\` before connecting.
-:::
-
-Example WSL virtual CAN setup:
-
-\`\`\`bash
-sudo modprobe vcan
-sudo ip link add dev vcan0 type vcan
-sudo ip link set up vcan0
-ip link show vcan0
-\`\`\`
+| Expression | Meaning |
+| --- | --- |
+| \`canId == 0x18203C01\` | Match exact 29-bit CAN ID |
+| \`id == 0x123\` | Match standard 11-bit CAN ID |
+| \`iface == vcan0\` | Match frames received on interface \`vcan0\` |
+| \`dir == RX\` | Match received frames |
+| \`dir == TX\` | Match transmitted frames |
+| \`payload contains "01 01"\` | Match hex sequence anywhere in payload |
+| \`name contains "control"\` | Match decoded message title |
+| \`service_identifier == k2_focus_control\` | Match exact string enum signal |
+| \`instance_index == FIELD\` | Match string enum prefix |
+| \`txStatus == failed\` | Match failed transmissions |
 
 ## Candump log import
 
@@ -320,877 +226,195 @@ Decoded fields show engineering values from the selected profile. Fresh values a
 Decoded values are only as reliable as the loaded profiles. Confirm profile byte order, scaling, offsets, payload header fields, and CAN ID layouts before using a value for analysis.
 :::
 
-## Profile editor
+## Monitor sorting
+
+Click a column header to sort the visible trace rows. The first click sorts ascending, the second click sorts descending, and the third click removes the manual sort.
+
+When a column sort is active:
+
+- A small arrow appears in the header.
+- Loaded logs sort the full file contents.
+- Live capture continues to append incoming frames according to the active sort order.
+
+## Monitor columns
+
+| Column | Content | Notes |
+| --- | --- | --- |
+| Line | Sequential line number | Invariant across sorting and array shifts |
+| Time | Timestamp | Seconds from start or absolute timestamp |
+| Interface | \`can0\`, \`vcan0\`, etc. | Source channel |
+| Direction | \`RX\`, \`TX:pending\`, \`TX:sent\`, \`TX:failed\` | Message direction and transmit state |
+| CAN ID | Hex identifier | 11-bit or 29-bit CAN ID |
+| DLC | Data length code | 0 to 64 bytes |
+| Flags | \`FD\`, \`BRS\`, \`ESI\` | CAN-FD frame properties |
+| Name | Decoded message name | From profile identification rules |
+| Decoded / Payload | Decoded values or raw hex | Summarized decoded signals or raw payload |
+
+## Trace ordering and retention
+
+Keep the newest rows in the trace table and discard older rows automatically. Latest live frames stay at the bottom unless a manual sort column is selected.
+
+Specify a retention limit between 50 and 100,000 rows in Settings. The default limit is 20,000 rows.
+
+## Loaded trace pagination
+
+When viewing large offline logs, pagination controls appear below the table allowing you to navigate across pages cleanly without slowing down rendering.
+
+## Monitor keyboard navigation
+
+- Up and Down Arrow move selection by one row.
+- Page Up and Page Down move by a larger step.
+- Home moves to the first visible row.
+- End moves to the last visible row.
+- Enter toggles the decoded preview panel.
+
+# 3. Profile Editor & Signal Definitions
 
 The Profile Editor describes how raw CAN or CAN-FD frames become meaningful decoded values. A profile is a JSON contract: it defines the bus, identifier layout, optional payload header, dictionaries, message identification rules, payload fields, error rules, and display hints.
 
 The editor works from one canonical profile shape. JSON view shows the same canonical JSON that the runtime decodes. Older or external source formats should be converted before importing them into the app.
 
-### Canonical profile sections
+## Canonical profile sections
 
 | Section | Purpose |
 | --- | --- |
 | \`meta\` | Profile id, name, version, description, and source |
 | \`bus\` | CAN or CAN-FD, identifier format, and byte order |
 | \`layouts.canId\` | Decoded arbitration ID fields |
-| \`layouts.payloadHeader\` | Optional shared payload fields decoded before message payload |
-| \`dictionaries\` | Numeric-to-text values used by fields |
-| \`messages[]\` | Message identity and payload fields |
-| \`errors[]\` | Error extraction rules such as \`message_good != 1\` |
-| \`display\` | Optional presentation hints |
+| \`layouts.payloadHeader\` | Optional header fields preceding payload data |
+| \`dictionaries\` | Value maps turning numeric values into labels |
+| \`messages\` | Message identification rules and payload fields |
+| \`errors\` | Rules mapping frame data to error severity and messages |
 
-:::note
-Canonical profiles use absolute \`startBit\` plus \`bitLength\` everywhere. They do not use byte offsets, length-bytes fields, or mixed byte/bit coordinates.
-:::
+## Start from live trace
 
-### Start from live trace
+1. Open CAN Monitor and select an unmapped row.
+2. Right click the row and select Create Profile for Message.
+3. The app opens Profile Editor with pre-populated CAN ID, DLC, and sample payload bytes.
+4. Add payload signal fields, select dictionaries, and save the new profile.
 
-1. Open CAN Monitor.
-2. Capture traffic from the daemon or open a candump file.
-3. Right click a frame and choose Define Message Structure.
-4. The app opens Profile Editor and selects or creates the matching message entry.
-5. Edit \`identifyBy\` values so the message matches the intended frames.
-6. Define payload fields using absolute bit positions.
-7. Check Decoded preview against the selected payload.
-8. Apply the edit when the layout is correct.
+## Visual editor layout
 
-:::tip
-Use a real frame from the trace as the preview source. It makes field boundaries, scaling, offsets, dictionaries, and byte order mistakes visible immediately.
-:::
+- Header: Profile name, bus mode, identifier type, and default byte order.
+- Message list: Select a message to edit its identification criteria and payload fields.
+- Field editor: Add, remove, and reorder signals. Set bit offset, bit length, data type, scaling factor, offset, unit, and dictionary map.
+- JSON Preview: Live canonical JSON representing the edited profile.
 
-### Visual editor layout
+## Message identification
 
-The visual editor is split into three work areas:
+A profile matches a frame when all defined identification criteria pass:
 
-| Area | Purpose |
-| --- | --- |
-| Profile outline | Navigate metadata, bus, layouts, dictionaries, messages, errors, and display |
-| Definition editor | Edit the selected canonical JSON section |
-| Decoded preview | Decode the selected payload using the active draft profile |
+- CAN ID matches exact value or mask.
+- Payload header fields match required constants.
+- Payload length meets minimum DLC.
 
-Use the profile selector in the toolbar to switch which JSON profile is open for editing. Loading another profile appends it to the profile library and does not replace the current editing context. CAN Monitor decodes against all loaded profiles and uses only profiles whose identification rules match the frame.
+## Payload fields
 
-Double click a decoded message or decoded payload field in CAN Monitor's Decoded Preview to jump directly to the matching message in Profile Editor.
+Supported signal types:
 
-:::warning
-If a frame does not match a loaded profile, it should not borrow value maps, message names, or payload fields from an unrelated profile. Load the correct profile or inspect the raw values.
-:::
+- \`uint\`: Unsigned integer (1 to 64 bits)
+- \`int\`: Signed integer (two's complement)
+- \`float\`: Single-precision IEEE 754 float (32 bits)
+- \`double\`: Double-precision IEEE 754 float (64 bits)
+- \`string\`: ASCII or UTF-8 string bytes
+- \`enum\`: Numeric value mapped through a dictionary map
 
-### Message identification
+## Convert XML to canonical JSON
 
-Each message has an \`identifyBy\` object. Keys are decoded field names from the CAN ID layout, payload header layout, or the implicit raw \`can_id\` value. Values are the expected decoded values.
+The Profile Editor includes a converter for legacy XML profile formats. Click Convert XML to JSON, paste the XML source, and inspect the resulting canonical JSON before importing.
 
-Examples:
+## Minimal canonical profile
 
 \`\`\`json
 {
-  "identifyBy": {
-    "can_id": 801
-  }
-}
-\`\`\`
-
-\`\`\`json
-{
-  "identifyBy": {
-    "service_identifier": 810,
-    "command_class": 5,
-    "attribute_address": 3,
-    "feature_index": 1
-  }
-}
-\`\`\`
-
-The second example stays generic. Those field names only have meaning because the profile defines them in \`layouts.canId.fields\` and \`layouts.payloadHeader.fields\`.
-
-### Payload fields
-
-For each payload field, define:
-
-- Name: stable field identifier, for example \`speed_rpm\` or \`message_good\`.
-- Start bit: absolute first bit in the payload.
-- Bit length: number of bits used by the field.
-- Type: \`uint\`, \`int\`, \`bool\`, \`enum\`, \`bytes\`, or \`string\`.
-- Dictionary: optional value map key from \`dictionaries\`.
-- Factor: multiplier applied to the raw value.
-- Offset: value added after scaling.
-- Unit: optional display unit.
-- Expression: optional simple expression for display value composition.
-
-:::danger
-Do not guess safety-critical field names or meanings from raw payload bytes alone. Use a specification, generated code, XML schema, DBC, ARXML, JSON schema, or protocol document as the source of truth.
-:::
-
-### Convert XML to canonical JSON
-
-The repository includes a helper script:
-
-\`\`\`text
-scripts/knossos_xml_to_profile_json.py
-\`\`\`
-
-Use it to convert one or more XML files into canonical profile JSON:
-
-\`\`\`bash
-python scripts/knossos_xml_to_profile_json.py \
-  ./k2_light_control.xml ./k2_xy_axis_control.xml \
-  --split-dir ./profiles
-\`\`\`
-
-This writes one self-contained \`*_profile.json\` file per XML. Each file includes CAN ID layout, payload header layout, dictionaries, messages, payload fields, and error rules when the XML exposes them.
-
-:::note
-The app runtime consumes JSON profiles, not XML. The converter is a source-schema bridge that keeps the monitor and profile editor independent from the original XML format.
-:::
-
-:::warning
-The converter is intentionally conservative. XML schemas differ in naming and nesting, so review the generated JSON before relying on it for live decode.
-:::
-
-:::tip
-Keep generated profiles under version control next to the XML files. When the XML changes, regenerate the JSON and compare the diff before using it in a test session.
-:::
-
-:::note
-Generic canonical fixtures are committed under \`profiles/test/\`. Use those profile and candump pairs to validate editor and decoder behavior without relying on local working profiles.
-:::
-
-### Minimal canonical profile
-
-\`\`\`json
-{
-  "schemaVersion": "1.0",
   "meta": {
-    "id": "motor-generic",
-    "name": "Motor Controller Generic",
+    "id": "engine-status-v1",
+    "name": "Engine Status",
     "version": "1.0.0"
   },
   "bus": {
-    "type": "can-fd",
-    "idFormat": "standard",
-    "byteOrder": "little"
-  },
-  "layouts": {
-    "canId": {
-      "bitLength": 11,
-      "fields": [
-        { "name": "node_id", "startBit": 0, "bitLength": 7, "type": "uint" },
-        { "name": "message_class", "startBit": 7, "bitLength": 4, "type": "uint" }
-      ]
-    }
+    "type": "can_fd",
+    "idType": "extended",
+    "byteOrder": "little_endian"
   },
   "messages": [
     {
-      "id": "motor_status",
-      "label": "Motor Status",
-      "identifyBy": { "can_id": 801 },
-      "payload": {
-        "bitLength": 32,
-        "fields": [
-          { "name": "rpm", "startBit": 0, "bitLength": 16, "type": "uint", "factor": 0.25, "unit": "rpm" }
-        ]
-      }
+      "id": "engine_telemetry",
+      "name": "Engine Telemetry",
+      "canId": "0x18203C01",
+      "fields": [
+        {
+          "id": "engine_rpm",
+          "name": "Engine Speed",
+          "type": "uint",
+          "bitOffset": 0,
+          "bitLength": 16,
+          "scale": 0.25,
+          "unit": "RPM"
+        }
+      ]
     }
   ]
 }
 \`\`\`
 
-### Error status decoding
+## Error status decoding
 
-Use canonical \`errors[]\` rules for protocol error handling. Do not model protocol errors as normal payload expression fields.
+Profiles can include error evaluation rules that examine signal values or raw payload bytes to raise warning or critical alerts when limits are exceeded.
 
-\`\`\`json
-"dictionaries": {
-  "error_status": {
-    "12": "ERROR_AXIS_POSITION_NOT_REACHED"
-  }
-},
-"errors": [
-  {
-    "id": "default_error_status",
-    "when": "message_good != 1",
-    "source": {
-      "startBit": 16,
-      "bitLength": 32,
-      "type": "uint",
-      "byteOrder": "little"
-    },
-    "dictionary": "error_status",
-    "display": "Error \${raw}: \${text}"
-  }
-]
-\`\`\`
+## Shared definitions (Common profiles)
 
-The decoder evaluates \`when\` against decoded CAN ID and payload header values. If the condition is true, it reads the error code from \`source.startBit\` and \`source.bitLength\`, then resolves the display text through the named dictionary.
+In large-scale CAN networks, message profiles often share node addresses, error codes, and common status enums. Create a Common Profile containing shared \`dictionaries\` and \`errors\`. Any active profile referencing a missing dictionary will dynamically resolve it across loaded common profiles.
 
-The decoded frame exposes:
+# 4. CAN Simulator & Transmit Workflows
 
-- \`message_good\`
-- \`errorCode\`
-- \`errorText\`
-- error row highlighting in CAN Monitor
+The Transmit Composer and CAN Simulator allow manual, cyclic, and automated frame transmission onto physical or virtual CAN buses.
 
-Use display filters such as:
+## Transmit Composer
 
-\`\`\`text
-error
-hasError == true
-errorCode == 12
-errorText contains POSITION
-message_good == bad
-\`\`\`
+Use Transmit Composer to stage and transmit single or repeated CAN / CAN-FD frames.
 
-:::tip
-Use field display expressions for simple value formatting, such as \`raw == 1 ? "On" : "Off"\`. Use \`errors[]\` for dictionary-based protocol errors because it keeps error handling declarative and profile-driven.
-:::
+1. Open Transmit Composer.
+2. Enter target CAN ID (standard or extended).
+3. Set DLC and payload hex bytes.
+4. Configure CAN-FD and BRS flags.
+5. Click Send Frame.
 
-### Generic decoding order
+## Cyclic TX
 
-For any canonical CAN-FD profile, decoding follows this order:
+1. Open Transmit Composer.
+2. Enable Cyclic TX.
+3. Set transmission period in milliseconds (e.g. \`100 ms\`).
+4. Select Send Mode:
+   - **Fire-and-forget**: Sends periodically without waiting for responses.
+   - **Wait for ACK**: Waits for daemon send acknowledgement before scheduling next frame.
+   - **Wait for CAN response**: Waits until live capture receives a matching RX response frame.
 
-1. Decode the arbitration ID through \`layouts.canId.fields\`.
-2. Decode \`layouts.payloadHeader.fields\` if the profile defines a payload header.
-3. Match \`messages[].identifyBy\` against decoded values.
-4. Decode the matching message's \`payload.fields\`.
-5. Evaluate \`errors[]\` rules.
-6. Render display values from dictionaries, scaling, offsets, units, and expressions.
+## CAN Simulator & Sequences
 
-:::danger
-Unknown messages should not be decoded by guessing. Show the raw CAN ID fields and mark the frame as requiring another profile or schema.
-:::
+CAN Simulator executes multi-step automated transmission sequences with conditional logic, response validation, and logging.
 
-### Timing analysis
+### Step types
 
-Timing analysis should group repeated messages by:
+- **Send Frame**: Transmits a predefined CAN frame.
+- **Wait**: Pauses execution for a specified duration in milliseconds.
+- **Wait for CAN Response**: Suspends sequence execution until a matching CAN response frame is captured or timeout expires.
 
-- message id or message label
-- selected CAN ID fields
-- selected payload header fields
-- direction when relevant
+# 5. CAN Bridge Daemon & Remote Connections
 
-For each group, calculate interval statistics such as last interval, minimum interval, maximum interval, average interval, and missed-period warnings.
+The CAN bridge daemon is a separate Linux/WSL service that exposes SocketCAN interfaces to this desktop app over WebSockets. Run it where the physical or virtual CAN interfaces exist.
 
-For reference-drive analysis, useful checks include:
+## Remote daemon connection
 
-- start_reference_drive requests and responses
-- retrigger_reference_drive requests and responses
-- movement_aborted events
+To monitor CAN or CAN-FD traffic from WSL or a remote Linux host:
 
-### Shared definitions (Common profiles)
+1. Start \`can_bridge_daemon\` on the target machine.
+2. Open Connect in this app.
+3. Enter WebSocket host IP, port (default \`9501\`), and interface name (\`can0\`, \`vcan0\`).
+4. Click Discover to list active network interfaces.
+5. Click Save and Connect.
 
-In large-scale CAN networks, message profiles often share node addresses, error codes, and common status enums. To avoid duplicating dictionaries or error rules in every single file:
-
-1. **Create a Common Profile**: Define a JSON profile containing only the reusable \`dictionaries\` and \`errors\` sections (layouts and messages can remain empty).
-2. **Load Multiple Profiles**: Load both your service-specific profile and the common profile into the Profile Library.
-3. **Automatic Resolution**: Any field in your active profile referencing a dictionary or error rule that it does not define will check other active profiles dynamically.
-4. **Visual Editing**: The **Dictionary** select dropdown in the visual editor will automatically include all dictionaries defined across *all loaded profiles*.
-5. **Clean Export**: When saving, your service profile keeps the reference but does not include the dictionary values directly, preventing data duplication.
-
-## CAN Monitor display filters
-
-The CAN Monitor display filter is placed directly above the captured or loaded log table. It works across static columns, decoded CAN ID fields, decoded payload header fields, payload values, TX status fields, and raw payload text. It accepts simple Wireshark-style conditions and validates the expression while you type.
-
-The filter box changes color:
-
-- Neutral: no filter is active.
-- Green: the filter syntax is valid.
-- Red: the filter syntax is invalid, and the message below the box explains where parsing failed.
-
-Filtering is deferred while typing so the input stays responsive on large traces. The table is virtualized, so only visible rows are rendered even when the trace contains many frames.
-
-:::tip
-Use decoded field names directly. If a profile defines \`command_class\`, \`message_good\`, \`service_identifier\`, \`attribute_address\`, or a message-specific payload field such as \`position\`, those names can be used in the display filter.
-:::
-
-### Filter examples
-
-\`\`\`text
-18203C01
-canId == 18203C01
-iface == can1
-len >= 8
-mode == CAN-FD
-payload contains "01 01"
-command_class == response
-message_good == good
-service_identifier == 5 and attribute_address == 64
-position > 1000
-attributeName ~= reference
-error
-hasError == true
-errorCode == 12
-errorText contains POSITION_NOT_REACHED
-txStatus == failed
-txError contains daemon
-\`\`\`
-
-Supported operators:
-
-| Operator | Meaning | Example |
-| --- | --- | --- |
-| \`==\` | Exact text or numeric equality | \`canId == 18203C01\` |
-| \`!=\` | Not equal | \`dir != TX\` |
-| \`>\`, \`>=\`, \`<\`, \`<=\` | Numeric comparison | \`len >= 12\` |
-| \`contains\` | Case-insensitive substring match | \`payload contains AA BB\` |
-| \`~=\` | Case-insensitive regular expression | \`attributeName ~= reference\` |
-
-Bare text searches all available row values. Field conditions search one specific value. Conditions can be joined with \`and\` or \`or\`.
-
-Right click a column header to build a filter from that column. The menu can replace the current filter, add the selected row value with \`and\`, add it with \`or\`, or insert an editable condition template. Use the \`X\` button in the filter field to clear the expression quickly.
-
-Error rows are highlighted in red when a matching loaded profile decodes a bad response through its \`errors[]\` rules. Use \`error\` for a quick error-only filter, or use \`hasError == true\`, \`errorCode == 12\`, and \`errorText contains POSITION\` when you need a precise error view.
-
-### Monitor sorting
-
-CAN Monitor supports multi-column sorting after display filtering. Sorting is applied before loaded-log pagination, so every page follows the same ordered result set.
-
-Right click a column header to:
-
-- sort ascending
-- sort descending
-- add the column as the next ascending sort priority
-- add the column as the next descending sort priority
-- clear the current sort rules
-
-Active sort rules are shown in the sort strip above the trace summary. Each rule shows its priority, column name, and direction. Use the up and down controls on the rule chip to change priority, click the direction text to toggle ascending or descending, or click \`X\` to remove that one rule.
-
-:::tip
-Use sorting for offline analysis, for example sort by \`canId\`, then \`time\`, or sort by \`errorCode\`, then \`attributeName\`. For live capture, original stream order is usually easier to follow.
-:::
-
-Sort presets let you save a useful rule set and restore it later. Build the active sort rules, click Save in the sort strip, give the preset a name, and then reload it from the Sort presets dropdown. Delete removes only the selected sort preset, not the trace data.
-
-:::note
-Sorting does not modify the loaded candump file or captured frame buffer. It only changes table presentation and CSV export order.
-:::
-
-### Monitor columns
-
-When schema profiles are loaded, CAN Monitor keeps the table stable by showing:
-
-- default trace columns such as time, interface, CAN ID, direction, length, mode, and payload
-- universal CAN ID layout fields
-- payload header fields
-- one final payload column for message-specific decoded values
-
-Message-specific values such as \`ON_OFF_CYCLES\`, \`TOTAL_ONTIME\`, or private signal names are not added as separate table columns because they vary by message type. They are shown in the payload values column and in the decoded preview. Use the column menu to hide or show default columns, CAN ID fields, and payload header fields.
-
-Drag column headers to reorder the table. Right click cells to copy values, copy a complete CAN message, copy a candump line, stage the frame into the transmit composer, or use the payload as a decode preview.
-
-### Trace ordering and retention
-
-Live capture appends new frames at the bottom and automatically follows the newest packet while capture is active. Loaded candump files are shown in the same order as the file.
-
-Trace retention is configured in Settings. The maximum row count applies to live capture and locally transmitted TX rows, where older rows are discarded once the limit is exceeded. Loaded candump files are not trimmed by this setting so source order and source line numbers remain intact.
-
-:::tip
-Use a smaller live trace retention limit when the bus is very busy. It keeps decode, filtering, and row rendering responsive while still showing the newest traffic.
-:::
-
-The status bar Frames value is the total captured or loaded frame count. It does not shrink when a display filter is active or when live trace retention removes older rows. Table line numbers keep increasing during live capture, so removed rows do not cause reused sequence numbers.
-
-### Loaded trace pagination
-
-Loaded candump and log files use pagination at the bottom of CAN Monitor. Live capture does not use pagination; it continues to append and follow the newest frame as before.
-
-The pagination footer provides:
-
-- First, Previous, Next, and Last page controls
-- row count choices: 10, 25, 50, 100, 250, 500, and 1000
-- current page and total page count
-- visible row range and total filtered row count
-
-The selected row count and current page are saved with monitor preferences. When a new log is opened, the table starts at page 1. If a display filter reduces the result set and the old page no longer exists, the app automatically moves to the last valid page.
-
-:::warning
-Pagination is only for loaded traces. Do not expect live capture to pause at page boundaries; live capture is intentionally stream-oriented.
-:::
-
-Use Log to export retained trace rows as standard candump text. Use CSV to export the current decoded table view with the active display filter, active sorting, visible columns, and column order.
-
-:::note
-CSV export follows the table as currently configured. Hide columns or apply a display filter before exporting when you only need a focused subset.
-:::
-
-### Monitor keyboard navigation
-
-When focus is on CAN Monitor and not inside an input field, the table supports keyboard navigation:
-
-- Arrow Up and Arrow Down move the selected row.
-- Page Up and Page Down move by a larger step.
-- Home moves to the first visible row.
-- End moves to the last visible row.
-- Enter toggles the decoded preview panel.
-
-For loaded traces, keyboard navigation follows the current page. For live capture, it follows the current filtered and sorted stream.
-
-## Terminal Trace
-
-Terminal Trace is a candump-style text view for the same frame buffer used by CAN Monitor. Open it from the sidebar, the View menu, or the command panel.
-
-Use it when you want a fast, plain text view of live traffic or a loaded log:
-
-- each line is formatted like candump output
-- live capture follows the newest frame when Follow is enabled
-- loaded candump files are shown in source order
-- the line limit can show the newest 250, 500, 1000, 5000, or all frames
-- Wrap controls whether long payload lines stay horizontal or wrap inside the panel
-- Copy places the visible terminal text on the clipboard
-- Save writes the visible terminal text as a candump log file
-
-:::note
-Terminal Trace is a presentation view. It does not replace CAN Monitor filtering, decoded preview, sorting, or pagination. Use CAN Monitor for structured analysis and Terminal Trace when plain candump-style text is easier to inspect or copy.
-:::
-
-:::tip
-For very busy live buses, keep the terminal line limit at 1000 or below and leave Follow enabled. This keeps the text stream responsive while still showing the newest traffic.
-:::
-
-## Mobile remote monitoring
-
-Rusty CAN Studio can be installed as a browser-based mobile web app from the PWA build. This is intended for remote monitoring on a phone or tablet while the CAN bridge daemon runs on the Linux or WSL host where the CAN interfaces exist.
-
-Recommended mobile workflow:
-
-1. Start can-bridge-daemon on the machine attached to the CAN bus.
-2. Serve the web build on a network address reachable from the mobile device.
-3. Open the app in the mobile browser.
-4. Use the browser option to add the app to the home screen.
-5. Open Connect and create a Remote Daemon profile pointing to the daemon host and WebSocket port.
-6. Use CAN Monitor or Terminal Trace for live traffic.
-
-The mobile layout gives the monitor the full screen width, hides the desktop sidebar, stacks decoded preview and transmit panels below the trace, and keeps the status bar compact. The top menu and command panel remain available for navigation.
-
-:::warning
-Mobile browsers can block insecure WebSocket connections depending on network, HTTPS, and browser policy. For reliable field use, serve the app and daemon endpoint with a network setup accepted by the target device.
-:::
-
-:::note
-The mobile web app is for remote monitoring and light inspection. Profile editing, large loaded log analysis, and complex simulator sequences are still more comfortable on desktop.
-:::
-
-Field layout expressions can control how a payload value is displayed. Expressions are intentionally small: arithmetic, comparisons, ternary conditions, and quoted display strings are supported. Statements, loops, imports, global objects, and full JavaScript programs are not allowed.
-
-\`\`\`text
-raw * 0.1
-raw == 1 ? "On" : "Off"
-value + " ms"
-\`\`\`
-
-:::note
-Filter field names ignore case and punctuation for matching. For example, \`canId\`, \`can_id\`, and \`CAN ID\` resolve to the same column where applicable.
-:::
-
-:::warning
-Display filtering does not drop frames from capture. It only controls which rows are shown in the table.
-:::
-
-## Filtering and search
-
-The help search field searches the rendered documentation. Matching text is highlighted in the preview, and the active result scrolls into view.
-
-Keyboard behavior:
-
-- Ctrl+F or Cmd+F focuses help search.
-- Arrow Down moves to the next result while the search field is focused.
-- Arrow Up moves to the previous result while the search field is focused.
-- F3 moves to the next result.
-- Shift+F3 moves to the previous result.
-- Escape clears the search field.
-
-## Keyboard shortcuts and command panel
-
-Open Help > Keyboard Shortcuts to review and edit application shortcuts. Click a shortcut field, press the new key combination, and the change is saved immediately for this installation.
-
-Default shortcuts:
-
-- Ctrl+Shift+P: open the command panel.
-- Ctrl+1: open CAN Monitor.
-- Ctrl+2: open Profile Editor.
-- Ctrl+3: open Terminal Trace.
-- Ctrl+,: open Settings.
-- Ctrl+/: open Keyboard Shortcuts.
-- F1: open Help.
-
-The command panel shows the same saved shortcuts beside each command and can also open the shortcut editor. Duplicate shortcuts are highlighted in the shortcut editor so they can be resolved before use.
-
-:::tip
-Use the command panel when you do not remember a shortcut. Search by action name, view name, connection workflow, theme, or help topic.
-:::
-
-## About screen
-
-Open Help > About to view application information, current appearance settings, and quick links back to the monitor and help system.
-
-## Appearance settings
-
-Open Settings to change how the whole application looks and feels. Appearance changes apply immediately and are saved for the next session.
-
-## Localization settings
-
-Open Settings > Localization to choose the application locale. The current implementation provides a localization foundation for selected app chrome and settings surfaces, plus locale-aware formatting.
-
-Available locale choices:
-
-- English
-- Deutsch
-- Francais
-- Arabic
-
-Changing the locale updates:
-
-- selected navigation and menu labels
-- selected Settings labels
-- date and time formatting
-- number formatting
-- document language
-- document direction for right-to-left locales
-
-:::note
-Profile names, decoded field names, CAN payload values, daemon messages, and imported JSON content are shown exactly as provided by profiles, traces, and the daemon. They are protocol data, not translated UI strings.
-:::
-
-:::tip
-Use the preview cards in Localization to verify number and date formatting immediately after changing language.
-:::
-
-Available mode options:
-
-- System: follow the operating system light or dark preference.
-- Light: force light mode.
-- Dark: force dark mode.
-
-Available color themes:
-
-- Default: balanced general-purpose theme.
-- Graphite: neutral engineering UI with low visual noise.
-- Zeiss Blue: professional blue accent palette.
-- High Contrast: stronger borders and contrast for readability.
-- Terminal Trace: dark/log-focused palette for long trace sessions.
-- Warm Neutral: softer palette for long sessions.
-
-Available density options:
-
-- Comfortable: default spacing.
-- Compact: reduced spacing for more rows and controls on screen.
-- Dense: maximum information density for trace-heavy workflows.
-
-Density affects table row height, button and input height, panel padding, gaps, and font scale. The difference is most visible in CAN Monitor and Profile Editor tables.
-
-The Settings preview shows typical monitor states such as RX, TX sent, TX failed, decoded values, buttons, and status badges so you can evaluate a theme before continuing work. A portable implementation reference is available in \`docs/theme-system-spec.md\`.
-
-## Diagnostics log
-
-Open Settings > Diagnostics log to inspect recent application events that are useful for troubleshooting.
-
-The diagnostics log records:
-
-- connection attempts and failures
-- remote interface discovery results
-- capture pause and resume events
-- transmit failures and daemon rejections
-- profile import, JSON parse, validation, and export-blocking errors
-
-Each entry has a timestamp, severity, source, message, and optional detail text. The log is saved locally and capped to the newest 500 entries so it stays useful without growing forever.
-
-Use Export diagnostics when you need to share troubleshooting information. Use Clear diagnostics when the old entries are no longer relevant.
-
-:::warning
-Diagnostics can include host names, interface names, CAN IDs, profile names, and error text. Review exported diagnostics before sharing them outside your team.
-:::
-
-## Historical traces
-
-Open Settings > Historical traces to save and reload retained trace snapshots.
-
-The archive stores the current retained CAN Monitor frame buffer as candump text. Saved traces can be:
-
-- loaded back into CAN Monitor
-- exported as candump log files
-- deleted individually
-- cleared as a group
-
-Use this for short-term investigation workflows, for example saving a failing live capture before reconnecting, preserving a filtered test run, or keeping a known reference trace available for profile work.
-
-:::note
-Historical traces are stored locally in browser/Tauri storage and are capped to the newest saved entries. For long-term evidence, export the trace as a candump log and store it in your normal project or test-result location.
-:::
-
-## Security checks
-
-The repository includes a repeatable security baseline for dependency and accidental-secret checks.
-
-Run the web dependency audit:
-
-\`\`\`bash
-npm run audit
-\`\`\`
-
-Run the fuller local helper on Windows:
-
-\`\`\`powershell
-npm run security:audit
-\`\`\`
-
-The helper runs npm audit, tries cargo audit for Tauri dependencies when available, and scans repository files for common secret patterns. The CI workflow also runs audit, tests, build, and Rust dependency audit on pull requests and pushes to main.
-
-:::warning
-Security checks do not sanitize engineering data. Review diagnostics exports, trace archives, candump logs, settings backups, and profile JSON before sharing them.
-:::
-
-## Testing and quality checks
-
-Use the automated quality checks before sharing changes or before packaging a build.
-
-Run the fast unit test suite:
-
-\`\`\`bash
-npm run test
-\`\`\`
-
-Run the fuller local quality check on Windows:
-
-\`\`\`powershell
-npm run quality:check
-\`\`\`
-
-The full local check runs Vitest unit tests, a production frontend build, accessibility baseline checks, browser compatibility baseline checks, npm dependency audit, and Rust \`cargo check\` for the Tauri crate.
-
-Useful variants:
-
-\`\`\`powershell
-npm run quality:check -- -SkipRust
-npm run quality:check -- -SkipAudit
-\`\`\`
-
-Run the accessibility baseline directly:
-
-\`\`\`powershell
-npm run accessibility:check
-\`\`\`
-
-The accessibility baseline checks document language, viewport, document title, icon button accessible-name fallback, screen-reader-only text, alert roles, helpful title text, and raw button \`type\` attributes.
-
-Run the browser compatibility baseline after a production build:
-
-\`\`\`powershell
-npm run browser:check
-\`\`\`
-
-The browser baseline checks production browser targets, responsive viewport metadata, PWA manifest metadata, generated module output, built manifest display mode, and direct user-agent browser sniffing.
-
-:::tip
-Use the fast test command while editing logic, then run the full quality check before pushing a larger feature.
-:::
-
-:::note
-The CI quality workflow runs install, tests, production build, and Rust compile checks on pull requests and pushes to main. The separate security workflow handles dependency vulnerability checks.
-:::
-
-:::warning
-Automated accessibility checks are a baseline, not a full WCAG audit. For major UI changes, also verify keyboard navigation, visible focus, screen-reader names, contrast in each theme, 200 percent zoom, and compact/dense layouts manually.
-:::
-
-:::tip
-For UI-heavy changes, preview the production build in Chromium/WebView2, Firefox, and Safari when available. Check candump loading, display filters, Help, Profile Editor, sticky headers, dialogs, scrolling, themes, and density settings.
-:::
-
-### Performance benchmarks
-
-Run benchmarks when changing trace parsing, display filtering, sorting, profile decoding, or any path that may touch thousands of frames:
-
-\`\`\`bash
-npm run benchmark
-\`\`\`
-
-The benchmark suite covers candump parsing on larger traces and canonical profile decoding. Benchmark results vary by machine, so use them as before-and-after comparisons on the same computer.
-
-## Transmit composer
-
-Use the transmit composer to prepare a single CAN-FD frame or a cyclic transmission.
-
-Example frame:
-
-\`\`\`text
-ID:      18DA10F1
-DLC:     64
-Payload: 02 10 03 00 00 00 00 00
-Mode:    CAN-FD with BRS
-\`\`\`
-
-Single-frame transmission sends through the active remote daemon connection. The monitor inserts a local TX row immediately:
-
-- \`TX:pending\`: the app sent the request and is waiting for daemon acknowledgement.
-- \`TX:sent\`: the daemon accepted the frame for transmission.
-- \`TX:failed\`: the daemon, connection, or interface rejected the frame.
-
-TX rows are color coded and can be filtered with \`txStatus\` and \`txError\`. Retry count controls how many additional attempts are made when the daemon or interface reports an error.
-
-### Cyclic TX
-
-Cyclic TX repeatedly sends the current composer frame. Configure:
-
-- Period value and unit: \`ms\` or \`s\`.
-- Send mode: fire-and-forget, wait for daemon ACK, or wait for CAN response before scheduling the next frame.
-- Expected response: any RX frame on the selected interface, or a response/event message derived from loaded profiles.
-- Response timeout: maximum time to wait for the selected response.
-- Late ACK/response policy: skip the missed period, send the next frame immediately, or stop cyclic TX.
-
-Fire-and-forget keeps the requested cadence and does not wait for acknowledgement before scheduling the next send. Wait-for-ACK avoids piling up sends when the daemon or bus is slow. Wait-for-CAN-response waits until live capture receives the expected RX frame on the selected interface.
-
-Example workflow for periodically requesting \`on_off_cycles\`:
-
-1. Load a candump file or start live capture with a profile that decodes \`on_off_cycles\`.
-2. Find a known \`on_off_cycles.get_current_value.command\` or equivalent request row in CAN Monitor.
-3. Right click the row and choose Use in Transmit Composer. This copies CAN ID, payload, DLC, CAN-FD, and BRS settings into the composer.
-4. Open Cyclic TX in the transmit composer.
-5. Set Period and Unit, for example \`500 ms\`.
-6. Set Send mode to Wait for CAN response.
-7. In Expected response, select \`on_off_cycles.get_current_value.response\`.
-8. Set Response timeout to a value that fits the bus and device timing, for example \`1000 ms\`.
-9. Choose the late policy:
-   - Skip missed period: keep running, but wait until the next period after a timeout.
-   - Send next immediately: keep running and retry immediately after a late response.
-   - Stop cyclic TX: stop on the first missing or late response.
-10. Start cyclic TX and watch the monitor for \`TX:sent\` rows followed by the decoded response rows.
-
-:::warning
-Wait-for-CAN-response depends on subscribed live capture. If the expected response is filtered out by the daemon or the wrong interface is selected, cyclic TX will time out.
-:::
-
-## CAN Simulator sequences
-
-Use CAN Simulator when a workflow is larger than one manual transmit or one cyclic frame. The Sequences workspace models a reusable state machine without assuming any specific protocol or organization-specific message format.
-
-A sequence is made of ordered steps:
-
-- Send Once: send one manually defined frame or profile-referenced message.
-- Wait For Response: wait until live capture receives a matching RX frame.
-- Send Cyclic: repeatedly send a frame until a response, timeout, or stop policy ends the step.
-- Delay: wait for a fixed duration.
-- Branch: reserve a conditional decision point for simple expression-driven workflows.
-
-Typical start-then-poll workflow:
-
-1. Add a Send Once step for frame A.
-2. Add a Wait For Response step for response A.
-3. Set the success condition, for example \`message_good == 1\`.
-4. Add a Send Cyclic step for frame B.
-5. Set the cyclic stop response, for example \`message_b.response\`.
-6. Set the cyclic stop condition, for example \`message_good == 1\`.
-7. Set period, maximum duration, timeout policy, and late-response behavior.
-8. Run the sequence and inspect the run log plus CAN Monitor trace.
-
-Example sequence JSON:
-
-\`\`\`json
-{
-  "name": "Start then poll until response",
-  "steps": [
-    {
-      "type": "send",
-      "name": "Send frame A once",
-      "frameRef": "message_a.command",
-      "canId": "18203C01",
-      "payload": "01 01"
-    },
-    {
-      "type": "wait",
-      "name": "Wait for response A",
-      "expect": "message_a.response",
-      "condition": "message_good == 1",
-      "timeoutMs": 1000,
-      "onTimeout": "fail"
-    },
-    {
-      "type": "cyclic",
-      "name": "Cyclic frame B until response",
-      "frameRef": "message_b.command",
-      "canId": "14089C01",
-      "payload": "01 01 07 00 00 00",
-      "periodMs": 100,
-      "maxDurationMs": 10000,
-      "stopWhen": {
-        "expect": "message_b.response",
-        "condition": "message_good == 1",
-        "matches": 1
-      }
-    }
-  ]
-}
-\`\`\`
-
-Response matching uses decoded profile data when profiles are loaded. You can match by message name, decoded meaning, service name, attribute name, feature name, CAN ID, or expression fields.
-
-Useful conditions:
-
-\`\`\`text
-message == "on_off_cycles.get_current_value.response"
-message_good == 1
-error_status == null
-service_identifier == 810 && attribute_address == 3
-\`\`\`
-
-Scenario-related frames are marked in CAN Monitor with \`SEQ:tx\` for transmitted sequence frames and \`SEQ:rx-match\` for received frames that satisfied a wait or cyclic stop condition.
-
-:::tip
-Keep the transmit composer for quick manual sends. Use CAN Simulator sequences for multi-step workflows such as wake-up then poll, unlock then stream, request calibration then wait for event, or cyclic keepalive until state changes.
-:::
-
-## Connection profiles
-
-Open Connect to create or edit connection profiles. Remote Daemon profiles can be saved without connecting, or saved and connected immediately. When the daemon is reachable, use Discover to load available CAN interfaces into a dropdown.
-
-Local CAN is shown separately from Remote Daemon. Direct Local CAN capture is not wired in this UI yet, so Save and Connect is disabled for Local CAN profiles.
-
-Remote Daemon connections retry automatically when Auto reconnect is enabled. The status bar reports only the connection state: Disconnected, Connecting, Connected, or Failed.
-
-Connection profiles can also store CAN timing metadata:
-
-- CAN-FD enabled or disabled
-- nominal bitrate for the arbitration phase
-- data bitrate for the CAN-FD payload phase
-
-These values are saved with the profile and shown in the Connection Profiles dialog. They are useful when you keep several remote daemon profiles for different buses or test benches.
-
-:::warning
-The bitrate fields document the expected interface timing. The current desktop app and WebSocket JSON daemon path do not reconfigure SocketCAN timing. Bring the interface up with matching \`ip link\` settings on the daemon host before connecting.
-:::
-
-### Hardware adapters
-
-The app integrates with common CAN hardware through the Linux SocketCAN interface exposed by the daemon host. Connection profiles can record the adapter family so profiles remain understandable when you switch between virtual CAN, lab hardware, and vehicle adapters.
-
-Supported adapter profile labels include:
-
-- Generic SocketCAN
-- Virtual CAN
-- PEAK PCAN
-- Kvaser
-- Vector
-- CANable / SLCAN
-- Other SocketCAN adapter
-
-This label does not change the wire protocol used by the desktop app. The daemon still subscribes to Linux CAN interfaces such as \`vcan0\`, \`can0\`, or \`can1\`. Vendor drivers, \`slcand\`, candlelight firmware, or other setup tools must expose the adapter as SocketCAN before the app can use it.
-
-:::tip
-Use one connection profile per physical bus setup. For example, keep separate profiles for \`vcan0\` simulation, PEAK PCAN at 500000/2000000 bit/s, and CANable/SLCAN at classic 500000 bit/s.
-:::
-
-## CAN bridge daemon
-
-The CAN bridge daemon is a separate Linux/WSL service that exposes SocketCAN interfaces to this desktop app. Run it where the CAN interfaces exist. For WSL workflows, the daemon runs inside WSL and the desktop app connects to it from Windows.
-
-### Recommended workflow
-
-1. Start or verify the CAN interface in Linux or WSL.
-2. Start the daemon with WebSocket JSON enabled.
-3. In this app, create a Remote Daemon connection profile.
-4. Use Discover in the connection dialog to list interfaces reported by the daemon.
-5. Select the interface, then Save and Connect.
-6. Use CAN Monitor for live RX/TX frames and Transmit Composer for manual or cyclic TX.
-
-### Prepare a virtual CAN interface
+## Prepare a virtual CAN interface
 
 \`\`\`bash
 sudo modprobe vcan
@@ -1199,13 +423,13 @@ sudo ip link set up vcan0
 ip link show vcan0
 \`\`\`
 
-For physical CAN, bring up the interface with the required bitrate:
+For physical CAN hardware:
 
 \`\`\`bash
 sudo ip link set can0 up type can bitrate 500000
 \`\`\`
 
-### Run the daemon
+## Run the daemon
 
 Development run:
 
@@ -1213,153 +437,107 @@ Development run:
 cargo run -- --tcp-bind 0.0.0.0:9500 --ws-bind 0.0.0.0:9501 --grpc-bind 0.0.0.0:9502
 \`\`\`
 
-Run with fake frames when the bus is quiet:
-
-\`\`\`bash
-RUST_LOG=info cargo run -- --tcp-bind 0.0.0.0:9500 --ws-bind 0.0.0.0:9501 --grpc-bind 0.0.0.0:9502 --fake
-\`\`\`
-
-Use release mode when you need lower overhead:
+Production release run:
 
 \`\`\`bash
 cargo build --release
 RUST_LOG=info ./target/release/can_bridge_daemon --tcp-bind 0.0.0.0:9500 --ws-bind 0.0.0.0:9501 --grpc-bind 0.0.0.0:9502
 \`\`\`
 
-### Transport options
+## Transport options
 
-- WebSocket JSON: easiest option for this app and browser-like clients.
-- WebSocket binary: lower overhead for high-rate streaming clients.
-- TCP JSONL: good for shell tooling and line-oriented clients.
-- TCP binary: efficient for custom clients.
-- gRPC: typed API and streaming for generated clients.
+- WebSocket JSON: Default transport used by this app (\`ws://HOST:PORT/ws/text\`).
+- WebSocket binary: High-throughput binary stream.
+- TCP JSONL: Line-oriented JSON over TCP.
+- gRPC: Typed streaming API.
 
-The current app connection flow uses WebSocket JSON.
+## Daemon-side raw CAN filtering
 
-### Daemon operations used by the app
-
-- \`client_hello\`: starts the session.
-- \`list_ifaces\`: returns Linux CAN interfaces such as \`can0\` or \`vcan0\`.
-- \`subscribe\`: streams RX/TX frame events for selected interfaces.
-- \`unsubscribe\`: pauses live capture for the session.
-- \`send_frame\`: sends a CAN or CAN-FD frame through the selected interface.
-- \`send_ack\`: reports whether the daemon successfully handed the frame to the selected SocketCAN interface.
-
-### Capture filters
-
-Remote profiles can include a raw daemon-side filter. This reduces traffic before frames are forwarded to the app. Filters are intentionally protocol-agnostic and work on raw CAN properties:
-
-- CAN ID
-- CAN ID mask
-- interface
-- CAN-FD flag
-- payload length range
-
-Use profile-specific decoding in the app to decide which raw CAN ID/mask should be used. The daemon should not know service identifiers, source addresses, destination addresses, or any product-specific schema names.
-
-The filter compares this expression:
+Remote profiles can include raw daemon-side filters to reduce network traffic before frames are forwarded over WebSockets:
 
 \`\`\`text
 (incoming_can_id & mask) == (filter_can_id & mask)
 \`\`\`
 
-For service identifier \`810\`, the concrete comparison is:
-
+Example: Filter for service identifier \`810\` (\`0x32A\`):
 \`\`\`text
 (frame.id & 0x000003FF) == (0x0000032A & 0x000003FF)
 \`\`\`
 
-For profiles that use this 29-bit arbitration layout:
+## Mobile remote monitoring
 
-\`\`\`text
-[29:26] command_class
-[25]    broadcast
-[24:19] destination_address
-[18:13] source_address
-[12]    start_of_transfer
-[11]    end_of_transfer
-[10]    toggle
-[9:0]   service_identifier
-\`\`\`
+Rusty CAN Studio can be served as a PWA for remote monitoring on mobile phones or tablets while \`can-bridge-daemon\` runs on the Linux host attached to the CAN bus.
 
-Examples:
+# 6. User Tools, Shortcuts & Help Editing
 
-| Goal | CAN ID value | Mask | Why |
-| --- | ---: | ---: | --- |
-| Only service identifier \`810\` (\`0x32A\`) | \`0000032A\` | \`000003FF\` | Service identifier occupies bits \`9:0\`, so the lower 10 bits are compared. |
-| Only responses for service \`810\` | \`1400032A\` | \`3C0003FF\` | \`command_class=5\` is placed in bits \`29:26\`, plus service bits \`9:0\`. |
-| Only traffic from source address \`1\` | \`00002000\` | \`0007E000\` | Source address occupies bits \`18:13\`; value \`1 << 13\` is \`0x2000\`. |
-| Only traffic to destination address \`5\` | \`00280000\` | \`01F80000\` | Destination address occupies bits \`24:19\`; value \`5 << 19\` is \`0x280000\`. |
-| Only command/request frames to destination \`5\` for service \`810\` | \`1828032A\` | \`3DF803FF\` | Combines command class bits, destination bits, broadcast bit, and service bits. |
+Use this chapter as a reference for application tools, UI shortcuts, customization, and help editing.
 
-:::tip
-Start with a broad filter such as only service identifier, then add command class or address bits after confirming the monitor still receives the expected traffic.
-:::
+## Filtering and search
 
-:::warning
-These examples assume the profile's CAN ID bit layout shown above. If another protocol uses a different arbitration ID layout, calculate the mask from that profile's own CAN ID fields instead.
-:::
+The help search field searches rendered documentation. Matching text is highlighted in the preview, and the active result scrolls smoothly into view.
 
-### TX acknowledgement
+Search navigation shortcuts:
 
-\`TX\` in the monitor direction column means the frame was transmitted from the app toward the bus through the daemon. \`TX:pending\` means the app has staged the transmit request and is waiting for daemon acknowledgement. \`TX:sent\` means the daemon reported that the selected CAN interface accepted the frame send call. \`TX:failed\` means the daemon, connection, or selected interface rejected the frame.
+- **Ctrl+F**: Focus search input.
+- **Enter / n / Arrow Down**: Jump to next search match.
+- **Shift+Enter / p / Arrow Up**: Jump to previous search match.
+- **Escape**: Clear search and exit search mode.
 
-:::note
-\`TX:sent\` is not the same as an application-level response from the target device. Use cyclic Wait for CAN response when the next send should wait for a received response frame.
-:::
+## Keyboard shortcuts and command panel
 
-### Limitations and planned improvements
+Open Help > Keyboard Shortcuts to review and edit application shortcuts.
 
-- Direct Local CAN from the desktop app is not wired yet; use Remote Daemon.
-- Daemon-side filters are raw CAN filters only. Higher-level profile fields must be translated to raw ID/mask filters by the app.
-- Response matching in cyclic TX is based on received frames and loaded profile definitions; there is no universal request/response correlation in raw CAN.
-- Interface discovery depends on Linux netlink and available SocketCAN interfaces.
-- Windows-native daemon builds are not supported because SocketCAN and netlink are Linux-specific.
-- Future improvements could include richer filter editing, named filter presets, per-profile response templates, better timeout visualization, and daemon-side metrics.
+Default shortcuts:
 
-:::danger
-Do not transmit frames on a physical bus unless you know the target system and arbitration impact. Incorrect frames can disturb diagnostics, flashing, or live control messages.
-:::
+- **Ctrl+Shift+P**: Open command panel.
+- **Ctrl+1**: Open CAN Monitor.
+- **Ctrl+2**: Open Profile Editor.
+- **Ctrl+3**: Open Terminal Trace.
+- **Ctrl+,**: Open Settings.
+- **Ctrl+/**: Open Keyboard Shortcuts.
+- **F1**: Open Help.
+
+## About, Appearance & Localization
+
+- **About Screen**: View app version, environment details, and quick links.
+- **Appearance Settings**: Toggle Light, Dark, or System mode, color palettes, and UI density.
+- **Localization Settings**: Select application language, date/time formatting, and number format options.
 
 ## Editing help content
 
-Open the Edit tab to change this markdown. The View tab renders the final documentation. The Diff tab compares the default content against your custom content.
+Open the Edit tab in the Help view to customize markdown documentation. The View tab renders final formatted output, and the Diff tab compares custom changes against the default manual.
 
-Use these callout blocks exactly as shown:
+Use these callout directive blocks:
 
 \`\`\`markdown
 :::note
-Use this for neutral information.
+Neutral information block.
 :::
 
 :::tip
-Use this for workflow advice.
+Workflow recommendation.
 :::
 
 :::warning
-Use this for risky but recoverable situations.
+Warning for risky operations.
 :::
 
 :::danger
-Use this for destructive or safety-critical situations.
+Safety-critical warning.
 :::
 \`\`\`
 
 ## Saving and resetting
 
-Save stores your edited help content. Reset removes the custom version and restores the built-in default. Both actions ask for confirmation first.
+- **Save**: Persists custom help changes locally.
+- **Reset Chapter**: Restores default markdown for the selected chapter.
+- **Reset All**: Restores the entire factory default help manual.
 
 ## Troubleshooting
 
 ### Search does not find text
-
-Make sure you are in the View tab. Search operates on rendered help content.
+Ensure you are in the View tab. Search operates on rendered HTML output.
 
 ### ToC does not show an entry
-
-Only headings are included in the table of contents. Use \`#\`, \`##\`, or \`###\` headings for navigable sections.
-
-### Custom markdown looks wrong
-
-Check fenced code blocks and directive fences. Each callout must have an opening directive and a closing \`:::\` line.
+Only headings are included in the Table of Contents. Use \`#\`, \`##\`, or \`###\` heading tags.
 `;

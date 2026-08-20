@@ -108,7 +108,7 @@ export function HelpShell() {
 
       <HelpToolbar ref={searchRef} />
 
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+      <div className="flex min-h-0 flex-1 flex-row overflow-hidden">
         <HelpChapterList />
 
         <main className="min-h-0 flex-1 overflow-hidden">
@@ -117,9 +117,7 @@ export function HelpShell() {
           {mode === "diff" && <HelpDiff />}
         </main>
 
-        <aside className="max-h-40 overflow-auto border-t lg:max-h-none lg:w-72 lg:border-l lg:border-t-0">
-          <HelpTOC />
-        </aside>
+        <HelpTOC />
       </div>
     </div>
   );

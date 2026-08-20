@@ -37,7 +37,9 @@
     --tw-prose-captions: hsl(var(--muted-foreground));
     font-family: Inter, 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
     font-size: 1.05rem;
-    line-height: 1.68;
+    line-height: 1.7;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 .help-markdown .prose h1,
@@ -152,7 +154,9 @@
     padding: 0 !important;
     font-size: inherit;
     font-weight: 400;
-    white-space: pre;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
 }
 
 .help-markdown .prose blockquote {
@@ -174,6 +178,8 @@
 .help-markdown .prose td {
     border: 1px solid hsl(var(--border));
     padding: 0.42rem 0.6rem;
+    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 .help-markdown .prose th {

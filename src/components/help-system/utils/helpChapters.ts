@@ -11,12 +11,18 @@ function slugify(value: string) {
 }
 
 function titleFromChapter(markdown: string, fallback: string) {
-  const heading = markdown.match(/^##\s+(.+)$/m) ?? markdown.match(/^#\s+(.+)$/m);
-  return heading?.[1]?.trim() || fallback;
+  const heading = markdown.match(/^#\s+(.+)$/m) ?? markdown.match(/^##\s+(.+)$/m);
+  if (!heading) return fallback;
+  return heading[1].trim().replace(/^[0-9]+\.\s*/, "");
 }
 
 export function splitHelpMarkdown(markdown: string): HelpChapter[] {
   const lines = markdown.split(/\r?\n/);
+
+  // Check if markdown uses multiple top-level H1 ('# ') headings for major chapters
+  const h1Count = lines.filter((line) => line.startsWith("# ") && !line.includes("Workbench Help")).length;
+  const splitPrefix = h1Count > 1 ? "# " : "## ";
+
   const chapters: HelpChapter[] = [];
   let current: string[] = [];
   let order = 0;
@@ -35,7 +41,7 @@ export function splitHelpMarkdown(markdown: string): HelpChapter[] {
   }
 
   for (const line of lines) {
-    if (line.startsWith("## ") && current.length > 0) {
+    if (line.startsWith(splitPrefix) && current.length > 0) {
       pushCurrent();
       current = [line];
     } else {
