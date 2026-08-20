@@ -141,7 +141,10 @@ type FilterResult = {
 };
 
 function rowKeyFor(frame: WsFrame, index: number) {
-  return `${frame.ts_ms}-${frame.iface}-${frame.id}-${index}`;
+  if (frame.line_no != null) {
+    return `line-${frame.line_no}`;
+  }
+  return `frame-${frame.ts_ms}-${frame.iface}-${frame.id}-${index}`;
 }
 
 function formatDecodedValue(field: DecodedField) {
@@ -890,9 +893,11 @@ export function CanFdDashboard() {
   }, [alertRules, traceRows]);
 
   const selectedFrame = useMemo(() => {
-    if (!selectedFrameKey) return undefined;
-    return sortedRows.find((row) => row.key === selectedFrameKey)?.frame;
-  }, [selectedFrameKey, sortedRows]);
+    if (selectedFrameKey) {
+      return traceRows.find((row) => row.key === selectedFrameKey)?.frame;
+    }
+    return sortedRows[sortedRows.length - 1]?.frame ?? frames[frames.length - 1];
+  }, [frames, selectedFrameKey, sortedRows, traceRows]);
 
   const selectedTraceRow = useMemo(() => {
     if (!selectedFrameKey) return null;
@@ -900,17 +905,14 @@ export function CanFdDashboard() {
   }, [selectedFrameKey, traceRows]);
 
   useEffect(() => {
-    if (selectedFrameKey) {
-      const row = traceRows.find((r) => r.key === selectedFrameKey);
-      if (row) {
-        const frame = row.frame;
-        setTxId(formatCanId(frame.id));
-        setTxPayload(formatPayloadBytes(frame.data_hex));
-        setTxDlc(String(byteLength(frame.data_hex)));
-        stageSharedTransmitDraft(frame);
-      }
+    const frame = selectedFrame;
+    if (frame) {
+      setTxId(formatCanId(frame.id));
+      setTxPayload(formatPayloadBytes(frame.data_hex));
+      setTxDlc(String(byteLength(frame.data_hex)));
+      stageSharedTransmitDraft(frame);
     }
-  }, [selectedFrameKey, traceRows, stageSharedTransmitDraft]);
+  }, [selectedFrame, stageSharedTransmitDraft]);
 
   const selectedDecodedFrame = useMemo(() => {
     const frame = selectedFrame;
@@ -1488,7 +1490,7 @@ export function CanFdDashboard() {
         <tr
           {...props}
           className={rowClass(item)}
-          onClick={() => setSelectedFrameKey(item.key)}
+          onClick={() => setSelectedFrameKey(selectedFrameKey === item.key ? null : item.key)}
           onContextMenu={(event) => rowContextMenu(event, item)}
         />
       ),
@@ -2011,7 +2013,7 @@ export function CanFdDashboard() {
                   fixedHeaderContent={fixedHeaderContent}
                   itemContent={virtualRowContent}
                   defaultItemHeight={45}
-                  followOutput={status === "connected" && !traceSourceName ? "smooth" : false}
+                  followOutput={status === "connected" && !traceSourceName ? "auto" : false}
                 />
               </CardContent>
               {loadedTracePaginationEnabled && (
