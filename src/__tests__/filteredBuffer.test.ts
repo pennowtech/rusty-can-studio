@@ -13,6 +13,18 @@ function accumulateFilteredRows<T extends { frame: WsFrame }>(
   return combined.slice(Math.max(0, combined.length - limit));
 }
 
+export function resolveFilteredRows<T extends { frame: WsFrame }>(
+  isFilterActive: boolean,
+  isLiveStreaming: boolean,
+  accumulated: T[],
+  allRows: T[],
+  matchesFilter: (row: T) => boolean,
+): T[] {
+  if (!isFilterActive) return allRows;
+  if (isLiveStreaming) return accumulated;
+  return allRows.filter(matchesFilter);
+}
+
 describe("accumulateFilteredRows", () => {
   const frame1: WsFrame = { id: 0x123, is_extended: false, is_fd: false, data_hex: "112233", iface: "can0", dir: "rx", ts_ms: 1000, line_no: 1 };
   const frame2: WsFrame = { id: 0x200, is_extended: false, is_fd: false, data_hex: "AABBCC", iface: "can0", dir: "rx", ts_ms: 1001, line_no: 2 };
@@ -25,12 +37,9 @@ describe("accumulateFilteredRows", () => {
     let accumulated = accumulateFilteredRows([], [{ frame: frame1 }], matchesId123, 500);
     expect(accumulated).toEqual([{ frame: frame1 }]);
 
-    // High frequency noise frames on CAN ID 0x200 arrive
     accumulated = accumulateFilteredRows(accumulated, [{ frame: frame2 }, { frame: frame3 }], matchesId123, 500);
-    // frame1 with ID 0x123 MUST NOT be evicted by 0x200 noise frames
     expect(accumulated).toEqual([{ frame: frame1 }]);
 
-    // Another frame with ID 0x123 arrives
     accumulated = accumulateFilteredRows(accumulated, [{ frame: frame4 }], matchesId123, 500);
     expect(accumulated).toEqual([{ frame: frame1 }, { frame: frame4 }]);
   });
@@ -40,7 +49,25 @@ describe("accumulateFilteredRows", () => {
     expect(accumulated).toEqual([{ frame: frame1 }]);
 
     accumulated = accumulateFilteredRows(accumulated, [{ frame: frame4 }], matchesId123, 1);
-    // Capacity is 1, so oldest matching frame is evicted when new matching frame arrives
     expect(accumulated).toEqual([{ frame: frame4 }]);
+  });
+});
+
+describe("resolveFilteredRows", () => {
+  const frame1: WsFrame = { id: 0x123, is_extended: false, is_fd: false, data_hex: "112233", iface: "can0", dir: "rx", ts_ms: 1000, line_no: 1 };
+  const frame2: WsFrame = { id: 0x200, is_extended: false, is_fd: false, data_hex: "AABBCC", iface: "can0", dir: "rx", ts_ms: 1001, line_no: 2 };
+  const matchesId123 = (row: { frame: WsFrame }) => row.frame.id === 0x123;
+
+  test("filters static captured rows when live capture is disconnected or stopped", () => {
+    const captured = [{ frame: frame1 }, { frame: frame2 }];
+    const result = resolveFilteredRows(true, false, [], captured, matchesId123);
+    expect(result).toEqual([{ frame: frame1 }]);
+  });
+
+  test("uses live streaming accumulator when live capture is active", () => {
+    const captured = [{ frame: frame1 }, { frame: frame2 }];
+    const liveAccumulated = [{ frame: frame1 }];
+    const result = resolveFilteredRows(true, true, liveAccumulated, captured, matchesId123);
+    expect(result).toEqual(liveAccumulated);
   });
 });

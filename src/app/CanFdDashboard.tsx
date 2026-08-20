@@ -225,9 +225,23 @@ function parseComparableNumber(value: string) {
 }
 
 function getRowField(row: TraceRow, fieldName: string) {
+  if (row.values[fieldName] !== undefined) {
+    return { value: row.values[fieldName], numeric: row.numericValues[fieldName] };
+  }
+
+  const candidateKeys = Object.keys(row.values);
+  const caseInsensitiveKey = candidateKeys.find((k) => k.toLowerCase() === fieldName.toLowerCase());
+  if (caseInsensitiveKey) {
+    return { value: row.values[caseInsensitiveKey], numeric: row.numericValues[caseInsensitiveKey] };
+  }
+
   const wanted = normalizeKey(fieldName);
-  const key = Object.keys(row.values).find((candidate) => normalizeKey(candidate) === wanted);
-  return key ? { value: row.values[key], numeric: row.numericValues[key] } : undefined;
+  const normalizedKey = candidateKeys.find((candidate) => normalizeKey(candidate) === wanted);
+  if (normalizedKey) {
+    return { value: row.values[normalizedKey], numeric: row.numericValues[normalizedKey] };
+  }
+
+  return undefined;
 }
 
 function compareFilterValue(actual: string, actualNumber: number | undefined, operator: FilterClause["operator"], expected: string) {
@@ -235,9 +249,26 @@ function compareFilterValue(actual: string, actualNumber: number | undefined, op
   const expectedLower = expected.toLowerCase();
   const expectedNumber = parseComparableNumber(expected);
 
-  if (!operator || operator === "contains") return actualLower.includes(expectedLower);
-  if (operator === "==") return actualLower === expectedLower || (actualNumber != null && expectedNumber != null && actualNumber === expectedNumber);
-  if (operator === "!=") return actualLower !== expectedLower && (actualNumber == null || expectedNumber == null || actualNumber !== expectedNumber);
+  if (!operator || operator === "contains") {
+    return actualLower.includes(expectedLower) || (actualNumber != null && expectedNumber != null && actualNumber === expectedNumber);
+  }
+  if (operator === "==") {
+    return (
+      actualLower === expectedLower ||
+      actualLower.startsWith(expectedLower) ||
+      actualLower.includes(expectedLower) ||
+      (actualNumber != null && expectedNumber != null && actualNumber === expectedNumber)
+    );
+  }
+  if (operator === "!=") {
+    const matches = (
+      actualLower === expectedLower ||
+      actualLower.startsWith(expectedLower) ||
+      actualLower.includes(expectedLower) ||
+      (actualNumber != null && expectedNumber != null && actualNumber === expectedNumber)
+    );
+    return !matches;
+  }
   if (operator === "~=") {
     try {
       return new RegExp(expected, "i").test(actual);
@@ -732,6 +763,7 @@ export function CanFdDashboard() {
   );
 
 
+  const isLiveStreaming = status === "connected" && !capturePaused && !traceSourceName;
   const isFilterActive = parsedFilter.valid && parsedFilter.clauses.length > 0;
   const [accumulatedFilteredRows, setAccumulatedFilteredRows] = useState<TraceRow[]>([]);
   const lastProcessedLineRef = useRef<number>(0);
@@ -740,7 +772,7 @@ export function CanFdDashboard() {
   const currentFilterKey = `${appliedSearch}-${profilesForDecode.map((p) => p.meta.name).join(",")}`;
 
   useEffect(() => {
-    if (!isFilterActive) {
+    if (!isFilterActive || !isLiveStreaming) {
       setAccumulatedFilteredRows([]);
       lastProcessedLineRef.current = 0;
       lastFilterKeyRef.current = "";
@@ -766,14 +798,17 @@ export function CanFdDashboard() {
         });
       }
     }
-  }, [currentFilterKey, isFilterActive, parsedFilter, traceRows, traceFrameLimit]);
+  }, [currentFilterKey, isFilterActive, isLiveStreaming, parsedFilter, traceRows, traceFrameLimit]);
 
   const filteredRows = useMemo(() => {
-    if (isFilterActive) {
+    if (!isFilterActive) {
+      return traceRows;
+    }
+    if (isLiveStreaming) {
       return accumulatedFilteredRows;
     }
-    return traceRows;
-  }, [accumulatedFilteredRows, isFilterActive, traceRows]);
+    return traceRows.filter((row) => rowMatchesFilter(row, parsedFilter));
+  }, [accumulatedFilteredRows, isFilterActive, isLiveStreaming, parsedFilter, traceRows]);
   const sortedRows = useMemo(() => sortTraceRows(filteredRows, sortRules), [filteredRows, sortRules]);
   const loadedTracePaginationEnabled = Boolean(traceSourceName);
   const loadedTracePageCount = loadedTracePaginationEnabled ? Math.max(1, Math.ceil(sortedRows.length / loadedPageSize)) : 1;
