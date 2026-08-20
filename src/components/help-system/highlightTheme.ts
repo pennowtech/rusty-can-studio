@@ -1,6 +1,6 @@
 // Vite raw CSS imports (bundled locally)
-import githubLightCss from "highlight.js/styles/a11y-light.min.css?inline";
-import githubDarkCss from "highlight.js/styles/tokyo-night-dark.min.css?inline";
+import githubLightCss from "highlight.js/styles/github.min.css?inline";
+import githubDarkCss from "highlight.js/styles/github-dark.min.css?inline";
 
 let styleEl: HTMLStyleElement | null = null;
 export function applyHighlightTheme(theme: "light" | "dark") {
