@@ -23,7 +23,7 @@ Use the left navigation to switch between the monitor, simulator, profile editor
 Start with a narrow CAN ID filter when the bus is busy. It keeps the trace readable and makes search results more useful.
 :::
 
-## New user examples
+## Guide: New user examples
 
 Use these short examples as a first training path. They build from offline inspection to live capture, decoding, transmit, and simulator workflows.
 
@@ -33,7 +33,7 @@ Use these short examples as a first training path. They build from offline inspe
 2. Select Open candump.
 3. Choose a \`.log\`, \`.txt\`, or \`.candump\` file.
 4. Select a row and inspect Decoded Preview.
-5. Try a display filter such as \`canId == 0x18203C01\` or \`payload contains "01 01"\`.
+5. Try a display filter such as \`canId == 0x18203C01\` or \`payload ~ "01 01"\`.
 
 :::note
 Loaded logs keep the original file order and source line numbers. Display filters hide rows visually but do not renumber the source log.
@@ -44,7 +44,7 @@ Loaded logs keep the original file order and source line numbers. Display filter
 1. Open Profile Editor.
 2. Load the canonical profile JSON files for the messages you want to decode.
 3. Return to CAN Monitor.
-4. Select a frame and confirm that Decoded Preview shows CAN ID fields, payload header fields, message name, payload values, and error status.
+4. Select a frame and confirm that Decoded Preview shows CAN ID fields, payload common fields, message name, payload values, and error status.
 
 :::warning
 If a frame belongs to a service or message that is not covered by a loaded profile, it should not borrow names or value maps from unrelated profiles. Load the correct profile or inspect the raw values.
@@ -107,7 +107,7 @@ For WSL testing, create \`vcan0\` first with \`sudo modprobe vcan\`, \`sudo ip l
 Review exported traces, settings, diagnostics, and profile JSON before sharing. They can contain host names, CAN identifiers, decoded names, and timing data.
 :::
 
-## End-user guide
+## Guide: End-user guide
 
 Use the end-user guide as the task-oriented reference for normal operation. It covers the main workspaces and the decisions users make during a real session.
 
@@ -157,7 +157,7 @@ ${examplesHelpMarkdown}
 
 # 2. CAN Monitor & Display Filters
 
-The CAN Monitor display filter is placed directly above the captured or loaded log table. It works across static columns, decoded CAN ID fields, decoded payload header fields, payload values, TX status fields, and raw payload text. It accepts simple Wireshark-style conditions and validates the expression while you type.
+The CAN Monitor display filter is placed directly above the captured or loaded log table. It works across static columns, decoded CAN ID fields, decoded payload common fields, payload values, TX status fields, and raw payload text. It accepts simple Wireshark-style conditions and validates the expression while you type.
 
 The filter box changes color:
 
@@ -167,7 +167,16 @@ The filter box changes color:
 
 Filtering is deferred while typing so the input stays responsive on large traces. The table is virtualized, so only visible rows are rendered even when the trace contains many frames.
 
-## Filter examples
+## Display mode: show only matches vs. highlight
+
+Next to the filter box, a toggle switches how an active filter affects the table:
+
+- **Show only matches** (default): non-matching rows are removed from the table entirely.
+- **Highlight**: all rows stay visible, in their original order, with matching rows highlighted — useful for seeing a filtered signal in the context of the surrounding traffic instead of in isolation.
+
+The status text next to the filter box reflects whichever mode is active (\`N/M frames\` for show-only, \`N/M frames highlighted\` for highlight mode).
+
+## Reference: Filter examples
 
 | Expression | Meaning |
 | --- | --- |
@@ -176,13 +185,20 @@ Filtering is deferred while typing so the input stays responsive on large traces
 | \`iface == vcan0\` | Match frames received on interface \`vcan0\` |
 | \`dir == RX\` | Match received frames |
 | \`dir == TX\` | Match transmitted frames |
-| \`payload contains "01 01"\` | Match hex sequence anywhere in payload |
-| \`name contains "control"\` | Match decoded message title |
+| \`payload ~ "01 01"\` | Match hex sequence anywhere in payload |
+| \`name ~ "control"\` | Match decoded message title |
+| \`payload ~= "^01(\\s01)+$"\` | Regex match against the payload text |
 | \`service_identifier == k2_focus_control\` | Match exact string enum signal |
-| \`instance_index == FIELD\` | Match string enum prefix |
+| \`instance_index ~ FIELD\` | Match string enum by substring/prefix |
 | \`txStatus == failed\` | Match failed transmissions |
+| \`len > 4 and (dir == RX or dir == TX)\` | Parentheses and correct and/or precedence |
+| \`time >= 1735000000000\` | Match frames at or after a millisecond timestamp |
 
-## Candump log import
+:::tip
+The clock icon next to the filter box opens a picker for \`time\` clauses — pick a date and time, or type a raw millisecond value directly, without typing the comparison by hand. The Time column only shows \`HH:MM:SS.mmm\`, with no date, so for a loaded candump log you may not know which date to pick — hover any row's Time cell to see its exact date and raw millisecond value, then either type that date into the picker or switch to its Raw (ms) tab and paste the number directly. Live capture timestamps are always today, so this only matters for loaded files.
+:::
+
+## Guide: Candump log import
 
 You can also inspect an offline candump file without a running daemon.
 
@@ -204,7 +220,7 @@ Loaded candump frames are decoded through the same loaded profile library as liv
 
 Loaded candump files keep the same order as the source log. The Line column shows the original source line number from the file. Live capture uses append-at-bottom ordering so the newest packet appears at the end of the table.
 
-## CAN-FD basics
+## Reference: CAN-FD basics
 
 CAN-FD has three details that matter in this application:
 
@@ -223,10 +239,10 @@ The live trace shows timestamp, identifier, direction, DLC, CAN-FD mode, and dec
 Decoded fields show engineering values from the selected profile. Fresh values are updated from recent frames. Latched values are retained until replaced by a newer frame.
 
 :::warning
-Decoded values are only as reliable as the loaded profiles. Confirm profile byte order, scaling, offsets, payload header fields, and CAN ID layouts before using a value for analysis.
+Decoded values are only as reliable as the loaded profiles. Confirm profile byte order, scaling, offsets, payload common fields, and CAN ID layouts before using a value for analysis.
 :::
 
-## Monitor sorting
+## Behavior: Monitor sorting
 
 Click a column header to sort the visible trace rows. The first click sorts ascending, the second click sorts descending, and the third click removes the manual sort.
 
@@ -236,7 +252,7 @@ When a column sort is active:
 - Loaded logs sort the full file contents.
 - Live capture continues to append incoming frames according to the active sort order.
 
-## Monitor columns
+## Reference: Monitor columns
 
 | Column | Content | Notes |
 | --- | --- | --- |
@@ -250,17 +266,17 @@ When a column sort is active:
 | Name | Decoded message name | From profile identification rules |
 | Decoded / Payload | Decoded values or raw hex | Summarized decoded signals or raw payload |
 
-## Trace ordering and retention
+## Behavior: Trace ordering and retention
 
 Keep the newest rows in the trace table and discard older rows automatically. Latest live frames stay at the bottom unless a manual sort column is selected.
 
 Specify a retention limit between 50 and 100,000 rows in Settings. The default limit is 20,000 rows.
 
-## Loaded trace pagination
+## Behavior: Loaded trace pagination
 
 When viewing large offline logs, pagination controls appear below the table allowing you to navigate across pages cleanly without slowing down rendering.
 
-## Monitor keyboard navigation
+## Shortcuts: Monitor keyboard navigation
 
 - Up and Down Arrow move selection by one row.
 - Page Up and Page Down move by a larger step.
@@ -270,45 +286,50 @@ When viewing large offline logs, pagination controls appear below the table allo
 
 # 3. Profile Editor & Signal Definitions
 
-The Profile Editor describes how raw CAN or CAN-FD frames become meaningful decoded values. A profile is a JSON contract: it defines the bus, identifier layout, optional payload header, dictionaries, message identification rules, payload fields, error rules, and display hints.
+The Profile Editor describes how raw CAN or CAN-FD frames become meaningful decoded values. A profile is a JSON contract: it defines the bus, identifier layout, optional payload common fields, dictionaries, message identification rules, payload fields, error rules, and display hints.
 
 The editor works from one canonical profile shape. JSON view shows the same canonical JSON that the runtime decodes. Older or external source formats should be converted before importing them into the app.
 
-## Canonical profile sections
+## Reference: Canonical profile sections
 
 | Section | Purpose |
 | --- | --- |
 | \`meta\` | Profile id, name, version, description, and source |
 | \`bus\` | CAN or CAN-FD, identifier format, and byte order |
-| \`layouts.canId\` | Decoded arbitration ID fields |
-| \`layouts.payloadHeader\` | Optional header fields preceding payload data |
+| \`canId\` | Decoded arbitration ID fields |
+| \`payload.common\` | Optional fields shared by every message, decoded once ahead of variant selection |
+| \`payload.discriminator\` | Ordered field names whose decoded values pick a \`payload.variants\` entry |
+| \`payload.variants\` | One entry per message, keyed by its discriminator values joined with \`:\` |
 | \`dictionaries\` | Value maps turning numeric values into labels |
-| \`messages\` | Message identification rules and payload fields |
 | \`errors\` | Rules mapping frame data to error severity and messages |
 
-## Start from live trace
+:::note
+Older files may nest \`canId\` under a \`layouts\` object instead (\`layouts.canId\`) — both shapes load the same way; the app normalizes either into the same internal representation. New files can use either, but \`canId\` as a direct top-level field (shown above) is simpler and is what \`scripts/knossos_xml_to_profile_json.py\` writes.
+:::
+
+## Guide: Start from live trace
 
 1. Open CAN Monitor and select an unmapped row.
 2. Right click the row and select Create Profile for Message.
 3. The app opens Profile Editor with pre-populated CAN ID, DLC, and sample payload bytes.
 4. Add payload signal fields, select dictionaries, and save the new profile.
 
-## Visual editor layout
+## Reference: Visual editor layout
 
 - Header: Profile name, bus mode, identifier type, and default byte order.
 - Message list: Select a message to edit its identification criteria and payload fields.
 - Field editor: Add, remove, and reorder signals. Set bit offset, bit length, data type, scaling factor, offset, unit, and dictionary map.
 - JSON Preview: Live canonical JSON representing the edited profile.
 
-## Message identification
+## Reference: Message identification
 
-A profile matches a frame when all defined identification criteria pass:
+A profile decodes the CAN ID fields, then \`payload.common\` fields, then looks up the message these
+select: the values of whichever fields \`payload.discriminator\` names (drawn from either \`canId\` or
+\`payload.common\`) are joined with \`:\` and looked up directly in \`payload.variants\`. A variant only
+needs an \`identifyWhen\` expression on top of that in the rare case where two variants would otherwise
+land on the exact same discriminator key.
 
-- CAN ID matches exact value or mask.
-- Payload header fields match required constants.
-- Payload length meets minimum DLC.
-
-## Payload fields
+## Reference: Payload fields
 
 Supported signal types:
 
@@ -319,58 +340,52 @@ Supported signal types:
 - \`string\`: ASCII or UTF-8 string bytes
 - \`enum\`: Numeric value mapped through a dictionary map
 
-## Convert XML to canonical JSON
+## Guide: Convert XML to canonical JSON
 
 The Profile Editor includes a converter for legacy XML profile formats. Click Convert XML to JSON, paste the XML source, and inspect the resulting canonical JSON before importing.
 
-## Minimal canonical profile
+## Reference: Minimal canonical profile
 
 \`\`\`json
 {
-  "meta": {
-    "id": "engine-status-v1",
-    "name": "Engine Status",
-    "version": "1.0.0"
+  "schemaVersion": "1.0",
+  "meta": { "id": "engine-status-v1", "name": "Engine Status", "version": "1.0.0" },
+  "bus": { "type": "can-fd", "idFormat": "extended", "byteOrder": "little" },
+  "layouts": {
+    "canId": { "bitLength": 29, "fields": [{ "name": "can_id", "startBit": 0, "bitLength": 29, "type": "uint" }] }
   },
-  "bus": {
-    "type": "can_fd",
-    "idType": "extended",
-    "byteOrder": "little_endian"
-  },
-  "messages": [
-    {
-      "id": "engine_telemetry",
-      "name": "Engine Telemetry",
-      "canId": "0x18203C01",
-      "fields": [
-        {
-          "id": "engine_rpm",
-          "name": "Engine Speed",
-          "type": "uint",
-          "bitOffset": 0,
+  "payload": {
+    "discriminator": ["can_id"],
+    "variants": {
+      "404765697": {
+        "id": "engine_telemetry",
+        "label": "Engine Telemetry",
+        "payload": {
           "bitLength": 16,
-          "scale": 0.25,
-          "unit": "RPM"
+          "fields": [{ "name": "engine_rpm", "label": "Engine Speed", "startBit": 0, "bitLength": 16, "type": "uint", "factor": 0.25, "unit": "RPM" }]
         }
-      ]
+      }
     }
-  ]
+  }
 }
 \`\`\`
 
-## Error status decoding
+The variant key (\`404765697\`) is \`0x18203C01\` in decimal — \`payload.discriminator\` names \`can_id\`, so
+that's the value \`payload.variants\` is keyed by.
+
+## Reference: Error status decoding
 
 Profiles can include error evaluation rules that examine signal values or raw payload bytes to raise warning or critical alerts when limits are exceeded.
 
-## Shared definitions (Common profiles)
+## Reference: Shared definitions (Common profiles)
 
-In large-scale CAN networks, message profiles often share node addresses, error codes, and common status enums. Create a Common Profile containing shared \`dictionaries\` and \`errors\`. Any active profile referencing a missing dictionary will dynamically resolve it across loaded common profiles.
+In large-scale CAN networks, message profiles often share a CAN ID layout, node addresses, error codes, and common status enums. Create a Common Profile containing the shared \`canId\` / \`payload.common\`, \`dictionaries\`, and \`errors\`. A dependent profile points \`canId\`/\`payload.common\` at it explicitly with \`{ "ref_file": "common_profile.json" }\`; dictionaries and errors resolve automatically by key across whatever other profiles are currently loaded, no reference needed. See Chapter 7 for the full workflow, including converting Knossos XML service definitions into this shape.
 
 # 4. CAN Simulator & Transmit Workflows
 
 The Transmit Composer and CAN Simulator allow manual, cyclic, and automated frame transmission onto physical or virtual CAN buses.
 
-## Transmit Composer
+## Guide: Transmit Composer
 
 Use Transmit Composer to stage and transmit single or repeated CAN / CAN-FD frames.
 
@@ -380,7 +395,7 @@ Use Transmit Composer to stage and transmit single or repeated CAN / CAN-FD fram
 4. Configure CAN-FD and BRS flags.
 5. Click Send Frame.
 
-## Cyclic TX
+## Guide: Cyclic TX
 
 1. Open Transmit Composer.
 2. Enable Cyclic TX.
@@ -390,7 +405,7 @@ Use Transmit Composer to stage and transmit single or repeated CAN / CAN-FD fram
    - **Wait for ACK**: Waits for daemon send acknowledgement before scheduling next frame.
    - **Wait for CAN response**: Waits until live capture receives a matching RX response frame.
 
-## CAN Simulator & Sequences
+## Guide: CAN Simulator & Sequences
 
 CAN Simulator executes multi-step automated transmission sequences with conditional logic, response validation, and logging.
 
@@ -404,7 +419,7 @@ CAN Simulator executes multi-step automated transmission sequences with conditio
 
 The CAN bridge daemon is a separate Linux/WSL service that exposes SocketCAN interfaces to this desktop app over WebSockets. Run it where the physical or virtual CAN interfaces exist.
 
-## Remote daemon connection
+## Setup: Remote daemon connection
 
 To monitor CAN or CAN-FD traffic from WSL or a remote Linux host:
 
@@ -412,9 +427,21 @@ To monitor CAN or CAN-FD traffic from WSL or a remote Linux host:
 2. Open Connect in this app.
 3. Enter WebSocket host IP, port (default \`9501\`), and interface name (\`can0\`, \`vcan0\`).
 4. Click Discover to list active network interfaces.
-5. Click Save and Connect.
+5. Click Test Connection to confirm the daemon is reachable.
+6. Click Save and Connect.
 
-## Prepare a virtual CAN interface
+You don't need to set Nominal bitrate or Data bitrate for a remote daemon connection. The daemon's CAN interface already has these speeds configured on its own host. This app only needs the interface name to talk to it — not its timing.
+
+## Reference: Daemon capture filter
+
+This is optional. It tells the daemon which frames to send you, before they even leave the daemon host.
+
+- **CAN ID hex**: only frames with this ID are sent.
+- **Mask hex**: which bits of the ID have to match. Use \`1FFFFFFF\` to require every bit to match.
+
+Leave both fields empty to receive every frame the daemon sees.
+
+## Setup: Prepare a virtual CAN interface
 
 \`\`\`bash
 sudo modprobe vcan
@@ -429,7 +456,7 @@ For physical CAN hardware:
 sudo ip link set can0 up type can bitrate 500000
 \`\`\`
 
-## Run the daemon
+## Setup: Run the daemon
 
 Development run:
 
@@ -444,14 +471,14 @@ cargo build --release
 RUST_LOG=info ./target/release/can_bridge_daemon --tcp-bind 0.0.0.0:9500 --ws-bind 0.0.0.0:9501 --grpc-bind 0.0.0.0:9502
 \`\`\`
 
-## Transport options
+## Reference: Transport options
 
 - WebSocket JSON: Default transport used by this app (\`ws://HOST:PORT/ws/text\`).
 - WebSocket binary: High-throughput binary stream.
 - TCP JSONL: Line-oriented JSON over TCP.
 - gRPC: Typed streaming API.
 
-## Daemon-side raw CAN filtering
+## Reference: Daemon-side raw CAN filtering
 
 Remote profiles can include raw daemon-side filters to reduce network traffic before frames are forwarded over WebSockets:
 
@@ -464,15 +491,15 @@ Example: Filter for service identifier \`810\` (\`0x32A\`):
 (frame.id & 0x000003FF) == (0x0000032A & 0x000003FF)
 \`\`\`
 
-## Mobile remote monitoring
+## Guide: Mobile remote monitoring
 
-Rusty CAN Studio can be served as a PWA for remote monitoring on mobile phones or tablets while \`can-bridge-daemon\` runs on the Linux host attached to the CAN bus.
+RustyCAN can be served as a PWA for remote monitoring on mobile phones or tablets while \`can-bridge-daemon\` runs on the Linux host attached to the CAN bus.
 
 # 6. User Tools, Shortcuts & Help Editing
 
 Use this chapter as a reference for application tools, UI shortcuts, customization, and help editing.
 
-## Filtering and search
+## Guide: Filtering and search
 
 The help search field searches rendered documentation. Matching text is highlighted in the preview, and the active result scrolls smoothly into view.
 
@@ -483,7 +510,7 @@ Search navigation shortcuts:
 - **Shift+Enter / p / Arrow Up**: Jump to previous search match.
 - **Escape**: Clear search and exit search mode.
 
-## Keyboard shortcuts and command panel
+## Shortcuts: Keyboard shortcuts and command panel
 
 Open Help > Keyboard Shortcuts to review and edit application shortcuts.
 
@@ -497,47 +524,118 @@ Default shortcuts:
 - **Ctrl+/**: Open Keyboard Shortcuts.
 - **F1**: Open Help.
 
-## About, Appearance & Localization
+## Reference: About, Appearance & Localization
 
 - **About Screen**: View app version, environment details, and quick links.
 - **Appearance Settings**: Toggle Light, Dark, or System mode, color palettes, and UI density.
 - **Localization Settings**: Select application language, date/time formatting, and number format options.
 
-## Editing help content
+## Reference: Callout blocks
 
-Open the Edit tab in the Help view to customize markdown documentation. The View tab renders final formatted output, and the Diff tab compares custom changes against the default manual.
-
-Use these callout directive blocks:
-
-\`\`\`markdown
-:::note
-Neutral information block.
-:::
-
-:::tip
-Workflow recommendation.
-:::
-
-:::warning
-Warning for risky operations.
-:::
-
-:::danger
-Safety-critical warning.
-:::
-\`\`\`
-
-## Saving and resetting
-
-- **Save**: Persists custom help changes locally.
-- **Reset Chapter**: Restores default markdown for the selected chapter.
-- **Reset All**: Restores the entire factory default help manual.
+Note, tip, warning, and danger callouts appear throughout this manual to flag workflow recommendations and risky operations at a glance.
 
 ## Troubleshooting
 
 ### Search does not find text
-Ensure you are in the View tab. Search operates on rendered HTML output.
+Search runs against the rendered help page. Clear any active display filter elsewhere in the app before searching — it doesn't affect Help, but confirms you're looking at the right context — then try the search again.
 
-### ToC does not show an entry
-Only headings are included in the Table of Contents. Use \`#\`, \`##\`, or \`###\` heading tags.
+# 7. Knossos XML Import & Shared Profiles
+
+Knossos service-definition XML files (\`k2_*.xml\`) describe CAN-FD services in a format that predates this app's canonical profile JSON. \`scripts/knossos_xml_to_profile_json.py\` converts them, and can either bake everything into one profile per XML file or split out the CAN ID layout, payload common fields, and protocol-level dictionaries every service shares into one reusable common file that the rest explicitly reference with \`ref_file\`.
+
+## Setup: Run the conversion script
+
+Convert a single XML file to one self-contained canonical profile (no sharing, everything inline):
+
+\`\`\`bash
+python scripts/knossos_xml_to_profile_json.py k2_light_control.xml -o k2_light_control_profile.json
+\`\`\`
+
+Convert several XML files at once, writing one profile per file plus a shared common file:
+
+\`\`\`bash
+python scripts/knossos_xml_to_profile_json.py k2_light_control.xml k2_focus_control.xml --split-dir ./profiles
+\`\`\`
+
+This writes \`profiles/knossos_common.json\` (CAN ID layout, payload common fields, and the protocol-level dictionaries — \`command_class\`, \`broadcast\`, \`start_of_transfer\`, \`end_of_transfer\`, \`message_good\` — no variants) alongside \`profiles/k2_light_control_profile.json\` and \`profiles/k2_focus_control_profile.json\`, one per input XML file, each already pointing at it:
+
+\`\`\`json
+"canId": { "ref_file": "knossos_common.json" },
+"payload": { "common": { "ref_file": "knossos_common.json" }, "discriminator": [ "command_class", "attribute_address", "feature_index" ], "variants": { "...": "..." } }
+\`\`\`
+
+Device-specific dictionaries built from that device's own XML (\`attribute_address\`, \`feature_index\`, \`instance_index\`, \`service_identifier\`, and any \`error_status\` codes) stay in the per-device file — only the truly identical protocol constants move to the common file. Load all the files \`--split-dir\` writes together and they work as-is, no manual editing needed.
+
+## Guide: How \`ref_file\` resolves automatically
+
+Load more than one profile JSON at once — Load Profile JSON accepts multiple files in one dialog — and the Profile Editor resolves references at view time:
+
+- **\`canId\` / \`payload.common\`**: when either is written as \`{ "ref_file": "some_file.json" }\`, the Profile Editor looks through every other currently-loaded profile for one whose own source filename matches (case-insensitive, ignoring its folder) and uses that profile's layout instead.
+- **Dictionaries**: independently of \`ref_file\`, any dictionary key missing from the active profile is filled in from the first other loaded profile that defines it — this is how device-specific files still pick up the common file's \`command_class\`/\`broadcast\`/etc. without referencing it explicitly.
+- **Errors**: same idea, merged by error rule id.
+
+This resolution happens purely from what's currently loaded — nothing is written back to disk, and nothing is recorded beyond the \`ref_file\` string itself. Unload the referenced file, or never load it in the first place, and the reference simply can't resolve.
+
+:::warning
+An unresolved \`ref_file\` is never silent — a toast error and a diagnostics log entry appear the moment such a profile becomes active ("*profile* references *file*, but that file isn't currently loaded"), and the CAN ID layout / Payload common tab shows the same message inline instead of a blank layout. If you see this, load the referenced file too, or check you didn't misspell its name.
+:::
+
+The CAN ID layout and Payload common tabs show a "Referenced from *file* (loaded as *profile*)" banner with a "Switch to *profile*" button whenever \`ref_file\` resolves successfully — use it to jump straight to the file that actually owns the data, instead of hunting for it in the profile selector.
+
+## Reference: Writing a common (shared) profile file
+
+A common profile is a regular canonical profile JSON with an empty \`payload.variants\` object — it exists purely to be loaded alongside other profiles, not to describe any message on its own:
+
+\`\`\`json
+{
+  "schemaVersion": "1.0",
+  "meta": { "id": "k2_common", "name": "K2 Common CAN Layout", "version": "1.0.0" },
+  "bus": { "type": "can-fd", "idFormat": "extended", "byteOrder": "little" },
+  "canId": { "label": "Universal CAN ID Layout", "bitLength": 29, "fields": [ "... shared fields ..." ] },
+  "payload": {
+    "common": { "label": "Payload common", "bitLength": 16, "fields": [ "... shared fields ..." ] },
+    "discriminator": [],
+    "variants": {}
+  },
+  "dictionaries": {
+    "command_class": { "6": "command/request", "5": "response", "3": "event/notification" }
+  },
+  "errors": [],
+  "display": {}
+}
+\`\`\`
+
+Keep in mind:
+
+- \`meta.id\` must be unique across every profile you load together — it's the key used to avoid merging a profile with itself.
+- Only put dictionaries here that are genuinely identical across every dependent profile. A dictionary that differs per device — like a \`service_identifier\` map naming that one device, or \`attribute_address\`/\`feature_index\` built from that device's own XML — belongs in the device's own file instead; dictionary keys still merge fine across files as long as each device contributes different numeric keys.
+- Give the common profile its own real \`meta.name\` — it shows up in the profile selector and in the "Referenced from ..." banner, so name it for what it is ("K2 Common CAN Layout"), not after whichever device you copied it from.
+- The filename you save this as is what every dependent profile's \`ref_file\` must match exactly (case-insensitive) — rename it and every reference to it breaks until you update them too.
+
+## Reference: Writing a dependent (message-only) profile file
+
+A dependent profile keeps its own \`payload.discriminator\`/\`payload.variants\`, and points \`ref_file\` at the common file for the layouts it doesn't define itself:
+
+\`\`\`json
+{
+  "canId": { "ref_file": "k2_common.json" },
+  "payload": {
+    "common": { "ref_file": "k2_common.json" },
+    "discriminator": ["command_class", "attribute_address", "feature_index"],
+    "variants": {
+      "6:0:1": { "id": "k2_light_control.light_switch.get_current_value.command", "label": "light_switch.get_current_value.command", "payload": { "bitLength": 16, "fields": [] } }
+    }
+  }
+}
+\`\`\`
+
+The variant key (\`6:0:1\`) is the \`discriminator\` field values — \`command_class\`, \`attribute_address\`, \`feature_index\` — joined with \`:\`, in that order. \`service_identifier\` doesn't need to be part of the discriminator here: it's constant across every message in one k2 device file, so the right profile is already selected (by trying each loaded profile) before variants are even consulted.
+
+Keep in mind:
+
+- \`ref_file\` can be written on its own with no \`fields\`/\`bitLength\` at all, as shown above — the app fills those in as empty defaults automatically when it loads the file. You never need to write \`"fields": []\` yourself.
+- Keep only device-specific dictionary entries locally, such as a single-entry \`service_identifier\` map naming this device. Duplicate copies of shared dictionaries in a dependent file aren't invalid, but they defeat the point of splitting the file out.
+- To convert an existing profile that already owns its layout into one that references a shared file instead, open its CAN ID layout tab and use "Reference a shared CAN ID layout file instead" — it prompts for the filename to reference, then clears this profile's own fields after you confirm.
+- \`ref_file\` only resolves against profiles that are actually loaded in the app right now — it isn't a filesystem path the app goes and reads on its own. Whatever file you name has to be opened via Load Profile JSON too, in the same session.
+- If two variants would land on the exact same discriminator key (equality alone can't tell them apart), register an array of variants at that key instead of one object, giving each an \`identifyWhen\` expression (e.g. \`"mode < 10"\`) — the first one whose expression passes wins.
 `;

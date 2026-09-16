@@ -10,7 +10,7 @@ type BitLayoutField = {
   bitLength: number;
 };
 
-export function validateCanIdLayout(fields: BitLayoutField[]): BitOverlapError[] {
+export function validateBitLayout(fields: BitLayoutField[]): BitOverlapError[] {
   const errors: BitOverlapError[] = [];
 
   for (let i = 0; i < fields.length; i++) {

@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "Rusty CAN Studio Windows setup"
+Write-Host "RustyCAN Windows setup"
 Write-Host "Checking required tools..."
 
 function Assert-Command($Name, $InstallHint) {

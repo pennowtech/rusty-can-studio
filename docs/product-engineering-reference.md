@@ -1,8 +1,8 @@
-# Rusty CAN Studio
+# RustyCAN
 
 Complete Product & Engineering Reference
 
-Version 1.0  |  July 13, 2026  |  Pennowtech / Rusty CAN Studio Team
+Version 1.0  |  July 13, 2026  |  Pennowtech / RustyCAN Team
 
 | Platform | Stack | Backend | Status |
 | --- | --- | --- | --- |
@@ -31,14 +31,14 @@ Internal - Not for External Distribution
 
 ### 1.1 Product Summary
 
-Rusty CAN Studio is a desktop workbench for CAN and CAN-FD traffic analysis, profile-driven decoding, and controlled transmission workflows. It lets engineers load candump logs, connect to a remote SocketCAN daemon, inspect live traffic, decode protocol fields from JSON profiles, and build repeatable simulator sequences without writing a custom tool for every investigation. The primary user action is to move from raw frames to meaningful diagnosis: capture or load traffic, decode it, filter it, and optionally transmit or simulate follow-up frames. The core benefit is faster CAN-FD investigation with a generic profile system that keeps protocol knowledge outside the application code.
+RustyCAN is a desktop workbench for CAN and CAN-FD traffic analysis, profile-driven decoding, and controlled transmission workflows. It lets engineers load candump logs, connect to a remote SocketCAN daemon, inspect live traffic, decode protocol fields from JSON profiles, and build repeatable simulator sequences without writing a custom tool for every investigation. The primary user action is to move from raw frames to meaningful diagnosis: capture or load traffic, decode it, filter it, and optionally transmit or simulate follow-up frames. The core benefit is faster CAN-FD investigation with a generic profile system that keeps protocol knowledge outside the application code.
 
 ### 1.2 Core Value Proposition
 
 | Pillar | Description | User Need Addressed |
 | --- | --- | --- |
 | Trace inspection | Load candump logs or stream live frames into one monitor table. | Engineers need to inspect raw traffic quickly without changing tools. |
-| Profile-driven decoding | Decode CAN ID fields, payload headers, payload values, and error status from JSON profiles. | Raw bytes need to become meaningful fields without hardcoding one protocol. |
+| Profile-driven decoding | Decode CAN ID fields, payload common fields, payload values, and error status from JSON profiles. | Raw bytes need to become meaningful fields without hardcoding one protocol. |
 | Remote SocketCAN access | Connect from Windows to `can_bridge_daemon` running in Linux or WSL. | Users need access to SocketCAN interfaces that are not native on Windows. |
 | Controlled transmission | Send single frames, cyclic frames, and sequence-driven workflows. | Users need to reproduce requests, poll status, and validate response behavior. |
 | Analysis ergonomics | Filtering, sorting, pagination, column controls, exports, archive, themes, density, and Help. | Long traces need to stay readable and repeatable during real investigations. |
@@ -83,7 +83,7 @@ In Scope - v1.0:
 - Subscribe to daemon-provided SocketCAN interfaces.
 - Display RX and app-originated TX frames in CAN Monitor.
 - Decode frames from JSON profiles.
-- Display CAN ID fields, payload headers, payload values, error status, and message names.
+- Display CAN ID fields, payload common fields, payload values, error status, and message names.
 - Display filters, sorting, pagination for loaded logs, column visibility, and column ordering.
 - Export raw candump and decoded CSV.
 - Send single frames and cyclic frames.
@@ -123,7 +123,7 @@ Note: Non-scope is intentional. The product should remain a generic CAN/CAN-FD w
 | --- | --- | --- | --- |
 | FR-10 | The system shall support field-based display filters. | Must | Examples: `canId == 18203C01`, `hasError == true`. |
 | FR-11 | The system shall validate display filter syntax while typing. | Must | Invalid filters should explain the failure. |
-| FR-12 | The system shall filter across raw and decoded columns. | Must | Includes CAN ID, payload headers, error fields, TX status. |
+| FR-12 | The system shall filter across raw and decoded columns. | Must | Includes CAN ID, payload common fields, error fields, TX status. |
 | FR-13 | The system shall allow column header context menus to build filters. | Should | Replace, AND, OR, editable condition. |
 | FR-14 | The system shall support multi-column sorting and sort presets. | Should | Sorting applies after filtering. |
 | FR-15 | The system shall allow monitor columns to be reordered, hidden, and shown. | Should | Preferences persist. |
@@ -134,7 +134,7 @@ Note: Non-scope is intentional. The product should remain a generic CAN/CAN-FD w
 | --- | --- | --- | --- |
 | FR-20 | The system shall load one or more JSON profiles. | Must | Profiles add decode coverage without replacing unrelated profiles. |
 | FR-21 | The system shall decode CAN ID layout fields from profile definitions. | Must | Generic bit layout. |
-| FR-22 | The system shall decode payload header fields before message matching. | Must | Enables attribute/operation matching. |
+| FR-22 | The system shall decode payload common fields before message matching. | Must | Enables attribute/operation matching. |
 | FR-23 | The system shall decode payload fields only for matching messages. | Must | Prevent unrelated profile leakage. |
 | FR-24 | The system shall support error status dictionaries from profile JSON. | Must | Bad responses show code and text. |
 | FR-25 | The system shall provide Visual and JSON editing modes. | Should | JSON remains source format. |
@@ -308,9 +308,9 @@ Note: Non-scope is intentional. The product should remain a generic CAN/CAN-FD w
 
 ```mermaid
 C4Context
-  title System Context - Rusty CAN Studio
+  title System Context - RustyCAN
   Person(engineer, "CAN-FD Engineer", "Loads traces, connects to daemon, decodes frames, sends test frames")
-  System(app, "Rusty CAN Studio", "Desktop CAN/CAN-FD workbench")
+  System(app, "RustyCAN", "Desktop CAN/CAN-FD workbench")
   System_Ext(daemon, "can_bridge_daemon", "Linux/WSL SocketCAN bridge")
   System_Ext(socketcan, "SocketCAN Interfaces", "vcan0, can0, can1")
   System_Ext(files, "Local Files", "candump logs, profile JSON, exports, settings backups")
@@ -684,7 +684,7 @@ sequenceDiagram
 
 ### 8.1 Entity Relationship Diagram
 
-Rusty CAN Studio v1.0 does not use a central database. Persistent data is local app state and local files.
+RustyCAN v1.0 does not use a central database. Persistent data is local app state and local files.
 
 ```mermaid
 erDiagram
@@ -726,9 +726,9 @@ erDiagram
 | schemaVersion | string | required | Canonical profile contract version. |
 | meta | object | required | Name, version, source metadata. |
 | bus | object | required | CAN/CAN-FD mode, identifier format, and byte order. |
-| layouts | object | required | CAN ID layout and optional payload header layout. |
+| layouts | object | required | CAN ID layout. |
+| payload | object | required | Payload common fields, discriminator, and message variants. |
 | dictionaries | object | optional | Numeric-to-text dictionaries used by fields. |
-| messages | array | required | Message identification rules and payload fields. |
 | errors | array | optional | Error extraction and dictionary rules. |
 | display | object | optional | Column, editor, and presentation hints. |
 
@@ -932,7 +932,7 @@ Daemon setup:
 2. Ensure Rust and `protoc` are installed.
 3. Create or bring up SocketCAN interfaces.
 4. Run daemon with WebSocket JSON enabled.
-5. Connect from Rusty CAN Studio.
+5. Connect from RustyCAN.
 
 ### 11.3 Project Initialisation
 
@@ -1041,7 +1041,7 @@ Security workflow:
 import { WsJsonDaemonClient } from "@/can-bridge/ws/WsJsonDaemonClient";
 
 const client = new WsJsonDaemonClient("ws://127.0.0.1:9501/ws/text");
-const hello = await client.connect({ clientName: "rusty-can-studio" });
+const hello = await client.connect({ clientName: "rustycan" });
 client.setFrameHandler((frame) => {
   // append frame to connection store
 });
@@ -1087,7 +1087,7 @@ Decoder inputs:
 Decoder outputs:
 
 - decoded CAN ID fields
-- payload header fields
+- payload common fields
 - payload value fields
 - message/profile names
 - error code/text
@@ -1313,7 +1313,7 @@ npm run security:audit
 | Tauri | Desktop app framework using a WebView frontend and Rust backend shell. |
 | WebSocket JSON | Text JSON protocol used between the app and daemon. |
 | Profile JSON | Runtime decode configuration for CAN ID and payload fields. |
-| Payload header | Shared payload bytes used to route/decode a message. |
+| Payload common | Shared payload bytes, decoded once, used to route/decode a message. |
 | TX ACK | Daemon acknowledgement that a frame send call was accepted or rejected. |
 | Sequence | CAN Simulator workflow made of send/wait/cyclic/delay/branch steps. |
 
@@ -1321,4 +1321,4 @@ npm run security:audit
 
 | Version | Date | Author | Changes |
 | --- | --- | --- | --- |
-| 1.0 | 2026-07-13 | Rusty CAN Studio Team | Initial product and engineering reference. |
+| 1.0 | 2026-07-13 | RustyCAN Team | Initial product and engineering reference. |

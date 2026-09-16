@@ -37,6 +37,7 @@ export function useCommandPaletteHotkey() {
   const paletteOpen = useCommandPaletteStore((s) => s.open);
   const shortcuts = useShortcutStore((s) => s.shortcuts);
   const setView = useAppStore((s) => s.setView);
+  const setAboutOpen = useAppStore((s) => s.setAboutOpen);
   const { setTheme } = useTheme();
   const openConnectDialog = useConnectDialogStore((s) => s.openDialog);
   const openConnectionManager = useUiStore((s) => s.openConnectionManager);
@@ -53,11 +54,11 @@ export function useCommandPaletteHotkey() {
       if (!command) return;
 
       e.preventDefault();
-      command.handler({ setView, setTheme, openConnectDialog, openConnectionManager, openPalette });
+      command.handler({ setView, setTheme, setAboutOpen, openConnectDialog, openConnectionManager, openPalette });
       if (paletteOpen && command.id !== "app.commandPalette") closePalette();
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closePalette, openConnectDialog, openConnectionManager, openPalette, paletteOpen, setTheme, setView, shortcuts]);
+  }, [closePalette, openConnectDialog, openConnectionManager, openPalette, paletteOpen, setAboutOpen, setTheme, setView, shortcuts]);
 }

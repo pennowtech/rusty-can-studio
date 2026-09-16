@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useProfileStore } from "@/profile-editor/store/profileStore";
+import { denormalizeProfileForExport, useProfileStore } from "@/profile-editor/store/profileStore";
 import { Download, Trash2, Upload, Plus } from "lucide-react";
 import { useRef } from "react";
 
@@ -27,7 +27,11 @@ export function ProfileToolbar() {
   const hasBlockingErrors = useProfileStore((s) => s.hasBlockingErrors);
 
   async function importFromFiles(files: FileList) {
-    importJsonTexts(await Promise.all(Array.from(files).map((file) => file.text())));
+    const fileArray = Array.from(files);
+    importJsonTexts(
+      await Promise.all(fileArray.map((file) => file.text())),
+      fileArray.map((file) => file.name),
+    );
   }
 
   function saveProfile() {
@@ -36,7 +40,7 @@ export function ProfileToolbar() {
       return;
     }
 
-    downloadJson(`${activeProfile.meta.name || "can-profile"}.json`, JSON.stringify(activeProfile, null, 2));
+    downloadJson(`${activeProfile.meta.name || "can-profile"}.json`, JSON.stringify(denormalizeProfileForExport(activeProfile), null, 2));
   }
 
   return (

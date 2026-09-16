@@ -1,6 +1,8 @@
-# Rusty CAN Studio
+![RustyCAN](assets/rusty-can-studio-banner.png)
 
-Rusty CAN Studio is a desktop workbench for CAN and CAN-FD traffic. It is built with Tauri, React, TypeScript, and Rust. The app is meant for people who need to inspect CAN traces, decode frames with JSON profiles, transmit frames through a bridge daemon, and build repeatable test or simulation workflows without writing a full custom tool every time.
+# RustyCAN
+
+RustyCAN is a desktop workbench for developers who need to inspect, decode, and simulate CAN and CAN-FD traffic. By combining a native Rust backend with a React/Tauri frontend, it provides a fast and lightweight environment to capture live traces, transmit frames, and build automated testing workflows.
 
 The current focus is CAN-FD workflows with remote SocketCAN access through `can_bridge_daemon`. You can still load candump logs locally and use the decoder/profile tools without a live daemon connection.
 
@@ -10,7 +12,7 @@ The current focus is CAN-FD workflows with remote SocketCAN access through `can_
 - Connect to a remote CAN bridge daemon running on Linux or WSL.
 - Subscribe to SocketCAN interfaces such as `vcan0`, `can0`, or `can1`.
 - Display live RX frames and locally transmitted TX rows in one trace table.
-- Decode CAN ID fields, payload headers, payload values, and error status using JSON profiles.
+- Decode CAN ID fields, payload common fields, payload values, and error status using JSON profiles.
 - Filter trace rows with Wireshark-style display filters.
 - Reorder, show, and hide monitor columns.
 - Export raw candump logs and decoded CSV views.
@@ -29,7 +31,7 @@ The desktop app does not talk to Linux SocketCAN directly from Windows. For live
 Typical setup:
 
 ```text
-Rusty CAN Studio on Windows
+RustyCAN on Windows
         |
         | WebSocket JSON
         v
@@ -46,7 +48,7 @@ For offline work, you can skip the daemon and load candump logs directly.
 
 If you just want to try a ready-built package, download the latest release from GitHub:
 
-- Rusty CAN Studio releases: https://github.com/pennowtech/rusty-can-studio/releases
+- RustyCAN releases: https://github.com/pennowtech/rusty-can-studio/releases
 
 For a guided Windows developer setup, run:
 
@@ -59,6 +61,8 @@ Install dependencies:
 ```bash
 npm install
 ```
+
+This works standalone — no other repo needs to be present. Some UI (the nav sidebar, the About dialog) is sourced from a sibling repo, [`sbt-desktop-kit`](https://github.com/pennowtech/sbt-desktop-kit), via a Vite alias that falls back gracefully (with a console warning) when that sibling isn't checked out. If you also have `sbt-desktop-kit` and FlexMQTT's `desktop-next` checked out as siblings of this repo, see `sbt-desktop-kit`'s README for an optional shared npm workspace setup — entirely optional, local-dev-only, and not required for this repo to build.
 
 Run the frontend in a browser:
 
@@ -107,7 +111,7 @@ Loaded logs keep their original order and line numbers. Display filters hide row
 ### Connect To A Live CAN Interface
 
 1. Start `can_bridge_daemon` in Linux or WSL.
-2. In Rusty CAN Studio, open Connect.
+2. In RustyCAN, open Connect.
 3. Choose Remote Daemon.
 4. Enter the daemon host and WebSocket port.
 5. Use Discover to list interfaces from the daemon.
@@ -133,7 +137,7 @@ bash scripts/setup-linux-daemon-prereqs.sh
 
 ### Decode Frames With Profiles
 
-Profiles are canonical JSON files that describe how CAN IDs, optional payload headers, messages, payload values, dictionaries, and errors should be decoded. The decoder should stay generic: protocol-specific meaning belongs in the JSON profile, not hardcoded app logic.
+Profiles are canonical JSON files that describe how CAN IDs, optional payload common fields, messages, payload values, dictionaries, and errors should be decoded. The decoder should stay generic: protocol-specific meaning belongs in the JSON profile, not hardcoded app logic.
 
 You can:
 
@@ -143,7 +147,7 @@ You can:
 - Use decoded fields in CAN Monitor columns and display filters.
 - Jump from decoded preview entries back into the profile editor.
 
-Profile matching is intentionally conservative. A profile should only decode a message when the relevant CAN ID and payload header fields match that profile.
+Profile matching is intentionally conservative. A profile should only decode a message when the relevant CAN ID and payload common fields match that profile.
 
 Generic example profiles and matching candump snippets are committed under `profiles/test/`. Local/generated working profiles in the root `profiles/` folder can be useful during development, but they should only be committed when they are intended as shared examples.
 

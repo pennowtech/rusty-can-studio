@@ -1,12 +1,14 @@
 import { create } from "zustand";
+import type { PayloadDisplayMode } from "@sbt/desktop-kit/components/PayloadFieldsCell";
 
 export type MonitorColumnId = "line" | "time" | "iface" | "canId" | "dir" | "len" | "mode" | "payload";
-export type DecodedPreviewColumnId = "field" | "bits" | "raw" | "value" | "meaning";
+export type FilterDisplayMode = "matches" | "highlight";
 
 export const loadedTracePageSizes = [10, 25, 50, 100, 250, 500, 1000] as const;
 
 type MonitorPreferencesState = {
   search: string;
+  filterDisplayMode: FilterDisplayMode;
   selectedTraceRowKey?: string;
   columnOrder: string[];
   loadedPageSize: number;
@@ -14,9 +16,16 @@ type MonitorPreferencesState = {
   showDecodedPreview: boolean;
   showTransmitComposer: boolean;
   monitorColumns: Record<MonitorColumnId, boolean>;
-  dynamicMonitorColumns: Record<string, boolean>;
-  decodedPreviewColumns: Record<DecodedPreviewColumnId, boolean>;
+  // Full = common + variant fields together (matches mqttx-next's own
+  // payload view, which has no separate "common" concept exposed in its
+  // UI). Variant only = just the variant-specific fields, on the
+  // expectation that payload.common fields get pinned as their own
+  // columns instead (see fieldColumnsStore.ts) - RustyCAN's default, since
+  // profile.payload.common fields are usually exactly what's worth sorting/
+  // filtering a trace by.
+  payloadDisplayMode: PayloadDisplayMode;
   setSearch: (search: string) => void;
+  setFilterDisplayMode: (mode: FilterDisplayMode) => void;
   setSelectedTraceRowKey: (key: string | null) => void;
   setColumnOrder: (columns: string[]) => void;
   setLoadedPageSize: (size: number) => void;
@@ -24,9 +33,7 @@ type MonitorPreferencesState = {
   setShowDecodedPreview: (visible: boolean) => void;
   setShowTransmitComposer: (visible: boolean) => void;
   toggleMonitorColumn: (column: MonitorColumnId) => void;
-  setDynamicMonitorColumns: (columns: string[]) => void;
-  toggleDynamicMonitorColumn: (column: string) => void;
-  toggleDecodedPreviewColumn: (column: DecodedPreviewColumnId) => void;
+  setPayloadDisplayMode: (mode: PayloadDisplayMode) => void;
 };
 
 const STORAGE_KEY = "cansim.monitor.preferences.v1";
@@ -42,14 +49,6 @@ const defaultMonitorColumns: Record<MonitorColumnId, boolean> = {
   payload: true,
 };
 
-const defaultDecodedPreviewColumns: Record<DecodedPreviewColumnId, boolean> = {
-  field: true,
-  bits: true,
-  raw: true,
-  value: true,
-  meaning: true,
-};
-
 const defaultColumnOrder: string[] = ["line", "time", "iface", "canId", "dir", "len", "mode", "payload"];
 const defaultLoadedPageSize = 1000;
 
@@ -63,11 +62,20 @@ function normalizePageIndex(value: unknown) {
   return Number.isFinite(numeric) && numeric >= 0 ? numeric : 0;
 }
 
+function normalizeFilterDisplayMode(value: unknown): FilterDisplayMode {
+  return value === "highlight" ? "highlight" : "matches";
+}
+
+function normalizePayloadDisplayMode(value: unknown): PayloadDisplayMode {
+  return value === "full" ? "full" : "variantOnly";
+}
+
 function loadPreferences() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as Partial<MonitorPreferencesState>;
     return {
       search: typeof parsed.search === "string" ? parsed.search : "",
+      filterDisplayMode: normalizeFilterDisplayMode(parsed.filterDisplayMode),
       selectedTraceRowKey: typeof parsed.selectedTraceRowKey === "string" ? parsed.selectedTraceRowKey : undefined,
       columnOrder: Array.isArray(parsed.columnOrder) ? parsed.columnOrder : defaultColumnOrder,
       loadedPageSize: normalizePageSize(parsed.loadedPageSize),
@@ -75,12 +83,12 @@ function loadPreferences() {
       showDecodedPreview: typeof parsed.showDecodedPreview === "boolean" ? parsed.showDecodedPreview : true,
       showTransmitComposer: typeof parsed.showTransmitComposer === "boolean" ? parsed.showTransmitComposer : true,
       monitorColumns: { ...defaultMonitorColumns, ...parsed.monitorColumns },
-      dynamicMonitorColumns: parsed.dynamicMonitorColumns ?? {},
-      decodedPreviewColumns: { ...defaultDecodedPreviewColumns, ...parsed.decodedPreviewColumns },
+      payloadDisplayMode: normalizePayloadDisplayMode(parsed.payloadDisplayMode),
     };
   } catch {
     return {
       search: "",
+      filterDisplayMode: "matches" as FilterDisplayMode,
       selectedTraceRowKey: undefined,
       columnOrder: defaultColumnOrder,
       loadedPageSize: defaultLoadedPageSize,
@@ -88,8 +96,7 @@ function loadPreferences() {
       showDecodedPreview: true,
       showTransmitComposer: true,
       monitorColumns: defaultMonitorColumns,
-      dynamicMonitorColumns: {},
-      decodedPreviewColumns: defaultDecodedPreviewColumns,
+      payloadDisplayMode: "variantOnly" as PayloadDisplayMode,
     };
   }
 }
@@ -98,6 +105,7 @@ function savePreferences(
   state: Pick<
     MonitorPreferencesState,
     | "search"
+    | "filterDisplayMode"
     | "selectedTraceRowKey"
     | "columnOrder"
     | "loadedPageSize"
@@ -105,14 +113,14 @@ function savePreferences(
     | "showDecodedPreview"
     | "showTransmitComposer"
     | "monitorColumns"
-    | "dynamicMonitorColumns"
-    | "decodedPreviewColumns"
+    | "payloadDisplayMode"
   >,
 ) {
   localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
       search: state.search,
+      filterDisplayMode: state.filterDisplayMode,
       selectedTraceRowKey: state.selectedTraceRowKey,
       columnOrder: state.columnOrder,
       loadedPageSize: state.loadedPageSize,
@@ -120,8 +128,7 @@ function savePreferences(
       showDecodedPreview: state.showDecodedPreview,
       showTransmitComposer: state.showTransmitComposer,
       monitorColumns: state.monitorColumns,
-      dynamicMonitorColumns: state.dynamicMonitorColumns,
-      decodedPreviewColumns: state.decodedPreviewColumns,
+      payloadDisplayMode: state.payloadDisplayMode,
     }),
   );
 }
@@ -139,16 +146,9 @@ export const monitorColumnLabels: Record<MonitorColumnId, string> = {
   payload: "Payload",
 };
 
-export const decodedPreviewColumnLabels: Record<DecodedPreviewColumnId, string> = {
-  field: "Field",
-  bits: "Bits",
-  raw: "Raw",
-  value: "Value",
-  meaning: "Meaning",
-};
-
 export const useMonitorPreferencesStore = create<MonitorPreferencesState>((set) => ({
   search: initial.search,
+  filterDisplayMode: initial.filterDisplayMode,
   selectedTraceRowKey: initial.selectedTraceRowKey,
   columnOrder: initial.columnOrder,
   loadedPageSize: initial.loadedPageSize,
@@ -156,14 +156,20 @@ export const useMonitorPreferencesStore = create<MonitorPreferencesState>((set) 
   showDecodedPreview: initial.showDecodedPreview,
   showTransmitComposer: initial.showTransmitComposer,
   monitorColumns: initial.monitorColumns,
-  dynamicMonitorColumns: initial.dynamicMonitorColumns,
-  decodedPreviewColumns: initial.decodedPreviewColumns,
+  payloadDisplayMode: initial.payloadDisplayMode,
 
   setSearch: (search) =>
     set((state) => {
       const next = { ...state, search };
       savePreferences(next);
       return { search };
+    }),
+
+  setFilterDisplayMode: (filterDisplayMode) =>
+    set((state) => {
+      const next = { ...state, filterDisplayMode };
+      savePreferences(next);
+      return { filterDisplayMode };
     }),
 
   setSelectedTraceRowKey: (selectedTraceRowKey) =>
@@ -224,45 +230,10 @@ export const useMonitorPreferencesStore = create<MonitorPreferencesState>((set) 
       return { monitorColumns };
     }),
 
-  setDynamicMonitorColumns: (columns) =>
+  setPayloadDisplayMode: (payloadDisplayMode) =>
     set((state) => {
-      const nextColumns = Object.fromEntries(columns.map((column) => [column, state.dynamicMonitorColumns[column] ?? true]));
-      const same =
-        Object.keys(nextColumns).length === Object.keys(state.dynamicMonitorColumns).length &&
-        Object.entries(nextColumns).every(([column, visible]) => state.dynamicMonitorColumns[column] === visible);
-      if (same) return {};
-
-      const next = { ...state, dynamicMonitorColumns: nextColumns };
+      const next = { ...state, payloadDisplayMode };
       savePreferences(next);
-      return { dynamicMonitorColumns: nextColumns };
-    }),
-
-  toggleDynamicMonitorColumn: (column) =>
-    set((state) => {
-      const totalVisible =
-        Object.values(state.monitorColumns).filter(Boolean).length + Object.values(state.dynamicMonitorColumns).filter(Boolean).length;
-      if (state.dynamicMonitorColumns[column] && totalVisible <= 1) return {};
-
-      const dynamicMonitorColumns = {
-        ...state.dynamicMonitorColumns,
-        [column]: !(state.dynamicMonitorColumns[column] ?? true),
-      };
-      const next = { ...state, dynamicMonitorColumns };
-      savePreferences(next);
-      return { dynamicMonitorColumns };
-    }),
-
-  toggleDecodedPreviewColumn: (column) =>
-    set((state) => {
-      const visibleCount = Object.values(state.decodedPreviewColumns).filter(Boolean).length;
-      if (state.decodedPreviewColumns[column] && visibleCount <= 1) return {};
-
-      const decodedPreviewColumns = {
-        ...state.decodedPreviewColumns,
-        [column]: !state.decodedPreviewColumns[column],
-      };
-      const next = { ...state, decodedPreviewColumns };
-      savePreferences(next);
-      return { decodedPreviewColumns };
+      return { payloadDisplayMode };
     }),
 }));

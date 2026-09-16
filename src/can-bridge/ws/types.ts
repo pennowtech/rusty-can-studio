@@ -22,9 +22,9 @@
  * - No `any`. Prefer unknown + narrowing.
  *
  * Protocol alignment:
- * - Handshake: client sends `client_hello`, server replies `hello_ack`. :contentReference[oaicite:4]{index=4}
- * - Requests: ping/list_ifaces/subscribe/unsubscribe/send_frame. :contentReference[oaicite:5]{index=5}
- * - Streaming: server/daemon emits `frame` messages when subscribed. :contentReference[oaicite:6]{index=6}
+ * - Handshake: client sends `client_hello`, server replies `hello_ack`.
+ * - Requests: ping/list_ifaces/subscribe/unsubscribe/send_frame.
+ * - Streaming: server/daemon emits `frame` messages when subscribed.
  * =============================================================================
  */
 

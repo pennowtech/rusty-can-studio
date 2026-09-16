@@ -23,7 +23,7 @@
  * - Timeouts are required for every unary.
  *
  * Protocol alignment:
- * - Based on `test_can_bridge_ws.py`. :contentReference[oaicite:7]{index=7}
+ * - Based on `test_can_bridge_ws.py`.
  * =============================================================================
  */
 
@@ -198,7 +198,7 @@ export class WsJsonDaemonClient {
     // Resolve first matching waiter (FIFO).
     // Matches are expected to be specific enough to avoid ambiguity.
     // Otherwise, the first matching waiter will win.
-    // This is aligned with test behavior. :contentReference[oaicite:10]{index=10}
+    // This is aligned with test behavior.
     // E.g., multiple pings with different IDs will be matched correctly.
     for (let i = 0; i < this.pendingResponses.length; i++) {
       const pendingResponse = this.pendingResponses[i];

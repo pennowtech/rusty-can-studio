@@ -24,21 +24,23 @@ describe("canonical profile decoding across unrelated CAN-FD formats", () => {
           ],
         },
       },
-      messages: [
-        {
-          id: "motor_status",
-          label: "Motor Status",
-          identifyBy: { can_id: 0x321 },
-          payload: {
-            bitLength: 32,
-            fields: [
-              { name: "rpm", startBit: 0, bitLength: 16, type: "uint", factor: 0.25, unit: "rpm" },
-              { name: "temperature", startBit: 16, bitLength: 8, type: "uint", offset: -40, unit: "degC" },
-              { name: "enabled", startBit: 24, bitLength: 1, type: "bool" },
-            ],
+      payload: {
+        discriminator: ["can_id"],
+        variants: {
+          "801": {
+            id: "motor_status",
+            label: "Motor Status",
+            payload: {
+              bitLength: 32,
+              fields: [
+                { name: "rpm", startBit: 0, bitLength: 16, type: "uint", factor: 0.25, unit: "rpm" },
+                { name: "temperature", startBit: 16, bitLength: 8, type: "uint", offset: -40, unit: "degC" },
+                { name: "enabled", startBit: 24, bitLength: 1, type: "bool" },
+              ],
+            },
           },
         },
-      ],
+      },
     };
     const [frame] = parseCandump("(000.000000) can0 321 [08] 20 4E 64 01 00 00 00 00");
     const decoded = decodeFrameWithProfiles([profile], frame);
@@ -69,20 +71,22 @@ describe("canonical profile decoding across unrelated CAN-FD formats", () => {
           ],
         },
       },
-      messages: [
-        {
-          id: "j1939.engine_speed",
-          label: "Engine Speed",
-          identifyBy: { pgn: 0xf004 },
-          payload: {
-            bitLength: 64,
-            fields: [
-              { name: "actual_torque", startBit: 16, bitLength: 8, type: "uint", offset: -125, unit: "%" },
-              { name: "engine_speed", startBit: 24, bitLength: 16, type: "uint", factor: 0.125, unit: "rpm" },
-            ],
+      payload: {
+        discriminator: ["pgn"],
+        variants: {
+          "61444": {
+            id: "j1939.engine_speed",
+            label: "Engine Speed",
+            payload: {
+              bitLength: 64,
+              fields: [
+                { name: "actual_torque", startBit: 16, bitLength: 8, type: "uint", offset: -125, unit: "%" },
+                { name: "engine_speed", startBit: 24, bitLength: 16, type: "uint", factor: 0.125, unit: "rpm" },
+              ],
+            },
           },
         },
-      ],
+      },
     };
     const [frame] = parseCandump("(000.000000) can0 0CF00401 [08] FF FF 7D 20 4E FF FF FF");
     const decoded = decodeFrameWithProfiles([profile], frame);
@@ -110,14 +114,6 @@ describe("canonical profile decoding across unrelated CAN-FD formats", () => {
             { name: "command_class", startBit: 26, bitLength: 4, type: "enum", dictionary: "command_class" },
           ],
         },
-        payloadHeader: {
-          bitLength: 16,
-          fields: [
-            { name: "message_good", startBit: 0, bitLength: 1, type: "enum", dictionary: "message_good" },
-            { name: "attribute_address", startBit: 1, bitLength: 7, type: "enum", dictionary: "attribute_address" },
-            { name: "feature_index", startBit: 8, bitLength: 4, type: "uint" },
-          ],
-        },
       },
       dictionaries: {
         service_identifier: { "810": "light" },
@@ -126,14 +122,24 @@ describe("canonical profile decoding across unrelated CAN-FD formats", () => {
         attribute_address: { "3": "on_off_cycles" },
         error_status: { "12": "ERROR_AXIS_POSITION_NOT_REACHED" },
       },
-      messages: [
-        {
-          id: "light.on_off_cycles.response",
-          label: "on_off_cycles response",
-          identifyBy: { service_identifier: 810, command_class: 5, attribute_address: 3, feature_index: 1 },
-          payload: { bitLength: 48, fields: [] },
+      payload: {
+        common: {
+          bitLength: 16,
+          fields: [
+            { name: "message_good", startBit: 0, bitLength: 1, type: "enum", dictionary: "message_good" },
+            { name: "attribute_address", startBit: 1, bitLength: 7, type: "enum", dictionary: "attribute_address" },
+            { name: "feature_index", startBit: 8, bitLength: 4, type: "uint" },
+          ],
         },
-      ],
+        discriminator: ["service_identifier", "command_class", "attribute_address", "feature_index"],
+        variants: {
+          "810:5:3:1": {
+            id: "light.on_off_cycles.response",
+            label: "on_off_cycles response",
+            payload: { bitLength: 48, fields: [] },
+          },
+        },
+      },
       errors: [
         {
           id: "default_error_status",
@@ -171,20 +177,22 @@ describe("canonical profile decoding across unrelated CAN-FD formats", () => {
             { name: "node_id", startBit: 0, bitLength: 8, type: "uint" },
           ],
         },
-        payloadHeader: {
+      },
+      dictionaries: { message_type: { "90": "ActuatorStatus" }, packet_kind: { "10": "status" } },
+      payload: {
+        common: {
           bitLength: 16,
           fields: [{ name: "packet_kind", startBit: 0, bitLength: 4, type: "enum", dictionary: "packet_kind" }],
         },
-      },
-      dictionaries: { message_type: { "90": "ActuatorStatus" }, packet_kind: { "10": "status" } },
-      messages: [
-        {
-          id: "actuator.status",
-          label: "Actuator Status",
-          identifyBy: { message_type: 90, packet_kind: 10 },
-          payload: { bitLength: 48, fields: [{ name: "position", startBit: 16, bitLength: 16, type: "uint", factor: 0.01, unit: "deg" }] },
+        discriminator: ["message_type", "packet_kind"],
+        variants: {
+          "90:10": {
+            id: "actuator.status",
+            label: "Actuator Status",
+            payload: { bitLength: 48, fields: [{ name: "position", startBit: 16, bitLength: 16, type: "uint", factor: 0.01, unit: "deg" }] },
+          },
         },
-      ],
+      },
     };
     const unrelatedProfile: CanonicalProfile = {
       schemaVersion: "1.0",
@@ -197,7 +205,12 @@ describe("canonical profile decoding across unrelated CAN-FD formats", () => {
         },
       },
       dictionaries: { message_type: { "1": "WrongMessage" } },
-      messages: [{ id: "unrelated.only", label: "Wrong", identifyBy: { message_type: 1 }, payload: { bitLength: 0, fields: [] } }],
+      payload: {
+        discriminator: ["message_type"],
+        variants: {
+          "1": { id: "unrelated.only", label: "Wrong", payload: { bitLength: 0, fields: [] } },
+        },
+      },
     };
     const [frame] = parseCandump("(000.000000) can0 015A0042 [08] 0A 11 10 27 20 03 00 00");
     const decoded = decodeFrameWithProfiles([unrelatedProfile, matchingProfile], frame);
@@ -211,7 +224,7 @@ describe("canonical profile decoding across unrelated CAN-FD formats", () => {
     });
   });
 
-  it("honors identifyWhen when equality keys are not enough", () => {
+  it("honors identifyWhen when a discriminator key collides", () => {
     const profile: CanonicalProfile = {
       schemaVersion: "1.0",
       meta: { id: "conditional", name: "Conditional messages", version: "1.0.0" },
@@ -221,27 +234,30 @@ describe("canonical profile decoding across unrelated CAN-FD formats", () => {
           bitLength: 11,
           fields: [{ name: "can_id", startBit: 0, bitLength: 11, type: "uint" }],
         },
-        payloadHeader: {
+      },
+      payload: {
+        common: {
           bitLength: 8,
           fields: [{ name: "mode", startBit: 0, bitLength: 8, type: "uint" }],
         },
+        discriminator: ["can_id"],
+        variants: {
+          "291": [
+            {
+              id: "conditional.low",
+              label: "Low mode",
+              identifyWhen: "mode < 10",
+              payload: { bitLength: 16, fields: [{ name: "low_value", startBit: 8, bitLength: 8, type: "uint" }] },
+            },
+            {
+              id: "conditional.high",
+              label: "High mode",
+              identifyWhen: "mode >= 10",
+              payload: { bitLength: 16, fields: [{ name: "high_value", startBit: 8, bitLength: 8, type: "uint" }] },
+            },
+          ],
+        },
       },
-      messages: [
-        {
-          id: "conditional.low",
-          label: "Low mode",
-          identifyBy: { can_id: 0x123 },
-          identifyWhen: "mode < 10",
-          payload: { bitLength: 16, fields: [{ name: "low_value", startBit: 8, bitLength: 8, type: "uint" }] },
-        },
-        {
-          id: "conditional.high",
-          label: "High mode",
-          identifyBy: { can_id: 0x123 },
-          identifyWhen: "mode >= 10",
-          payload: { bitLength: 16, fields: [{ name: "high_value", startBit: 8, bitLength: 8, type: "uint" }] },
-        },
-      ],
     };
     const [frame] = parseCandump("(000.000000) can0 123 [02] 0A 2A");
     const decoded = decodeFrameWithProfiles([profile], frame);
@@ -261,20 +277,22 @@ describe("canonical profile decoding across unrelated CAN-FD formats", () => {
           fields: [{ name: "can_id", startBit: 0, bitLength: 11, type: "uint" }],
         },
       },
-      messages: [
-        {
-          id: "signed.sample",
-          label: "Signed sample",
-          identifyBy: { can_id: 0x222 },
-          payload: {
-            bitLength: 16,
-            fields: [
-              { name: "delta", startBit: 0, bitLength: 8, type: "int" },
-              { name: "scaled_delta", startBit: 8, bitLength: 8, type: "int", factor: 0.5, unit: "step" },
-            ],
+      payload: {
+        discriminator: ["can_id"],
+        variants: {
+          "546": {
+            id: "signed.sample",
+            label: "Signed sample",
+            payload: {
+              bitLength: 16,
+              fields: [
+                { name: "delta", startBit: 0, bitLength: 8, type: "int" },
+                { name: "scaled_delta", startBit: 8, bitLength: 8, type: "int", factor: 0.5, unit: "step" },
+              ],
+            },
           },
         },
-      ],
+      },
     };
     const [frame] = parseCandump("(000.000000) can0 222 [02] FF FE");
     const decoded = decodeFrameWithProfiles([profile], frame);
@@ -297,17 +315,19 @@ describe("canonical profile decoding across unrelated CAN-FD formats", () => {
           fields: [{ name: "can_id", startBit: 0, bitLength: 11, type: "uint" }],
         },
       },
-      messages: [
-        {
-          id: "array.samples",
-          label: "Array samples",
-          identifyBy: { can_id: 0x333 },
-          payload: {
-            bitLength: 32,
-            fields: [{ name: "sample", startBit: 0, bitLength: 8, type: "uint", count: 4, strideBits: 8 }],
+      payload: {
+        discriminator: ["can_id"],
+        variants: {
+          "819": {
+            id: "array.samples",
+            label: "Array samples",
+            payload: {
+              bitLength: 32,
+              fields: [{ name: "sample", startBit: 0, bitLength: 8, type: "uint", count: 4, strideBits: 8 }],
+            },
           },
         },
-      ],
+      },
     };
     const [frame] = parseCandump("(000.000000) can0 333 [04] 01 02 03 04");
     const decoded = decodeFrameWithProfiles([profile], frame);

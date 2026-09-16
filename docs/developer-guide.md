@@ -1,10 +1,10 @@
 # Developer Guide
 
-This guide explains how the Rusty CAN Studio codebase is organized and which internal APIs are stable enough to build on. It is meant for contributors adding monitor features, profile support, transmit behavior, simulator workflows, or quality checks.
+This guide explains how the RustyCAN codebase is organized and which internal APIs are stable enough to build on. It is meant for contributors adding monitor features, profile support, transmit behavior, simulator workflows, or quality checks.
 
 ## Architecture
 
-Rusty CAN Studio is a Tauri 2 desktop app with a React/TypeScript frontend and a small Rust shell.
+RustyCAN is a Tauri 2 desktop app with a React/TypeScript frontend and a small Rust shell.
 
 ```text
 src/
@@ -193,10 +193,13 @@ type CanonicalProfile = {
   bus: CanonicalProfileBus;
   layouts: {
     canId: CanonicalLayout;
-    payloadHeader?: CanonicalLayout;
+  };
+  payload: {
+    common?: CanonicalLayout;
+    discriminator: string[];
+    variants: Record<string, CanonicalVariant | CanonicalVariant[]>;
   };
   dictionaries?: Record<string, Record<string, string>>;
-  messages: CanonicalMessage[];
   errors?: CanonicalErrorRule[];
   display?: Record<string, unknown>;
 }
@@ -215,9 +218,9 @@ Files:
 Decoder rules:
 
 - decode CAN ID fields from `layouts.canId.fields`
-- decode payload header fields before message matching
-- match only profiles whose `messages[].identifyBy` criteria apply
-- decode message-specific `payload.fields` after a match
+- decode `payload.common.fields` before variant matching
+- look up `payload.variants` by the `payload.discriminator` field values, joined with `:`
+- decode the matched variant's own `payload.fields` after a match
 - expose raw and display values when dictionaries exist
 - evaluate `errors[]` only when the configured condition indicates failure
 

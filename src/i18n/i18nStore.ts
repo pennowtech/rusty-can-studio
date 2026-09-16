@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type AppLocale = "en" | "de" | "fr" | "ar";
+export type AppLocale = "en" | "de" | "fr";
 
 type LocaleState = {
   locale: AppLocale;
@@ -10,11 +10,10 @@ type LocaleState = {
   t: (key: TranslationKey) => string;
 };
 
-export const localeOptions: Array<{ id: AppLocale; label: string; dir: "ltr" | "rtl" }> = [
-  { id: "en", label: "English", dir: "ltr" },
-  { id: "de", label: "Deutsch", dir: "ltr" },
-  { id: "fr", label: "Francais", dir: "ltr" },
-  { id: "ar", label: "Arabic", dir: "rtl" },
+export const localeOptions: Array<{ id: AppLocale; label: string }> = [
+  { id: "en", label: "English" },
+  { id: "de", label: "Deutsch" },
+  { id: "fr", label: "Francais" },
 ];
 
 const STORAGE_KEY = "cansim.locale.v1";
@@ -27,10 +26,7 @@ const translations = {
     "nav.profileEditor": "Profile Editor",
     "nav.settings": "Settings",
     "nav.help": "Help",
-    "menu.file": "File",
-    "menu.view": "View",
-    "menu.can": "CAN",
-    "menu.help": "Help",
+    "nav.shortcuts": "Keyboard Shortcuts",
     "settings.title": "Settings",
     "settings.subtitle": "Configure appearance, monitor retention, localization, and CAN-FD defaults.",
     "settings.localization": "Localization",
@@ -50,10 +46,7 @@ const translations = {
     "nav.profileEditor": "Profil-Editor",
     "nav.settings": "Einstellungen",
     "nav.help": "Hilfe",
-    "menu.file": "Datei",
-    "menu.view": "Ansicht",
-    "menu.can": "CAN",
-    "menu.help": "Hilfe",
+    "nav.shortcuts": "Tastenkuerzel",
     "settings.title": "Einstellungen",
     "settings.subtitle": "Darstellung, Trace-Aufbewahrung, Lokalisierung und CAN-FD-Defaults konfigurieren.",
     "settings.localization": "Lokalisierung",
@@ -73,10 +66,7 @@ const translations = {
     "nav.profileEditor": "Editeur de profils",
     "nav.settings": "Parametres",
     "nav.help": "Aide",
-    "menu.file": "Fichier",
-    "menu.view": "Vue",
-    "menu.can": "CAN",
-    "menu.help": "Aide",
+    "nav.shortcuts": "Raccourcis clavier",
     "settings.title": "Parametres",
     "settings.subtitle": "Configurer l'apparence, la retention du moniteur, la localisation et les valeurs CAN-FD.",
     "settings.localization": "Localisation",
@@ -88,29 +78,6 @@ const translations = {
     "common.cancel": "Annuler",
     "common.save": "Enregistrer",
     "common.clear": "Effacer",
-  },
-  ar: {
-    "nav.monitor": "CAN Monitor",
-    "nav.terminal": "Terminal Trace",
-    "nav.simulator": "Simulator",
-    "nav.profileEditor": "Profile Editor",
-    "nav.settings": "Settings",
-    "nav.help": "Help",
-    "menu.file": "File",
-    "menu.view": "View",
-    "menu.can": "CAN",
-    "menu.help": "Help",
-    "settings.title": "Settings",
-    "settings.subtitle": "Configure appearance, monitor retention, localization, and CAN-FD defaults.",
-    "settings.localization": "Localization",
-    "settings.language": "Language",
-    "settings.localizationDescription": "Arabic selection enables right-to-left layout direction and Arabic locale date and number formatting.",
-    "settings.appearance": "Appearance",
-    "settings.diagnostics": "Diagnostics log",
-    "settings.backup": "Backup and restore",
-    "common.cancel": "Cancel",
-    "common.save": "Save",
-    "common.clear": "Clear",
   },
 } as const;
 
@@ -124,9 +91,8 @@ function readLocale(): AppLocale {
 
 function applyDocumentLocale(locale: AppLocale) {
   if (typeof document === "undefined") return;
-  const option = localeOptions.find((item) => item.id === locale) ?? localeOptions[0];
   document.documentElement.lang = locale;
-  document.documentElement.dir = option.dir;
+  document.documentElement.dir = "ltr";
 }
 
 function translate(locale: AppLocale, key: TranslationKey) {

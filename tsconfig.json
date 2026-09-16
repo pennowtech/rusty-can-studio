@@ -7,7 +7,11 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      // Sibling checkout only, for now — matches vite.config.ts's alias.
+      // Repoint at node_modules/sbt-desktop-kit/* once it's pinned to a
+      // git ref (see docs/shared-code-migration-plan.md, decision 7).
+      "@sbt/desktop-kit/*": ["../sbt-desktop-kit/src/*"]
     },
 
     /* Bundler mode */

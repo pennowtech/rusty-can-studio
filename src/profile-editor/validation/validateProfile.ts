@@ -12,7 +12,8 @@ export function validateProfile(raw: unknown): string[] {
   if (!profile.bus?.idFormat) errors.push("bus.idFormat is required");
   if (!profile.bus?.byteOrder) errors.push("bus.byteOrder is required");
   if (!profile.layouts?.canId?.fields) errors.push("layouts.canId.fields is required");
-  if (!Array.isArray(profile.messages)) errors.push("messages must be an array");
+  if (!Array.isArray(profile.payload?.discriminator)) errors.push("payload.discriminator must be an array");
+  if (!profile.payload?.variants || typeof profile.payload.variants !== "object") errors.push("payload.variants must be an object");
 
   return errors;
 }

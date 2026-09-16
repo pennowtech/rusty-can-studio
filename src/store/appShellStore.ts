@@ -29,40 +29,44 @@
 import { create } from "zustand";
 
 // Define the possible main application views
-export type AppView = "monitor" | "terminal" | "simulator" | "profile-editor" | "settings" | "help" | "shortcuts" | "about";
-
-type SidebarMode = "expanded" | "icon";
+export type AppView = "monitor" | "terminal" | "simulator" | "profile-editor" | "settings" | "help" | "shortcuts";
 
 // Define the shape of the application shell state
-// - includes current view and sidebar mode
+// - includes current view
 // - includes methods to update the state
+// Sidebar collapse state used to live here (as sidebarMode/toggleSidebarMode)
+// but was never persisted, so it silently reset to collapsed on every
+// reload — moved to @sbt/desktop-kit's useNavRailStore (nav/navRailStore.ts)
+// as part of Phase B, which persists it correctly and is shared with
+// FlexMQTT's nav rail too.
+// About used to be a full-page view ("about") — replaced by the shared
+// AppAboutDialog modal (also Phase B), triggered from multiple places
+// (Sidebar's logo, the command palette), so its open state lives here
+// rather than duplicated per trigger.
 export type AppState = {
   view: AppView;
-  sidebarMode: SidebarMode;
   isMobile: boolean;
+  aboutOpen: boolean;
 
   setView: (view: AppView) => void;
-  toggleSidebarMode: () => void;
   setIsMobile: (v: boolean) => void;
+  setAboutOpen: (open: boolean) => void;
 };
 
 // Create the Zustand store for application shell state
-// - manages active view and sidebar mode
+// - manages active view
 // - provides mobile detection state
 // - provides methods to update state
-// - initial view is "monitor" and sidebar is "expanded"
+// - initial view is "monitor"
 // - no derived state, pure UI concerns
 export const useAppStore = create<AppState>((set) => ({
   view: "monitor",
-  sidebarMode: "icon",
   isMobile: false,
+  aboutOpen: false,
 
   setView: (view) => set({ view }),
 
-  toggleSidebarMode: () =>
-    set((s) => ({
-      sidebarMode: s.sidebarMode === "expanded" ? "icon" : "expanded",
-    })),
-
   setIsMobile: (v) => set({ isMobile: v }),
+
+  setAboutOpen: (open) => set({ aboutOpen: open }),
 }));

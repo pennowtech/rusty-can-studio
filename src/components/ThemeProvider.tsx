@@ -24,7 +24,7 @@ import * as React from "react";
 import { createContext, useEffect, useState } from "react";
 
 export type Theme = "light" | "dark" | "system";
-export type ThemePalette = "default" | "graphite" | "zeiss-blue" | "high-contrast" | "terminal" | "warm-neutral";
+export type ThemePalette = "default" | "graphite" | "zeiss-blue" | "high-contrast" | "terminal" | "warm-neutral" | "signal-deck" | "rusty-studio";
 export type ThemeDensity = "comfortable" | "compact" | "dense";
 
 export type AppearanceSettings = {
@@ -47,12 +47,12 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 const defaultAppearance: AppearanceSettings = {
-  theme: "system",
-  palette: "default",
+  theme: "light",
+  palette: "signal-deck",
   density: "comfortable",
 };
 
-const palettes: ThemePalette[] = ["default", "graphite", "zeiss-blue", "high-contrast", "terminal", "warm-neutral"];
+const palettes: ThemePalette[] = ["default", "graphite", "zeiss-blue", "high-contrast", "terminal", "warm-neutral", "signal-deck", "rusty-studio"];
 const densities: ThemeDensity[] = ["comfortable", "compact", "dense"];
 
 function isTheme(value: unknown): value is Theme {
@@ -102,6 +102,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             : "light"
           : appearance.theme;
 
+      // data-theme drives our own palette CSS (index.css), matching the
+      // light/dark switching mechanism used elsewhere on this account (see
+      // MQTTX desktop-next's themeStore). The "dark"/"light" class is ALSO
+      // set, purely so Tailwind's `dark:` utility variant keeps working —
+      // Tailwind's `darkMode: ["selector", '[data-theme="dark"]']` option
+      // (tried first) silently drops unrelated hand-authored @layer base
+      // rules that appear near a rule using that same selector text, a
+      // real bug in tailwindcss 3.4.19, confirmed with an isolated repro.
+      root.setAttribute("data-theme", nextResolvedTheme);
       root.classList.add(nextResolvedTheme);
       root.classList.add(`theme-${appearance.palette}`);
       root.classList.add(`density-${appearance.density}`);

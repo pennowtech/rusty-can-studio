@@ -11,6 +11,8 @@ import { useUiStore } from "@/store/uiStore";
 import { useTransmitDraftStore } from "@/store/transmitDraftStore";
 import { resolveProfileReferences, useProfileStore } from "@/profile-editor/store/profileStore";
 import { decodeFrameWithProfiles, type DecodedFrame } from "@/profile-editor/decodeProfile";
+import { listVariants } from "@/profile-editor/messageListHelpers";
+import { identifyByFromVariantKey } from "@/profile-editor/profileFieldHelpers";
 import type { WsFrame } from "@/can-bridge/ws/types";
 import type { ProfileDocument } from "@/profile-editor/model/profile";
 import { CheckCircle2, Clock, Copy, GitBranch, Link2, Pause, Play, Plus, RadioTower, RotateCcw, Send, Trash2, Workflow, XCircle } from "lucide-react";
@@ -285,10 +287,11 @@ export function CanSimulatorSequences() {
   const responseOptions = useMemo(() => {
     const options = new Map<string, string>();
     for (const profile of profilesForDecode) {
-      for (const message of profile.messages) {
-        const commandClass = message.identifyBy.command_class;
+      for (const { key, variant } of listVariants(profile)) {
+        const identifyBy = identifyByFromVariantKey(profile.payload.discriminator, key);
+        const commandClass = identifyBy.command_class;
         const commandClassText = String(commandClass ?? "").toLowerCase();
-        const messageText = `${message.id} ${message.label}`.toLowerCase();
+        const messageText = `${variant.id} ${variant.label}`.toLowerCase();
         const looksLikeResponse =
           commandClass === 5 ||
           commandClass === 3 ||
@@ -300,7 +303,7 @@ export function CanSimulatorSequences() {
           messageText.includes("response") ||
           messageText.includes("event");
         if (!looksLikeResponse) continue;
-        options.set(message.id, message.label ?? message.id);
+        options.set(variant.id, variant.label ?? variant.id);
       }
     }
     return Array.from(options.entries()).map(([id, label]) => ({ id, label }));
@@ -627,9 +630,9 @@ export function CanSimulatorSequences() {
   }
 
   async function loadSequenceJson() {
-    const text = await openJsonFile();
-    if (!text) return;
-    const parsed = JSON.parse(text) as SequenceDefinition | SequenceDefinition[];
+    const res = await openJsonFile();
+    if (!res) return;
+    const parsed = JSON.parse(res.text) as SequenceDefinition | SequenceDefinition[];
     const imported = (Array.isArray(parsed) ? parsed : [parsed]).filter((item) => item?.name && Array.isArray(item.steps));
     if (!imported.length) throw new Error("Sequence JSON must contain a sequence or an array of sequences.");
     const normalized = imported.map((sequence) => ({
@@ -667,7 +670,7 @@ export function CanSimulatorSequences() {
   } as const;
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[280px_minmax(420px,1fr)_360px] grid-rows-[minmax(0,1fr)_190px] overflow-hidden bg-muted/20">
+    <div className="grid h-full min-h-0 grid-cols-[280px_minmax(420px,1fr)_360px] grid-rows-[minmax(0,1fr)_190px] overflow-x-auto overflow-y-hidden bg-muted/20">
       <aside className="min-h-0 border-r bg-background">
         <div className="flex h-12 items-center justify-between border-b px-4">
           <div>
