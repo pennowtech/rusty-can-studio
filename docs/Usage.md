@@ -26,7 +26,7 @@
 **Column chooser:**
 
 - Use the Columns button in the monitor header.
-- Default trace columns, CAN ID fields, and payload header fields can be shown or hidden.
+- Default trace columns, CAN ID fields, and payload common fields can be shown or hidden.
 - Column visibility is remembered across app restarts.
 
 **Column reordering:**

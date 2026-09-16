@@ -5,7 +5,8 @@ This document defines the profile format that the Profile Editor should use as i
 The core idea is simple:
 
 - every layout uses absolute bits
-- every message says how it is identified
+- fields common to every message are decoded once, ahead of picking which message this is
+- a message ("variant") is picked by looking up the decoded discriminator values directly
 - every payload field uses the same field structure
 - textual values come from dictionaries
 - UI behavior comes from optional display metadata
@@ -19,8 +20,8 @@ The core idea is simple:
   "bus": {},
   "layouts": {},
   "dictionaries": {},
-  "messages": [],
-  "errors": [],
+  "payload": {},
+  "errors": {},
   "display": {}
 }
 ```
@@ -32,8 +33,8 @@ Required sections:
 | `schemaVersion` | Version of this canonical profile contract. |
 | `meta` | Name, id, version, source, and description. |
 | `bus` | CAN/CAN-FD settings and byte order. |
-| `layouts` | CAN ID layout and optional payload header layout. |
-| `messages` | Message definitions, identification values, and payload fields. |
+| `layouts` | CAN ID layout. |
+| `payload` | Fields common to every message, the discriminator that picks one, and the messages ("variants") themselves. |
 
 Optional sections:
 
@@ -65,32 +66,48 @@ If an importer reads `byte: 3` and `length: 2`, convert it to:
 { "startBit": 24, "bitLength": 16 }
 ```
 
-## Message Identification
+## Payload Shape: Common Fields, Discriminator, Variants
 
-Use `identifyBy` to say which decoded values identify a message.
+`payload` has three parts:
 
 ```json
-"identifyBy": {
-  "service_identifier": 810,
-  "command_class": 5,
-  "attribute_address": 3,
-  "feature_index": 1
+"payload": {
+  "common": { "bitLength": 16, "fields": [ "... fields shared by every message ..." ] },
+  "discriminator": ["command_class", "attribute_address", "feature_index"],
+  "variants": {
+    "5:3:1": {
+      "id": "on_off_cycles.get.response",
+      "label": "On Off Cycles Get Response",
+      "payload": { "bitLength": 48, "fields": [ "... this message's own fields ..." ] }
+    }
+  }
 }
 ```
 
-This is intentionally not split into `canId` and `payloadHeader`. The field names are already unique in the profile, and the decoder knows which layout produced them.
+- **`common`** (optional) is decoded once per frame, before any variant is picked. Omit it entirely for a profile with no shared payload fields — one discriminated purely off the CAN ID, for example.
+- **`discriminator`** is an ordered list of field names — drawn from `layouts.canId.fields` and/or `payload.common.fields` — whose decoded values pick a variant. A field that's constant across the whole file (a single service identifier, say) doesn't need to be listed.
+- **`variants`** is keyed by those values joined with `:`, in the order `discriminator` names them. `"5:3:1"` above means `command_class == 5 && attribute_address == 3 && feature_index == 1`.
 
-For advanced cases, use `identifyWhen`:
+This is intentionally not split further by which layout (`canId` vs `payload.common`) each discriminator field came from — the field names are already unique in the profile, and the decoder knows which layout produced each one.
+
+### When equality alone can't disambiguate
+
+If two messages would land on the exact same discriminator key, register an array of variants at that key instead of a single object, and give each an `identifyWhen` expression:
 
 ```json
-"identifyWhen": "pgn == 61444 && source_address != 0"
+"variants": {
+  "0x123": [
+    { "id": "conditional.low", "label": "Low mode", "identifyWhen": "mode < 10", "payload": { "bitLength": 16, "fields": [] } },
+    { "id": "conditional.high", "label": "High mode", "identifyWhen": "mode >= 10", "payload": { "bitLength": 16, "fields": [] } }
+  ]
+}
 ```
 
-Use `identifyBy` first. Use `identifyWhen` only when simple equality values cannot express the message.
+The first entry whose `identifyWhen` passes wins — or the first entry with no `identifyWhen` at all, for the ordinary non-colliding case. Use `identifyWhen` only when the discriminator key genuinely can't tell two messages apart; it isn't needed otherwise.
 
 ## Field Definition
 
-Every CAN ID field, payload header field, payload field, and error source uses the same bit-coordinate idea.
+Every CAN ID field, payload common field, payload field, and error source uses the same bit-coordinate idea.
 
 ```json
 {
@@ -111,7 +128,7 @@ Supported field properties:
 | `name` | Stable machine name. Use snake_case. |
 | `label` | Human-readable UI label. |
 | `note` | Optional help text. |
-| `startBit` | Absolute bit offset inside CAN ID, payload header, or payload. |
+| `startBit` | Absolute bit offset inside CAN ID, payload common, or payload. |
 | `bitLength` | Number of bits to read. |
 | `type` | `uint`, `int`, `bool`, `enum`, `bytes`, or `string`. |
 | `dictionary` | Dictionary id for textual display. |
@@ -153,7 +170,7 @@ A field references a dictionary by id:
 
 ## Example: Service-Style CAN-FD Profile
 
-This example shows a message with a 29-bit CAN ID layout and a 16-bit payload header.
+This example shows a message with a 29-bit CAN ID layout and a 16-bit payload common layout.
 
 ```json
 {
@@ -179,16 +196,6 @@ This example shows a message with a 29-bit CAN ID layout and a 16-bit payload he
         { "name": "source_address", "label": "Source", "startBit": 13, "bitLength": 6, "type": "uint" },
         { "name": "service_identifier", "label": "Service", "startBit": 0, "bitLength": 10, "type": "uint" }
       ]
-    },
-    "payloadHeader": {
-      "label": "Payload Header",
-      "bitLength": 16,
-      "fields": [
-        { "name": "message_good", "label": "Status", "startBit": 0, "bitLength": 1, "type": "bool", "dictionary": "message_good" },
-        { "name": "attribute_address", "label": "Attribute", "startBit": 1, "bitLength": 7, "type": "uint" },
-        { "name": "feature_index", "label": "Feature", "startBit": 8, "bitLength": 4, "type": "uint" },
-        { "name": "instance_index", "label": "Instance", "startBit": 12, "bitLength": 4, "type": "uint" }
-      ]
     }
   },
   "dictionaries": {
@@ -202,24 +209,31 @@ This example shows a message with a 29-bit CAN ID layout and a 16-bit payload he
       "1": "good"
     }
   },
-  "messages": [
-    {
-      "id": "on_off_cycles.get.response",
-      "label": "On Off Cycles Get Response",
-      "identifyBy": {
-        "service_identifier": 810,
-        "command_class": 5,
-        "attribute_address": 3,
-        "feature_index": 1
-      },
-      "payload": {
-        "bitLength": 48,
-        "fields": [
-          { "name": "on_off_cycles", "label": "On Off Cycles", "startBit": 16, "bitLength": 32, "type": "uint" }
-        ]
+  "payload": {
+    "common": {
+      "label": "Payload Common",
+      "bitLength": 16,
+      "fields": [
+        { "name": "message_good", "label": "Status", "startBit": 0, "bitLength": 1, "type": "bool", "dictionary": "message_good" },
+        { "name": "attribute_address", "label": "Attribute", "startBit": 1, "bitLength": 7, "type": "uint" },
+        { "name": "feature_index", "label": "Feature", "startBit": 8, "bitLength": 4, "type": "uint" },
+        { "name": "instance_index", "label": "Instance", "startBit": 12, "bitLength": 4, "type": "uint" }
+      ]
+    },
+    "discriminator": ["command_class", "attribute_address", "feature_index"],
+    "variants": {
+      "5:3:1": {
+        "id": "on_off_cycles.get.response",
+        "label": "On Off Cycles Get Response",
+        "payload": {
+          "bitLength": 48,
+          "fields": [
+            { "name": "on_off_cycles", "label": "On Off Cycles", "startBit": 16, "bitLength": 32, "type": "uint" }
+          ]
+        }
       }
     }
-  ],
+  },
   "errors": [
     {
       "id": "default_error_status",
@@ -236,6 +250,8 @@ This example shows a message with a 29-bit CAN ID layout and a 16-bit payload he
   ]
 }
 ```
+
+Here `service_identifier` doesn't appear in `discriminator` — it's constant for this whole profile file, so it doesn't help pick between messages within it.
 
 ## Example: Motor Generic Profile
 
@@ -265,23 +281,23 @@ This is the canonical form of `profiles/test/motor-generic.profile.json`.
       ]
     }
   },
-  "messages": [
-    {
-      "id": "motor_status",
-      "label": "Motor Status",
-      "identifyBy": {
-        "can_id": 801
-      },
-      "payload": {
-        "bitLength": 32,
-        "fields": [
-          { "name": "rpm", "label": "RPM", "startBit": 0, "bitLength": 16, "type": "uint", "factor": 0.25, "unit": "rpm" },
-          { "name": "temperature", "label": "Temperature", "startBit": 16, "bitLength": 8, "type": "uint", "offset": -40, "unit": "degC" },
-          { "name": "enabled", "label": "Enabled", "startBit": 24, "bitLength": 1, "type": "bool" }
-        ]
+  "payload": {
+    "discriminator": ["can_id"],
+    "variants": {
+      "801": {
+        "id": "motor_status",
+        "label": "Motor Status",
+        "payload": {
+          "bitLength": 32,
+          "fields": [
+            { "name": "rpm", "label": "RPM", "startBit": 0, "bitLength": 16, "type": "uint", "factor": 0.25, "unit": "rpm" },
+            { "name": "temperature", "label": "Temperature", "startBit": 16, "bitLength": 8, "type": "uint", "offset": -40, "unit": "degC" },
+            { "name": "enabled", "label": "Enabled", "startBit": 24, "bitLength": 1, "type": "bool" }
+          ]
+        }
       }
     }
-  ]
+  }
 }
 ```
 
@@ -313,22 +329,22 @@ This is the canonical form of `profiles/test/j1939-engine.profile.json`.
       ]
     }
   },
-  "messages": [
-    {
-      "id": "j1939.engine_speed",
-      "label": "Engine Speed",
-      "identifyBy": {
-        "pgn": 61444
-      },
-      "payload": {
-        "bitLength": 64,
-        "fields": [
-          { "name": "actual_torque", "label": "Actual Torque", "startBit": 16, "bitLength": 8, "type": "uint", "offset": -125, "unit": "%" },
-          { "name": "engine_speed", "label": "Engine Speed", "startBit": 24, "bitLength": 16, "type": "uint", "factor": 0.125, "unit": "rpm" }
-        ]
+  "payload": {
+    "discriminator": ["pgn"],
+    "variants": {
+      "61444": {
+        "id": "j1939.engine_speed",
+        "label": "Engine Speed",
+        "payload": {
+          "bitLength": 64,
+          "fields": [
+            { "name": "actual_torque", "label": "Actual Torque", "startBit": 16, "bitLength": 8, "type": "uint", "offset": -125, "unit": "%" },
+            { "name": "engine_speed", "label": "Engine Speed", "startBit": 24, "bitLength": 16, "type": "uint", "factor": 0.125, "unit": "rpm" }
+          ]
+        }
       }
     }
-  ]
+  }
 }
 ```
 
@@ -339,11 +355,11 @@ The visual editor can be generic if it follows only this schema:
 | JSON presence | Visual behavior |
 | --- | --- |
 | `layouts.canId` | Show CAN ID layout editor. |
-| `layouts.payloadHeader` | Show payload header layout editor. |
+| `payload.common` | Show payload common layout editor. |
 | `dictionaries` | Show dictionary manager. |
-| `messages` | Show message list and message editor. |
-| `messages[].identifyBy` | Show message identification values. |
-| `messages[].payload.fields` | Show payload field layout editor. |
+| `payload.variants` | Show message list and message editor. |
+| `payload.discriminator` + a variant's own registered key | Show message identification values. |
+| `payload.variants[key].payload.fields` | Show payload field layout editor. |
 | `errors` | Show error rules editor. |
 | `display` | Show monitor/editor display preferences. |
 
@@ -368,7 +384,7 @@ The application resolves references dynamically using the **Profile Reference Re
 ### Step-by-Step Usage
 
 #### Step 1: Create a Common Profile
-Create a profile containing only your reusable dictionaries and errors. Since layouts and messages are required sections, you can leave them empty:
+Create a profile containing only your reusable dictionaries and errors. Since `layouts` and `payload` are required sections, you can leave the CAN ID fields and variants empty:
 ```json
 {
   "schemaVersion": "1.0",
@@ -402,7 +418,7 @@ Create a profile containing only your reusable dictionaries and errors. Since la
       "display": "Hardware Error ${raw}: ${text}"
     }
   ],
-  "messages": []
+  "payload": { "discriminator": [], "variants": {} }
 }
 ```
 
@@ -418,4 +434,4 @@ Create a profile containing only your reusable dictionaries and errors. Since la
 - Choose your shared dictionary.
 
 #### Step 4: Save
-Click **Save JSON** on your service profile. Only your service profile's layout and messages will be written out to the file, but it will maintain the correct dictionary links.
+Click **Save JSON** on your service profile. Only your service profile's layout and variants will be written out to the file, but it will maintain the correct dictionary links.

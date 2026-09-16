@@ -5,7 +5,6 @@
  *
  * RESPONSIBILITY
  * - Defines the permanent UI structure:
- *   - Top menu bar
  *   - Sidebar
  *   - Main content area
  *   - Status bar
@@ -23,7 +22,6 @@
  * - Must stay readable and declarative
  */
 
-import { TopMenuBar } from "./TopMenuBar";
 import { Sidebar } from "./Sidebar";
 import { MainView } from "./MainView";
 import { StatusBar } from "./StatusBar";
@@ -57,8 +55,10 @@ export function AppShell() {
   return (
     <>
       <div className="flex h-screen flex-col">
-        <TopMenuBar />
-
+        {/* No orientation branching needed here - AppNavRail is a normal
+            flex item (reserves its own column, as always), but AppDock is
+            position: fixed (see AppDock.css), which removes it from flow
+            entirely regardless of where it's rendered. */}
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="hidden md:block">
             <Sidebar />

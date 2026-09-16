@@ -1,5 +1,16 @@
 [
   {
+    "label": "Workspace: npm install (shared node_modules)",
+    "command": "npm install",
+    "cwd": "$ZED_WORKTREE_ROOT/..",
+    "shell": {
+      "with_arguments": {
+        "program": "/bin/bash",
+        "args": ["-lc"]
+      }
+    }
+  },
+  {
     "label": "Run CanSim UI(WSL)",
     "command": "npm run dev",
     "cwd": "$ZED_WORKTREE_ROOT",

@@ -1,4 +1,4 @@
-import { BitOverlapError } from "./validateCanIdLayout";
+import { BitOverlapError } from "./validateBitLayout";
 
 export function mapBitErrors(errors: BitOverlapError[]): Record<string, BitOverlapError[]> {
   const map: Record<string, BitOverlapError[]> = {};

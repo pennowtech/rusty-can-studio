@@ -10,41 +10,76 @@
     "idFormat": "extended",
     "byteOrder": "little"
   },
-  "layouts": {
-    "canId": {
-      "label": "UDS 29-bit ID",
-      "bitLength": 29,
-      "fields": [
-        { "name": "target_address", "startBit": 8, "bitLength": 8, "type": "uint" },
-        { "name": "source_address", "startBit": 0, "bitLength": 8, "type": "uint" },
-        { "name": "addressing_type", "startBit": 24, "bitLength": 5, "type": "uint" }
-      ]
-    },
-    "payloadHeader": {
-      "label": "Payload header",
+  "canId": {
+    "label": "UDS 29-bit ID",
+    "bitLength": 29,
+    "fields": [
+      {
+        "name": "target_address",
+        "startBit": 8,
+        "bitLength": 8,
+        "type": "uint"
+      },
+      {
+        "name": "source_address",
+        "startBit": 0,
+        "bitLength": 8,
+        "type": "uint"
+      },
+      {
+        "name": "addressing_type",
+        "startBit": 24,
+        "bitLength": 5,
+        "type": "uint"
+      }
+    ]
+  },
+  "payload": {
+    "common": {
+      "label": "Payload common",
       "bitLength": 16,
       "fields": [
-        { "name": "payload_length", "startBit": 0, "bitLength": 8, "type": "uint" },
-        { "name": "service_id", "startBit": 8, "bitLength": 8, "type": "enum", "dictionary": "service_id" }
+        {
+          "name": "payload_length",
+          "startBit": 0,
+          "bitLength": 8,
+          "type": "uint"
+        },
+        {
+          "name": "service_id",
+          "startBit": 8,
+          "bitLength": 8,
+          "type": "enum",
+          "dictionary": "service_id"
+        }
       ]
+    },
+    "discriminator": [
+      "service_id"
+    ],
+    "variants": {
+      "34": {
+        "id": "uds.read_data_by_identifier.request",
+        "label": "Read DID request",
+        "payload": {
+          "bitLength": 32,
+          "fields": [
+            {
+              "name": "did",
+              "startBit": 16,
+              "bitLength": 16,
+              "type": "uint"
+            }
+          ]
+        }
+      }
     }
   },
   "dictionaries": {
-    "service_id": { "34": "ReadDataByIdentifier" }
-  },
-  "messages": [
-    {
-      "id": "uds.read_data_by_identifier.request",
-      "label": "Read DID request",
-      "identifyBy": { "service_id": 34 },
-      "payload": {
-        "bitLength": 32,
-        "fields": [
-          { "name": "did", "startBit": 16, "bitLength": 16, "type": "uint" }
-        ]
-      }
+    "service_id": {
+      "34": "ReadDataByIdentifier"
     }
-  ],
+  },
   "errors": [],
   "display": {}
 }

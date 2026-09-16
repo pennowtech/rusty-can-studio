@@ -20,6 +20,7 @@ import { Theme } from "@/components/ThemeProvider";
 export type CommandContext = {
   setView: (view: AppView) => void;
   setTheme: (theme: Theme) => void;
+  setAboutOpen: (open: boolean) => void;
   openConnectDialog: () => void;
   openConnectionManager: () => void;
   openPalette: () => void;

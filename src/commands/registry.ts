@@ -131,6 +131,6 @@ export const commandRegistry: AppCommand[] = [
     description: "Show product information and workspace capabilities.",
     category: "Help",
     keywords: ["about", "version", "info"],
-    handler: ({ setView }) => setView("about"),
+    handler: ({ setAboutOpen }) => setAboutOpen(true),
   },
 ];

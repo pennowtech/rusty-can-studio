@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://rusty-can-studio.local/schemas/canonical-profile.schema.json",
-  "title": "Rusty CAN Studio Canonical Profile",
+  "$id": "https://rustycan.local/schemas/canonical-profile.schema.json",
+  "title": "RustyCAN Canonical Profile",
   "description": "Protocol-neutral CAN/CAN-FD profile format used by the visual profile editor and decoder.",
   "type": "object",
-  "required": ["schemaVersion", "meta", "bus", "layouts", "messages"],
+  "required": ["schemaVersion", "meta", "bus", "layouts", "payload"],
   "additionalProperties": false,
   "properties": {
     "schemaVersion": {
@@ -24,9 +24,6 @@
       "properties": {
         "canId": {
           "$ref": "#/$defs/layout"
-        },
-        "payloadHeader": {
-          "$ref": "#/$defs/layout"
         }
       }
     },
@@ -41,12 +38,8 @@
       },
       "default": {}
     },
-    "messages": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "$ref": "#/$defs/message"
-      }
+    "payload": {
+      "$ref": "#/$defs/payload"
     },
     "errors": {
       "type": "array",
@@ -103,26 +96,41 @@
     },
     "layout": {
       "type": "object",
-      "required": ["bitLength", "fields"],
-      "additionalProperties": false,
-      "properties": {
-        "label": {
-          "type": "string"
+      "description": "Either an owned bit layout, or a { ref_file } pointer to another loaded profile's own layout of the same kind (canId, or payload.common) — see canonicalProfile.ts's CanonicalLayout doc.",
+      "oneOf": [
+        {
+          "required": ["ref_file"],
+          "additionalProperties": false,
+          "properties": {
+            "ref_file": {
+              "type": "string",
+              "description": "Filename of another loaded profile to inherit this layout from."
+            }
+          }
         },
-        "note": {
-          "type": "string"
-        },
-        "bitLength": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "fields": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/field"
+        {
+          "required": ["bitLength", "fields"],
+          "additionalProperties": false,
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            },
+            "bitLength": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/field"
+              }
+            }
           }
         }
-      }
+      ]
     },
     "field": {
       "type": "object",
@@ -176,9 +184,42 @@
         }
       }
     },
-    "message": {
+    "payload": {
       "type": "object",
-      "required": ["id", "label", "identifyBy", "payload"],
+      "description": "Payload decoding: fields common to every variant (decoded once), a discriminator naming which decoded values pick a variant, and the variants themselves.",
+      "required": ["discriminator", "variants"],
+      "additionalProperties": false,
+      "properties": {
+        "common": {
+          "$ref": "#/$defs/layout",
+          "description": "Decoded once per frame, ahead of variant selection. Omit for a profile with no shared payload fields (e.g. discriminated entirely off the CAN ID)."
+        },
+        "discriminator": {
+          "type": "array",
+          "description": "Ordered field names (from layouts.canId.fields and/or payload.common.fields) whose decoded values, joined with \":\", select a variants[] entry.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "variants": {
+          "type": "object",
+          "description": "Keyed by discriminator values joined with \":\" (e.g. \"6:0:1\"). An array value is only needed when discriminator equality alone can't disambiguate two variants — each entry's identifyWhen picks the right one.",
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "#/$defs/variant" },
+              {
+                "type": "array",
+                "minItems": 1,
+                "items": { "$ref": "#/$defs/variant" }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "required": ["id", "label", "payload"],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -192,16 +233,9 @@
         "description": {
           "type": "string"
         },
-        "identifyBy": {
-          "type": "object",
-          "description": "Decoded field values that identify this message.",
-          "additionalProperties": {
-            "type": ["string", "number", "boolean", "null"]
-          }
-        },
         "identifyWhen": {
           "type": "string",
-          "description": "Optional expression for advanced identification when identifyBy is not enough."
+          "description": "Only meaningful when this variant shares its discriminator key with sibling entries in a variants[] array — the first entry whose identifyWhen passes (or has none) wins."
         },
         "payload": {
           "type": "object",

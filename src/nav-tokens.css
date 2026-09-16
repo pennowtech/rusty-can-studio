@@ -1,0 +1,19 @@
+/* Bridges this app's own design tokens onto @sbt/desktop-kit's AppNavRail
+   component (its --sbt-nav-* namespace) — see AppNavRail.css's header
+   comment for why this can't just reach for the kit's tokens directly.
+   Same filename as FlexMQTT's own src/nav-tokens.css by convention; the
+   values below are app-specific, chosen to match this app's own former
+   Sidebar.tsx/SidebarButton.tsx styling (bg-muted/10, bg-primary/10
+   text-primary border-primary/20, hover:bg-muted/50). */
+:root {
+  --sbt-nav-bg: color-mix(in oklch, var(--muted) 10%, transparent);
+  --sbt-nav-border: var(--border);
+  --sbt-nav-text: var(--muted-foreground);
+  --sbt-nav-text-active: var(--primary);
+  --sbt-nav-active-bg: color-mix(in oklch, var(--primary) 10%, transparent);
+  --sbt-nav-active-border: color-mix(in oklch, var(--primary) 20%, transparent);
+  --sbt-nav-hover-bg: color-mix(in oklch, var(--muted) 50%, transparent);
+  /* AppDock's solid indicator color (dot/bar/glow active markers) -
+     distinct from --sbt-nav-active-bg, which is translucent. */
+  --sbt-nav-accent: var(--primary);
+}

@@ -33,29 +33,41 @@ import { commandRegistry } from "@/commands/registry";
 import { displayShortcut, formatShortcutFromEvent, shortcutConflicts, useShortcutStore } from "@/commands/shortcutStore";
 import { useTheme } from "@/components/ThemeProvider";
 import type { Theme, ThemeDensity, ThemePalette } from "@/components/ThemeProvider";
-import { HelpShell } from "@/components/help-system/HelpShell";
+import { HelpPage } from "@sbt/desktop-kit/help/HelpPage";
+import type { HelpChapter } from "@sbt/desktop-kit/help/HelpPage";
+import { defaultHelpMarkdown } from "@/components/help-system/defaultHelpMarkdown";
+import { splitHelpMarkdown } from "@sbt/desktop-kit/help/splitHelpMarkdown";
 import { localeOptions, useI18nStore } from "@/i18n/i18nStore";
 import { openJsonFile, saveJsonFile } from "@/profile-editor/tauriFileIO";
 import { useAppStore } from "@/store/appShellStore";
 import { useConnectionStore } from "@/store/connectionStore";
 import { DiagnosticLevel, useDiagnosticsStore } from "@/store/diagnosticsStore";
-import { useTraceArchiveStore } from "@/store/traceArchiveStore";
-import { parseCandump } from "@/can/candump";
 import { ProfileMainShell } from "@/profile-editor/ProfileMainShell";
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle, Info, Keyboard, Monitor, Palette, RotateCcw, Rows3, ShieldCheck } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useNavRailStore, type DockVariant } from "@sbt/desktop-kit/nav/navRailStore";
+import { Activity, AlertTriangle, FileJson, GitMerge, Info, Keyboard, Network, Rocket, Send, Settings2, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
 // import { EditorShell } from "@/editor/EditorShell";
+
+// Temporary switch — flip back to true to restore the feedback buttons'
+// real behavior once the feedback flow is ready again.
+const FEEDBACK_ENABLED = false;
+
+// Matched by chapter order to defaultHelpMarkdown.ts's fixed 7-chapter
+// structure (Getting Started, CAN Monitor, Profile Editor, Simulator,
+// Bridge Daemon, Tools & Shortcuts, Knossos XML & Shared Profiles).
+const helpChapterIcons = [Rocket, Activity, FileJson, Send, Network, Settings2, GitMerge];
+const helpChapters: HelpChapter[] = splitHelpMarkdown(defaultHelpMarkdown).map((chapter, index) => ({
+  ...chapter,
+  icon: helpChapterIcons[index],
+}));
 
 function SettingsView() {
   const traceFrameLimit = useConnectionStore((s) => s.traceFrameLimit);
-  const frames = useConnectionStore((s) => s.frames);
-  const loadTraceFrames = useConnectionStore((s) => s.loadTraceFrames);
   const setTraceFrameLimit = useConnectionStore((s) => s.setTraceFrameLimit);
-  const traceArchive = useTraceArchiveStore((s) => s.entries);
-  const addTraceArchiveEntry = useTraceArchiveStore((s) => s.addEntry);
-  const deleteTraceArchiveEntry = useTraceArchiveStore((s) => s.deleteEntry);
-  const clearTraceArchive = useTraceArchiveStore((s) => s.clear);
   const diagnostics = useDiagnosticsStore((s) => s.entries);
   const clearDiagnostics = useDiagnosticsStore((s) => s.clear);
   const locale = useI18nStore((s) => s.locale);
@@ -65,6 +77,16 @@ function SettingsView() {
   const t = useI18nStore((s) => s.t);
   const { theme, palette, density, setTheme, setPalette, setDensity } = useTheme();
   const [draftLimit, setDraftLimit] = useState(String(traceFrameLimit));
+  const useDock = useNavRailStore((s) => s.useDock);
+  const setUseDock = useNavRailStore((s) => s.setUseDock);
+  const navOrientation = useNavRailStore((s) => s.orientation);
+  const setNavOrientation = useNavRailStore((s) => s.setOrientation);
+  const navVariant = useNavRailStore((s) => s.variant);
+  const setNavVariant = useNavRailStore((s) => s.setVariant);
+  const navAutoHide = useNavRailStore((s) => s.autoHide);
+  const setNavAutoHide = useNavRailStore((s) => s.setAutoHide);
+  const navAutoHideDelayMs = useNavRailStore((s) => s.autoHideDelayMs);
+  const setNavAutoHideDelayMs = useNavRailStore((s) => s.setAutoHideDelayMs);
 
   useEffect(() => {
     setDraftLimit(String(traceFrameLimit));
@@ -82,7 +104,6 @@ function SettingsView() {
     "cansim.locale.v1",
     "can-connection-profiles",
     "cansim.trace.settings.v1",
-    "cansim.traceArchive.v1",
     "cansim.monitor.preferences.v1",
     "cansim.monitor.filterPresets.v1",
     "cansim.monitor.alertRules.v1",
@@ -102,7 +123,7 @@ function SettingsView() {
       JSON.stringify(
         {
           meta: {
-            app: "rusty-can-studio",
+            app: "rustycan",
             version: "0.2.0",
             exportedAt: new Date().toISOString(),
           },
@@ -111,16 +132,16 @@ function SettingsView() {
         null,
         2,
       ),
-      "rusty-can-studio-settings.json",
+      "rustycan-settings.json",
     );
   }
 
   async function importSettingsBackup() {
-    const text = await openJsonFile();
-    if (!text) return;
-    const parsed = JSON.parse(text) as { settings?: Record<string, string | null> };
+    const res = await openJsonFile();
+    if (!res) return;
+    const parsed = JSON.parse(res.text) as { settings?: Record<string, string | null> };
     if (!parsed.settings || typeof parsed.settings !== "object") {
-      window.alert("This file does not look like a Rusty CAN Studio settings backup.");
+      window.alert("This file does not look like a RustyCAN settings backup.");
       return;
     }
     const shouldImport = window.confirm("Importing this backup will replace local settings and reload the app. Continue?");
@@ -147,13 +168,19 @@ Steps to reproduce:
 App version: 0.2.0
 `;
 
+  function showFeedbackDisabledNotice() {
+    toast("Feedback is disabled for the time being", { position: "top-center", closeButton: true });
+  }
+
   function openFeedbackIssue() {
+    if (!FEEDBACK_ENABLED) return showFeedbackDisabledNotice();
     const title = encodeURIComponent("Feedback: ");
     const body = encodeURIComponent(feedbackTemplate);
     window.open(`https://github.com/pennowtech/rusty-can-studio/issues/new?title=${title}&body=${body}`, "_blank", "noopener,noreferrer");
   }
 
   function copyFeedbackTemplate() {
+    if (!FEEDBACK_ENABLED) return showFeedbackDisabledNotice();
     void navigator.clipboard?.writeText(feedbackTemplate);
   }
 
@@ -162,7 +189,7 @@ App version: 0.2.0
       JSON.stringify(
         {
           meta: {
-            app: "rusty-can-studio",
+            app: "rustycan",
             exportedAt: new Date().toISOString(),
           },
           diagnostics,
@@ -170,7 +197,7 @@ App version: 0.2.0
         null,
         2,
       ),
-      "rusty-can-studio-diagnostics.json",
+      "rustycan-diagnostics.json",
     );
   }
 
@@ -185,79 +212,6 @@ App version: 0.2.0
     return "text-muted-foreground";
   }
 
-  function formatCanId(id: number) {
-    return id.toString(16).toUpperCase().padStart(id > 0x7ff ? 8 : 3, "0");
-  }
-
-  function byteLength(dataHex: string) {
-    return Math.floor(dataHex.replace(/[^0-9a-fA-F]/g, "").length / 2);
-  }
-
-  function formatPayloadBytes(dataHex: string) {
-    const cleaned = dataHex.replace(/[^0-9a-fA-F]/g, "").toUpperCase();
-    return cleaned.match(/.{1,2}/g)?.join(" ") ?? "";
-  }
-
-  function formatCandumpLine(frame: (typeof frames)[number]) {
-    return `(${(frame.ts_ms / 1000).toFixed(6)}) ${frame.iface} ${formatCanId(frame.id)} [${byteLength(frame.data_hex).toString().padStart(2, "0")}] ${formatPayloadBytes(frame.data_hex)}`.trim();
-  }
-
-  function downloadTextFile(filename: string, contents: string) {
-    const blob = new Blob([contents], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function saveCurrentTraceToArchive() {
-    if (!frames.length) return;
-    const name = window.prompt("Trace name", `trace-${new Date().toISOString().replace(/[:.]/g, "-")}.candump.log`);
-    if (!name?.trim()) return;
-    addTraceArchiveEntry({
-      name: name.trim(),
-      frameCount: frames.length,
-      candumpText: frames.map(formatCandumpLine).join("\n"),
-    });
-  }
-
-  function loadArchivedTrace(id: string) {
-    const entry = traceArchive.find((item) => item.id === id);
-    if (!entry) return;
-    loadTraceFrames(entry.name, parseCandump(entry.candumpText));
-  }
-
-  function exportArchivedTrace(id: string) {
-    const entry = traceArchive.find((item) => item.id === id);
-    if (!entry) return;
-    downloadTextFile(entry.name.endsWith(".log") ? entry.name : `${entry.name}.candump.log`, entry.candumpText);
-  }
-
-  function deleteArchivedTrace(id: string) {
-    const entry = traceArchive.find((item) => item.id === id);
-    if (!entry) return;
-    if (!window.confirm(`Delete archived trace "${entry.name}"?`)) return;
-    deleteTraceArchiveEntry(id);
-  }
-
-  function clearArchivedTraces() {
-    if (!window.confirm("Delete all archived traces?")) return;
-    clearTraceArchive();
-  }
-
-  const densityDescription = {
-    comfortable: "Touch-friendly spacing for general use.",
-    compact: "Reduced spacing for more controls and rows.",
-    dense: "Trace-first layout with maximum visible data.",
-  }[density];
-
-  const densityPreviewRows = {
-    comfortable: "about 20-24 rows",
-    compact: "about 34-40 rows",
-    dense: "about 41-46 rows",
-  }[density];
 
   return (
     <div className="h-full overflow-auto p-6">
@@ -306,16 +260,17 @@ App version: 0.2.0
                         </SelectContent>
                       </Select>
                     </label>
-                    <div className="rounded-md border bg-muted/20 p-3">
-                      <div className="text-[11px] uppercase text-muted-foreground">Number</div>
-                      <div className="mt-1 font-mono text-sm">{formatNumber(1234567.89)}</div>
-                    </div>
-                    <div className="rounded-md border bg-muted/20 p-3">
-                      <div className="text-[11px] uppercase text-muted-foreground">Date and time</div>
-                      <div className="mt-1 font-mono text-sm">{formatDateTime(Date.now())}</div>
-                    </div>
+                    <label className="space-y-1 text-xs font-medium">Number
+                      <div className="rounded-md border bg-muted/20 p-1">
+                        <div className="mt-1 font-mono text-sm">{formatNumber(1234567.89)}</div>
+                      </div>
+                    </label>
+                    <label className="space-y-1 text-xs font-medium">Date and time
+                      <div className="rounded-md border bg-muted/20 p-1">
+                        <div className="mt-1 font-mono text-sm">{formatDateTime(Date.now())}</div>
+                      </div>
+                    </label>
                   </div>
-                  <p className="text-sm text-muted-foreground">{t("settings.localizationDescription")}</p>
                 </CardContent>
               </Card>
 
@@ -324,10 +279,6 @@ App version: 0.2.0
                   <CardTitle className="text-sm">{t("settings.backup")}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Export local app settings to a JSON file, or restore them on another installation. This includes appearance, shortcuts,
-                    monitor preferences, connection profiles, trace retention, custom help text, and CAN Simulator sequences.
-                  </p>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="outline" onClick={() => void exportSettingsBackup()}>Export settings</Button>
                     <Button variant="outline" onClick={() => void importSettingsBackup()}>Import settings</Button>
@@ -340,9 +291,6 @@ App version: 0.2.0
                   <CardTitle className="text-sm">Feedback</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Use this when something feels confusing, slow, broken, or missing. The issue template includes the basic details that make feedback easier to act on.
-                  </p>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="outline" onClick={openFeedbackIssue}>Open feedback issue</Button>
                     <Button variant="outline" onClick={copyFeedbackTemplate}>Copy template</Button>
@@ -379,6 +327,8 @@ App version: 0.2.0
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="default">Default</SelectItem>
+                          <SelectItem value="rusty-studio">Rusty Studio</SelectItem>
+                          <SelectItem value="signal-deck">Signal Deck</SelectItem>
                           <SelectItem value="graphite">Graphite</SelectItem>
                           <SelectItem value="zeiss-blue">Zeiss Blue</SelectItem>
                           <SelectItem value="high-contrast">High Contrast</SelectItem>
@@ -399,7 +349,6 @@ App version: 0.2.0
                           <SelectItem value="dense">Dense</SelectItem>
                         </SelectContent>
                       </Select>
-                      <span className="block text-[11px] font-normal text-muted-foreground">{densityDescription}</span>
                     </label>
                   </div>
 
@@ -407,7 +356,6 @@ App version: 0.2.0
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div>
                         <div className="text-sm font-medium">Theme preview</div>
-                        <div className="text-xs text-muted-foreground">Monitor states, decoded values, and controls use the selected palette immediately. Current density shows {densityPreviewRows} on a typical monitor.</div>
                       </div>
                       <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400">Connected</Badge>
                     </div>
@@ -459,6 +407,76 @@ App version: 0.2.0
                   </div>
                 </CardContent>
               </Card>
+
+              <Card className="rounded-lg">
+                <CardHeader>
+                  <CardTitle className="text-sm">Navigation</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <label className="flex items-center gap-2 text-xs font-medium">
+                    <Checkbox checked={useDock} onCheckedChange={(checked) => setUseDock(checked === true)} />
+                    Dock-style navigation
+                  </label>
+                  <p className="text-xs text-muted-foreground -mt-2">
+                    Replace the sidebar with a dock: floating, icon-first, with hover magnification. Off by
+                    default - the sidebar above keeps working exactly as it does today.
+                  </p>
+
+                  {useDock && (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="space-y-1 text-xs font-medium">
+                        Position
+                        <ToggleGroup
+                          type="single"
+                          variant="outline"
+                          value={navOrientation}
+                          onValueChange={(v) => v && setNavOrientation(v as "vertical" | "horizontal")}
+                          className="justify-start"
+                        >
+                          <ToggleGroupItem value="vertical">Left side</ToggleGroupItem>
+                          <ToggleGroupItem value="horizontal">Bottom</ToggleGroupItem>
+                        </ToggleGroup>
+                      </label>
+                      <label className="space-y-1 text-xs font-medium">
+                        Look
+                        <ToggleGroup
+                          type="single"
+                          variant="outline"
+                          value={navVariant}
+                          onValueChange={(v) => v && setNavVariant(v as DockVariant)}
+                          className="flex-wrap justify-start"
+                        >
+                          <ToggleGroupItem value="minimal">Minimal</ToggleGroupItem>
+                          <ToggleGroupItem value="classic">Classic</ToggleGroupItem>
+                          <ToggleGroupItem value="frosted">Frosted</ToggleGroupItem>
+                          <ToggleGroupItem value="taskbar">Taskbar</ToggleGroupItem>
+                          <ToggleGroupItem value="expand">Expand</ToggleGroupItem>
+                        </ToggleGroup>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-medium">
+                        <Checkbox checked={navAutoHide} onCheckedChange={(checked) => setNavAutoHide(checked === true)} />
+                        Auto-hide when idle
+                      </label>
+                      {navAutoHide && (
+                        <label className="space-y-1 text-xs font-medium">
+                          Hide after (ms)
+                          <Input
+                            type="number"
+                            min={500}
+                            max={15000}
+                            step={500}
+                            value={navAutoHideDelayMs}
+                            onChange={(e) => {
+                              const v = Number(e.target.value);
+                              if (!Number.isNaN(v)) setNavAutoHideDelayMs(Math.max(500, v));
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="traces" className="space-y-4 outline-none mt-0">
@@ -467,9 +485,6 @@ App version: 0.2.0
                   <CardTitle className="text-sm">CAN Monitor trace retention</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Keep the newest rows in the trace table and discard older rows automatically. Latest live frames stay at the bottom.
-                  </p>
                   <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
                     <label className="space-y-1 text-xs font-medium">
                       Maximum rows
@@ -499,44 +514,6 @@ App version: 0.2.0
                 </CardContent>
               </Card>
 
-              <Card className="rounded-lg">
-                <CardHeader>
-                  <div className="flex items-center justify-between gap-3">
-                    <CardTitle className="text-sm">Historical traces</CardTitle>
-                    <Badge variant="outline">{formatNumber(traceArchive.length)} saved</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Save the current retained trace as candump text for later inspection. Archived traces can be loaded back into CAN Monitor, exported, or deleted.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" disabled={!frames.length} onClick={saveCurrentTraceToArchive}>Save current trace</Button>
-                    <Button variant="outline" disabled={!traceArchive.length} onClick={clearArchivedTraces}>Clear archive</Button>
-                  </div>
-                  <div className="max-h-72 overflow-auto rounded-md border bg-muted/20">
-                    {traceArchive.length ? (
-                      traceArchive.map((entry) => (
-                        <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 border-b p-3 last:border-0">
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-medium">{entry.name}</div>
-                            <div className="mt-0.5 text-xs text-muted-foreground">
-                              {formatNumber(entry.frameCount)} frames, saved {formatDateTime(entry.createdAt)}
-                            </div>
-                          </div>
-                          <div className="flex shrink-0 gap-2">
-                            <Button variant="outline" size="sm" onClick={() => loadArchivedTrace(entry.id)}>Load</Button>
-                            <Button variant="ghost" size="sm" onClick={() => exportArchivedTrace(entry.id)}>Export</Button>
-                            <Button variant="ghost" size="sm" onClick={() => deleteArchivedTrace(entry.id)}>Delete</Button>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-4 text-sm text-muted-foreground">No archived traces yet.</div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
             </TabsContent>
 
             <TabsContent value="diagnostics" className="space-y-4 outline-none mt-0">
@@ -577,65 +554,6 @@ App version: 0.2.0
             </TabsContent>
           </div>
         </Tabs>
-      </div>
-    </div>
-  );
-}
-
-function AboutView() {
-  const setView = useAppStore((s) => s.setView);
-  const { palette, density } = useTheme();
-
-  return (
-    <div className="h-full overflow-auto bg-muted/20 p-6">
-      <div className="mx-auto max-w-5xl space-y-5">
-        <section className="overflow-hidden rounded-xl border bg-background shadow-sm">
-          <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="p-8">
-              <Badge variant="outline" className="mb-4">Version 0.2.0</Badge>
-              <h1 className="text-3xl font-semibold tracking-tight">Rusty CAN Studio</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-                A desktop workbench for CAN-FD capture, profile-driven decoding, loaded trace inspection, display filtering, and transmit preparation.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-2">
-                <Button onClick={() => setView("monitor")}>Open Monitor</Button>
-                <Button variant="outline" onClick={() => setView("help")}>Open Help</Button>
-              </div>
-            </div>
-            <div className="border-t bg-[radial-gradient(circle_at_20%_20%,hsl(var(--primary)/0.18),transparent_32%),linear-gradient(135deg,hsl(var(--muted)),hsl(var(--background)))] p-6 lg:border-l lg:border-t-0">
-              <div className="grid gap-3">
-                {[
-                  ["Active palette", palette],
-                  ["Density", density],
-                  ["Profile format", "JSON schema profiles"],
-                  ["Trace source", "Live capture or loaded log"],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border bg-background/80 p-3">
-                    <div className="text-[11px] uppercase text-muted-foreground">{label}</div>
-                    <div className="mt-1 text-sm font-medium">{value}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[
-            { icon: Monitor, title: "Monitor", text: "Sticky trace headers, display filters, decoded preview, context copy, and transmit staging." },
-            { icon: Rows3, title: "Profiles", text: "Visual editing for layouts, dictionaries, messages, error rules, and payload fields." },
-            { icon: Palette, title: "Themes", text: "Selectable color palettes and density modes for comfortable, compact, or dense workflows." },
-            { icon: ShieldCheck, title: "Help", text: "Searchable documentation, callouts, shortcuts, and workflow notes are available from Help." },
-          ].map((item) => (
-            <Card key={item.title} className="rounded-xl">
-              <CardHeader className="pb-2">
-                <item.icon className="h-5 w-5 text-primary" />
-                <CardTitle className="text-sm">{item.title}</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">{item.text}</CardContent>
-            </Card>
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -726,6 +644,7 @@ function ShortcutsView() {
 
 export function MainView() {
   const view = useAppStore((s) => s.view);
+  const { resolvedTheme } = useTheme();
 
   switch (view) {
     case "profile-editor":
@@ -748,13 +667,12 @@ export function MainView() {
       return <SettingsView />;
 
     case "help":
-      return <HelpShell />;
+      return (
+        <HelpPage chapters={helpChapters} resolvedTheme={resolvedTheme} />
+      );
 
     case "shortcuts":
       return <ShortcutsView />;
-
-    case "about":
-      return <AboutView />;
 
     default:
       return null;

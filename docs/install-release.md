@@ -1,6 +1,6 @@
 # Install A Release
 
-This guide explains how to install Rusty CAN Studio from GitHub Release artifacts.
+This guide explains how to install RustyCAN from GitHub Release artifacts.
 
 ## Download
 
@@ -19,7 +19,7 @@ Install:
 
 1. Double click the `.msi`.
 2. Follow the installer prompts.
-3. Start Rusty CAN Studio from the Start menu or installed shortcut.
+3. Start RustyCAN from the Start menu or installed shortcut.
 
 If Windows SmartScreen warns about an unknown publisher, that means the package is not code-signed yet. Choose to run it only if you trust the release source.
 
@@ -30,14 +30,14 @@ Release assets can include Linux packages such as `.AppImage`, `.deb`, or `.rpm`
 ### AppImage
 
 ```bash
-chmod +x rusty-can-studio*.AppImage
-./rusty-can-studio*.AppImage
+chmod +x RustyCAN*.AppImage
+./RustyCAN*.AppImage
 ```
 
 ### Debian / Ubuntu package
 
 ```bash
-sudo apt install ./rusty-can-studio*.deb
+sudo apt install ./rustycan*.deb
 ```
 
 Then launch it from the app menu or terminal.
@@ -53,7 +53,7 @@ Download the macOS release asset, usually a `.dmg` or `.app.tar.gz`.
 Install from `.dmg`:
 
 1. Open the `.dmg`.
-2. Drag Rusty CAN Studio to Applications.
+2. Drag RustyCAN to Applications.
 3. Launch it from Applications.
 
 If macOS blocks the app because it is unsigned or not notarized, open System Settings > Privacy & Security and allow the app only if you trust the release source.

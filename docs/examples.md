@@ -1,6 +1,6 @@
 # Examples
 
-This page collects practical Rusty CAN Studio workflows with copyable filters, sample frames, profile snippets, and simulator sequence JSON.
+This page collects practical RustyCAN workflows with copyable filters, sample frames, profile snippets, and simulator sequence JSON.
 
 Generic canonical profile fixtures and matching candump snippets are committed under `profiles/test/`. Use those files when you want quick, shareable examples that do not depend on local working profiles.
 
@@ -31,7 +31,7 @@ Useful filters:
 ```text
 canId == 0x18203C01
 iface == can1
-payload contains "01 01"
+payload ~ "01 01"
 len >= 6
 message_good == bad
 error
@@ -49,7 +49,7 @@ Workflow:
 2. Load one or more canonical profile JSON files.
 3. Return to CAN Monitor.
 4. Select a frame that belongs to one of the loaded profiles.
-5. Check Decoded Preview for CAN ID fields, payload header fields, message name, payload values, and error status.
+5. Check Decoded Preview for CAN ID fields, payload common fields, message name, payload values, and error status.
 
 Generic profile and candump pairs are committed under `profiles/test/`. Use them for quick editor and decoder checks when you do not want to load local working profiles.
 
@@ -62,7 +62,7 @@ Use this when SocketCAN interfaces exist in Linux or WSL.
 Workflow:
 
 1. Start `can_bridge_daemon` where the CAN interface exists.
-2. In Rusty CAN Studio, open Connect.
+2. In RustyCAN, open Connect.
 3. Choose Remote Daemon.
 4. Enter the WebSocket host and port.
 5. Use Discover to list interfaces.
@@ -130,7 +130,7 @@ error
 hasError == true
 message_good == bad
 errorCode == 12
-errorText contains POSITION
+errorText ~ POSITION
 ```
 
 Expected result:
@@ -168,7 +168,7 @@ Example field:
 
 Expected result: CAN Monitor can show `priority` as a column and the display filter can use `priority == 3`.
 
-## Example 8: Profile Editor Visual: Add A Payload Header Field
+## Example 8: Profile Editor Visual: Add A Payload Common Field
 
 Use this when every payload begins with shared routing, status, or feature bits.
 
@@ -176,13 +176,13 @@ Workflow:
 
 1. Open Profile Editor.
 2. Open Visual.
-3. Select Layouts, then Payload Header.
+3. Select Layouts, then Payload Common.
 4. Add a field with an absolute `startBit` and `bitLength`.
 5. Add a dictionary if the field has known text values.
 6. Save the profile.
 7. Select a matching frame in CAN Monitor.
 
-Example payload header field:
+Example payload common field:
 
 ```json
 {
@@ -194,7 +194,7 @@ Example payload header field:
 }
 ```
 
-Expected result: payload header fields are visible for matching frames before message-specific payload fields are decoded.
+Expected result: payload common fields are visible for matching frames before message-specific payload fields are decoded.
 
 ## Example 9: Profile Editor Visual: Add A Message
 
@@ -211,21 +211,22 @@ Workflow:
 7. Add payload fields.
 8. Check Decoded Preview against a known frame.
 
-Example message identity:
+Example message identity — registered under `payload.variants`, keyed by the `payload.discriminator` field values (here `service_identifier`, `attribute_address`) joined with `:`:
 
 ```json
-{
-  "id": "motor_status.response",
-  "name": "Motor status response",
-  "identifyBy": [
-    { "field": "service_identifier", "equals": 810 },
-    { "field": "attribute_address", "equals": 3 },
-    { "field": "message_good", "equals": 1 }
-  ]
+"payload": {
+  "discriminator": ["service_identifier", "attribute_address"],
+  "variants": {
+    "810:3": {
+      "id": "motor_status.response",
+      "label": "Motor status response",
+      "payload": { "bitLength": 0, "fields": [] }
+    }
+  }
 }
 ```
 
-Expected result: message-specific payload fields decode only when all identity conditions match.
+Expected result: message-specific payload fields decode only when the frame's decoded discriminator values match the variant's key.
 
 ## Example 10: Profile Editor JSON: Add A Payload Field
 
@@ -315,7 +316,7 @@ Example error rule:
 }
 ```
 
-Expected result: CAN Monitor highlights matching rows as errors, Decoded Preview shows the error text, and filters such as `errorCode == 12` or `errorText contains POSITION` work.
+Expected result: CAN Monitor highlights matching rows as errors, Decoded Preview shows the error text, and filters such as `errorCode == 12` or `errorText ~ POSITION` work.
 
 ## Example 13: Send One Frame
 

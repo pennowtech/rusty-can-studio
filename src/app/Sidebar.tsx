@@ -4,127 +4,73 @@
  * Primary application navigation sidebar.
  *
  * RESPONSIBILITY
- * - Allows switching between major app views:
- *   - CAN Monitor
- *   - Simulator
- *   - Profile Editor
- *   - Settings
- *   - Help
- * - Reflects the current active view
- * - Acts as the main tool switcher for the application
+ * - Supplies this app's nav items, active view, and logo/About affordance
+ *   to the shared @sbt/desktop-kit AppNavRail component.
+ * - Reflects the current active view via appShellStore.
+ * - Opens the shared About modal (AppAboutDialog) on logo click.
  *
- * CONVENTIONS
- * - MUST NOT render editor internals
- * - MUST NOT manage view state directly (delegates to appStore)
- * - MUST NOT  handle business logic
- * - SHOULD remain icon-first and compact
- * - Collapsing behavior is controlled externally
- *
- * UX NOTES
- * - Icon-first
- * - VS Code–inspired
- * - Collapsible
+ * Rendering, grouping, collapse/expand, its persistence, and the toggle
+ * button all live in AppNavRail (shared with FlexMQTT's nav rail) — this
+ * file only supplies the CAN-Studio-specific data and routing glue.
  */
-import { SidebarButton } from "@/components/SidebarButton";
+import { AppNavRail, type NavItem } from "@sbt/desktop-kit/nav/AppNavRail";
+import { AppDock } from "@sbt/desktop-kit/nav/AppDock";
+import { useNavRailStore } from "@sbt/desktop-kit/nav/navRailStore";
+import { AppAboutDialog } from "@sbt/desktop-kit/nav/AppAboutDialog";
 import { useI18nStore } from "@/i18n/i18nStore";
-import { useAppStore } from "@/store/appShellStore";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import {
-  Activity,
-  Terminal,
-  Sliders,
-  Edit3,
-  Settings,
-  PanelLeftClose,
-  PanelLeftOpen,
-  HelpCircleIcon,
-} from "lucide-react";
+import { useAppStore, type AppView } from "@/store/appShellStore";
+import appLogo from "@/assets/rusty-can-studio-logo.png";
+import { Activity, Terminal, Sliders, Edit3, Settings, HelpCircleIcon, Keyboard } from "lucide-react";
+import pkg from "../../package.json";
 
 export function Sidebar() {
-  const { view, setView, sidebarMode, toggleSidebarMode } = useAppStore();
+  const { view, setView, aboutOpen, setAboutOpen } = useAppStore();
   const t = useI18nStore((s) => s.t);
+  const useDock = useNavRailStore((s) => s.useDock);
+  const orientation = useNavRailStore((s) => s.orientation);
+  const variant = useNavRailStore((s) => s.variant);
+  const autoHide = useNavRailStore((s) => s.autoHide);
+  const autoHideDelayMs = useNavRailStore((s) => s.autoHideDelayMs);
 
-  const collapsed = sidebarMode === "icon";
-  const primaryItems = [
-    { icon: Activity, label: t("nav.monitor"), view: "monitor" as const },
-    { icon: Terminal, label: t("nav.terminal"), view: "terminal" as const },
-    { icon: Sliders, label: t("nav.simulator"), view: "simulator" as const },
+  const items: NavItem[] = [
+    { id: "monitor", icon: Activity, label: t("nav.monitor"), group: "Workspace" },
+    { id: "terminal", icon: Terminal, label: t("nav.terminal"), group: "Workspace" },
+    { id: "simulator", icon: Sliders, label: t("nav.simulator"), group: "Workspace" },
+    { id: "profile-editor", icon: Edit3, label: t("nav.profileEditor"), group: "Profiles" },
+    { id: "settings", icon: Settings, label: t("nav.settings"), group: "System" },
+    { id: "help", icon: HelpCircleIcon, label: t("nav.help"), group: "System" },
+    { id: "shortcuts", icon: Keyboard, label: t("nav.shortcuts"), group: "System" },
   ];
-  const profileItems = [
-    { icon: Edit3, label: t("nav.profileEditor"), view: "profile-editor" as const },
-  ];
-  const supportItems = [
-    { icon: Settings, label: t("nav.settings"), view: "settings" as const },
-    { icon: HelpCircleIcon, label: t("nav.help"), view: "help" as const },
-  ];
+
+  const logo = { src: appLogo, onClick: () => setAboutOpen(true), title: "About RustyCAN" };
 
   return (
-    <div
-      className={`
-         flex min-h-0 flex-col border-r bg-muted/10 backdrop-blur-md p-2 transition-all duration-300 ease-in-out
-         ${collapsed ? "w-14" : "w-56"}
-       `}
-    >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="flex justify-center">
-            <button type="button"
-              onClick={toggleSidebarMode}
-              className="mb-3 flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-all duration-200"
-            >
-              {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-              <span className="sr-only">{collapsed ? "Expand Sidebar" : "Collapse Sidebar"}</span>
-            </button>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="right" sideOffset={12}>
-          <p>{collapsed ? "Expand Sidebar" : "Collapse Sidebar"}</p>
-        </TooltipContent>
-      </Tooltip>
+    <>
+      {useDock ? (
+        <AppDock
+          items={items}
+          activeId={view}
+          onSelect={(id) => setView(id as AppView)}
+          logo={logo}
+          orientation={orientation}
+          variant={variant}
+          autoHide={autoHide}
+          autoHideDelayMs={autoHideDelayMs}
+        />
+      ) : (
+        <AppNavRail items={items} activeId={view} onSelect={(id) => setView(id as AppView)} logo={logo} />
+      )}
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-4">
-        <div className="space-y-1">
-          {!collapsed && <div className="px-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground">Workspace</div>}
-          {primaryItems.map((item) => (
-            <SidebarButton
-              key={item.view}
-              icon={item.icon}
-              label={item.label}
-              active={view === item.view}
-              collapsed={collapsed}
-              onClick={() => setView(item.view)}
-            />
-          ))}
-        </div>
-
-        <div className="space-y-1">
-          {!collapsed && <div className="px-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground">Profiles</div>}
-          {profileItems.map((item) => (
-            <SidebarButton
-              key={item.view}
-              icon={item.icon}
-              label={item.label}
-              active={view === item.view}
-              collapsed={collapsed}
-              onClick={() => setView(item.view)}
-            />
-          ))}
-        </div>
-
-        <div className="mt-auto space-y-1">
-          {!collapsed && <div className="px-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground">System</div>}
-          {supportItems.map((item) => (
-            <SidebarButton
-              key={item.view}
-              icon={item.icon}
-              label={item.label}
-              active={view === item.view}
-              collapsed={collapsed}
-              onClick={() => setView(item.view)}
-            />
-          ))}
-        </div>
-      </nav>
-    </div>
+      <AppAboutDialog
+        open={aboutOpen}
+        onOpenChange={setAboutOpen}
+        logoSrc={appLogo}
+        appName="RustyCAN"
+        version={`Version ${pkg.version}`}
+        description="A tool to inspect, decode, and simulate CAN and CAN-FD traffic. It provides a fast and lightweight environment to capture live traces, transmit frames, and build automated testing workflows."
+        infoRows={[{ label: "Backend", value: "gRPC, TCP, WebSocket" }, { label: "Rust", value: "1.98.0" }]}
+        copyright={`© ${new Date().getFullYear()} RustyCAN. All rights reserved.`}
+      />
+    </>
   );
 }

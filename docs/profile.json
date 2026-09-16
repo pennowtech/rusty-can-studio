@@ -11,16 +11,72 @@
     "idFormat": "extended",
     "byteOrder": "little"
   },
-  "layouts": {
-    "canId": {
-      "label": "Extended CAN ID",
-      "bitLength": 29,
-      "fields": [
-        { "name": "priority", "startBit": 26, "bitLength": 3, "type": "uint" },
-        { "name": "message_type", "startBit": 21, "bitLength": 5, "type": "uint" },
-        { "name": "source_node", "startBit": 13, "bitLength": 8, "type": "uint" },
-        { "name": "destination_node", "startBit": 5, "bitLength": 8, "type": "uint" }
-      ]
+  "canId": {
+    "label": "Extended CAN ID",
+    "bitLength": 29,
+    "fields": [
+      {
+        "name": "priority",
+        "startBit": 26,
+        "bitLength": 3,
+        "type": "uint"
+      },
+      {
+        "name": "message_type",
+        "startBit": 21,
+        "bitLength": 5,
+        "type": "uint"
+      },
+      {
+        "name": "source_node",
+        "startBit": 13,
+        "bitLength": 8,
+        "type": "uint"
+      },
+      {
+        "name": "destination_node",
+        "startBit": 5,
+        "bitLength": 8,
+        "type": "uint"
+      }
+    ]
+  },
+  "payload": {
+    "discriminator": [
+      "can_id"
+    ],
+    "variants": {
+      "419385573": {
+        "id": "vehicle_status",
+        "label": "Vehicle Status",
+        "payload": {
+          "bitLength": 40,
+          "fields": [
+            {
+              "name": "vehicle_speed",
+              "startBit": 0,
+              "bitLength": 16,
+              "type": "uint",
+              "factor": 0.01,
+              "unit": "km/h"
+            },
+            {
+              "name": "engine_rpm",
+              "startBit": 16,
+              "bitLength": 16,
+              "type": "uint",
+              "unit": "rpm"
+            },
+            {
+              "name": "gear_raw",
+              "startBit": 32,
+              "bitLength": 8,
+              "type": "enum",
+              "dictionary": "gear"
+            }
+          ]
+        }
+      }
     }
   },
   "dictionaries": {
@@ -31,23 +87,6 @@
       "3": "Park"
     }
   },
-  "messages": [
-    {
-      "id": "vehicle_status",
-      "label": "Vehicle Status",
-      "identifyBy": {
-        "can_id": 419385573
-      },
-      "payload": {
-        "bitLength": 40,
-        "fields": [
-          { "name": "vehicle_speed", "startBit": 0, "bitLength": 16, "type": "uint", "factor": 0.01, "unit": "km/h" },
-          { "name": "engine_rpm", "startBit": 16, "bitLength": 16, "type": "uint", "unit": "rpm" },
-          { "name": "gear_raw", "startBit": 32, "bitLength": 8, "type": "enum", "dictionary": "gear" }
-        ]
-      }
-    }
-  ],
   "errors": [],
   "display": {}
 }

@@ -4,7 +4,8 @@ Convert k2_*.xml files into the canonical CAN/CAN-FD profile JSON shape.
 
 The script is deliberately source-format agnostic at the output boundary: it
 extracts XML metadata, then writes schemaVersion 1.0 profiles with layouts,
-dictionaries, messages, error rules, and display hints.
+dictionaries, payload (common fields + discriminator + variants), error
+rules, and display hints.
 """
 
 from __future__ import annotations
@@ -207,16 +208,59 @@ def can_id_layout() -> dict[str, Any]:
     }
 
 
-def payload_header_layout(instance_values: dict[str, str]) -> dict[str, Any]:
+def payload_common_layout(include_instance_index: bool) -> dict[str, Any]:
     fields: list[dict[str, Any]] = [
         {"name": "attribute_address", "startBit": 1, "bitLength": 7, "type": "enum", "dictionary": "attribute_address"},
         {"name": "message_good", "startBit": 0, "bitLength": 1, "type": "enum", "dictionary": "message_good"},
         {"name": "instance_index", "startBit": 12, "bitLength": 4, "type": "enum", "dictionary": "instance_index"},
         {"name": "feature_index", "startBit": 8, "bitLength": 4, "type": "enum", "dictionary": "feature_index"},
     ]
-    if not instance_values:
+    if not include_instance_index:
         fields = [field for field in fields if field["name"] != "instance_index"]
-    return {"label": "Payload header", "bitLength": 16, "fields": fields}
+    return {"label": "Payload common", "bitLength": 16, "fields": fields}
+
+
+# discriminator excludes service_identifier deliberately: it's constant
+# across every message this script emits for one XML file (one service per
+# file), so it never helps distinguish between that file's own messages —
+# see canonicalProfile.ts's CanonicalProfile.payload doc.
+VARIANT_DISCRIMINATOR = ["command_class", "attribute_address", "feature_index"]
+
+
+def build_variants(messages: list[dict[str, Any]]) -> dict[str, Any]:
+    variants: dict[str, Any] = {}
+    for message in messages:
+        identify_by = message["identifyBy"]
+        key = ":".join(str(identify_by[name]) for name in VARIANT_DISCRIMINATOR)
+        variant = {
+            "id": message["id"],
+            "label": message["label"],
+            "description": message["description"],
+            "payload": message["payload"],
+        }
+        existing = variants.get(key)
+        if existing is None:
+            variants[key] = variant
+        elif isinstance(existing, list):
+            existing.append(variant)
+        else:
+            variants[key] = [existing, variant]
+    return variants
+
+
+# Protocol-level constants, identical for every k2_* device — these move
+# into the shared common profile (see common_profile/write_split_profiles)
+# instead of being duplicated into every per-device file. Device-specific
+# dictionaries (attribute_address, feature_index, instance_index,
+# service_identifier, error_status) stay local since they're built from
+# that device's own XML content and differ device to device.
+SHARED_DICTIONARIES: dict[str, dict[str, str]] = {
+    "command_class": {"6": "command/request", "5": "response", "3": "event/notification"},
+    "broadcast": {"0": "unicast", "1": "broadcast"},
+    "start_of_transfer": {"0": "not start", "1": "start"},
+    "end_of_transfer": {"0": "not end", "1": "end"},
+    "message_good": {"0": "bad", "1": "good"},
+}
 
 
 def message_definitions(root: ET.Element, source: Path, dictionaries: dict[str, dict[str, str]]) -> tuple[str, int, list[dict[str, Any]]]:
@@ -267,22 +311,21 @@ def message_definitions(root: ET.Element, source: Path, dictionaries: dict[str, 
     return service_name, service_identifier, messages
 
 
-def canonical_profile(path: Path) -> dict[str, Any]:
+def canonical_profile(path: Path, ref_common: str | None = None) -> dict[str, Any]:
     root = ET.parse(path).getroot()
     dictionaries = enum_dictionaries(root)
     instance_values = extract_instances(root)
     service_name, service_identifier, messages = message_definitions(root, path, dictionaries)
     dictionaries.update(
         {
-            "command_class": {"6": "command/request", "5": "response", "3": "event/notification"},
-            "broadcast": {"0": "unicast", "1": "broadcast"},
-            "start_of_transfer": {"0": "not start", "1": "start"},
-            "end_of_transfer": {"0": "not end", "1": "end"},
-            "message_good": {"0": "bad", "1": "good"},
             "service_identifier": {str(service_identifier): service_name},
             **({"instance_index": instance_values} if instance_values else {}),
         }
     )
+    if not ref_common:
+        # Standalone mode (single XML via -o, no shared common file):
+        # keep every dictionary inline, same as before ref_file existed.
+        dictionaries.update(SHARED_DICTIONARIES)
     error_values = extract_errors(root)
     if error_values:
         dictionaries["error_status"] = error_values
@@ -299,6 +342,11 @@ def canonical_profile(path: Path) -> dict[str, Any]:
         if error_values
         else []
     )
+    canId, payloadCommon = (
+        ({"ref_file": ref_common}, {"ref_file": ref_common})
+        if ref_common
+        else (can_id_layout(), payload_common_layout(bool(instance_values)))
+    )
     return {
         "schemaVersion": "1.0",
         "meta": {
@@ -308,32 +356,35 @@ def canonical_profile(path: Path) -> dict[str, Any]:
             "source": path.name,
         },
         "bus": {"type": "can-fd", "idFormat": "extended", "byteOrder": "little"},
-        "layouts": {"canId": can_id_layout(), "payloadHeader": payload_header_layout(instance_values)},
+        "canId": canId,
+        "payload": {
+            "common": payloadCommon,
+            "discriminator": VARIANT_DISCRIMINATOR,
+            "variants": build_variants(messages),
+        },
         "dictionaries": {key: value for key, value in dictionaries.items() if value},
-        "messages": messages,
         "errors": errors,
         "display": {},
     }
 
 
-def can_id_profile() -> dict[str, Any]:
+def common_profile() -> dict[str, Any]:
     return {
         "schemaVersion": "1.0",
         "meta": {
-            "id": "universal_can_id_layout",
-            "name": "Universal CAN ID Layout",
+            "id": "knossos_common",
+            "name": "Knossos Common CAN Layout",
             "version": "1.0.0",
-            "description": "Reusable 29-bit arbitration ID layout profile.",
+            "description": "Shared CAN ID layout, payload common fields, and protocol-level dictionaries for every k2_* device profile.",
         },
         "bus": {"type": "can-fd", "idFormat": "extended", "byteOrder": "little"},
-        "layouts": {"canId": can_id_layout()},
-        "dictionaries": {
-            "command_class": {"6": "command/request", "5": "response", "3": "event/notification"},
-            "broadcast": {"0": "unicast", "1": "broadcast"},
-            "start_of_transfer": {"0": "not start", "1": "start"},
-            "end_of_transfer": {"0": "not end", "1": "end"},
+        "canId": can_id_layout(),
+        "payload": {
+            "common": payload_common_layout(include_instance_index=True),
+            "discriminator": VARIANT_DISCRIMINATOR,
+            "variants": {},
         },
-        "messages": [],
+        "dictionaries": SHARED_DICTIONARIES,
         "errors": [],
         "display": {},
     }
@@ -341,14 +392,14 @@ def can_id_profile() -> dict[str, Any]:
 
 def write_split_profiles(paths: list[Path], output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    layout_path = output_dir / "knossos_can_id_layout.json"
-    layout_path.write_text(json.dumps(can_id_profile(), indent=2), encoding="utf-8")
-    print(f"Wrote {layout_path}")
+    common_path = output_dir / "knossos_common.json"
+    common_path.write_text(json.dumps(common_profile(), indent=2), encoding="utf-8")
+    print(f"Wrote {common_path}")
     for path in paths:
-        profile = canonical_profile(path)
+        profile = canonical_profile(path, ref_common=common_path.name)
         output_path = output_dir / f"{path.stem}_profile.json"
         output_path.write_text(json.dumps(profile, indent=2), encoding="utf-8")
-        print(f"Wrote {output_path} ({len(profile['messages'])} messages)")
+        print(f"Wrote {output_path} ({len(profile['payload']['variants'])} variant keys)")
 
 
 def main() -> int:
@@ -374,7 +425,7 @@ def main() -> int:
         output_path = output_path / f"{args.xml[0].stem}_profile.json"
     output_path.write_text(json.dumps(profile, indent=2), encoding="utf-8")
     print(f"Wrote {output_path}")
-    print(f"Messages: {len(profile['messages'])}")
+    print(f"Variant keys: {len(profile['payload']['variants'])}")
     return 0
 
 

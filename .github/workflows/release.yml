@@ -56,7 +56,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "Rusty CAN Studio ${{ github.ref_name }}"
+          releaseName: "RustyCAN ${{ github.ref_name }}"
           releaseBody: "Release build for ${{ github.ref_name }} (.exe, .dmg, .deb)."
           releaseDraft: false
           prerelease: false

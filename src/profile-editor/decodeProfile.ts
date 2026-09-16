@@ -1,5 +1,6 @@
+import { decodeFieldListRich, resolveVariantCandidate, discriminatorKey, type FieldSpec } from "@sbt/desktop-kit/utils/jsonStructCodec";
 import type { WsFrame } from "@/can-bridge/ws/types";
-import type { CanonicalField, CanonicalProfile } from "@/profile-editor/model/canonicalProfile";
+import type { CanonicalField, CanonicalProfile, CanonicalVariant } from "@/profile-editor/model/canonicalProfile";
 
 export type DecodedField = {
   name: string;
@@ -30,10 +31,22 @@ export type DecodedFrame = {
   errorCode?: number;
   errorText?: string;
   canIdFields: DecodedField[];
+  // Kept as the concatenation of payloadCommonFields + payloadVariantFields
+  // for callers that just want "everything decoded from the payload" (the
+  // profile-editor's DecodedPreviewPanel groups by canId/payload today).
   payloadDecodedFields: DecodedField[];
+  // Decoded once from profile.payload.common — small, stable across every
+  // variant in the profile (e.g. attribute_address/feature_index in the k2
+  // profiles). The "columns" view reads this, not payloadVariantFields,
+  // since a variant's own field count can run into the dozens.
+  payloadCommonFields: DecodedField[];
+  // Decoded from whichever variant's own payload.fields matched.
+  payloadVariantFields: DecodedField[];
   fields: DecodedField[];
   meaning: string;
   requiresSchema?: boolean;
+  rawCanId: number;
+  rawPayloadHex: string;
 };
 
 function bytesFromHex(hex: string) {
@@ -131,72 +144,97 @@ function decodeCanIdField(id: number, field: CanonicalField, profile: CanonicalP
   };
 }
 
-function decodePayloadField(
+// Expands one CanonicalField into the shared codec's FieldSpec shape — one
+// entry normally, `count` entries (each with its own explicit startBit,
+// named "name[i]") for a repeated/strided field. count/strideBits has no
+// equivalent in the shared codec (CAN-specific batch-telemetry pattern, not
+// something FlexMQTT's format needs), so it's expanded here rather than
+// pushed into @sbt/desktop-kit. `dictionary` always resolves to something
+// (falls back to the field's own name) to preserve the exact lookup
+// convention every CanonicalField reader already relies on. `bitOrder`
+// always follows the profile's own `bus.byteOrder` — CAN payload fields use
+// Intel (`'little'`) bit numbering almost universally; the shared codec's
+// `readBits` silently produces a wrong value for any multi-byte field if
+// this isn't threaded through (confirmed against a real 16-bit field: 2067.5
+// instead of the correct 5000 when left at the codec's 'big' default).
+function toFieldSpecs(field: CanonicalField, byteOrder: "little" | "big"): FieldSpec[] {
+  const count = Math.max(1, Math.floor(field.count ?? 1));
+  const stride = field.strideBits ?? field.bitLength;
+  return Array.from({ length: count }, (_, index) => ({
+    name: count > 1 ? `${field.name}[${index}]` : field.name,
+    startBit: field.startBit + index * stride,
+    bitLength: field.bitLength,
+    bitOrder: byteOrder,
+    signed: field.type === "int",
+    scale: field.factor,
+    offset: field.offset,
+    unit: field.unit,
+    dictionary: field.dictionary ?? field.name,
+  }));
+}
+
+// Decodes a whole CanonicalField[] list (profile.payload.common.fields, or
+// a matched variant's payload.fields) via the shared codec's field-decode
+// primitive, then layers back the two things that stay Rusty-native:
+// Rusty's own (more permissive, string-capable) `display.expression`
+// evaluator — re-run over the shared decode's result rather than passed
+// into the shared codec's own `expr`, since that's numeric-only and this
+// mechanism has no real-world usage to risk breaking — and the
+// context-threading (`putDecodedValue`-equivalent) every existing caller
+// downstream (variant matching, error rules) already depends on.
+function decodeFieldGroup(
   bytes: number[],
-  field: CanonicalField,
+  fields: CanonicalField[],
   byteOrder: "little" | "big",
   profile: CanonicalProfile,
   context: Record<string, number>,
-  index?: number,
-): DecodedField {
-  const fieldAtIndex = {
-    ...field,
-    startBit: field.startBit + (index ?? 0) * (field.strideBits ?? field.bitLength),
-  };
-  const extracted = extractFromBytes(bytes, fieldAtIndex, byteOrder);
-  const raw = fieldNumericValue(extracted, fieldAtIndex);
-  const scaled = raw * (field.factor ?? 1) + (field.offset ?? 0);
-  const expressionValue = evaluateExpression(field.display?.expression, { ...context, raw, value: scaled });
-  const physical = typeof expressionValue === "number" ? expressionValue : scaled;
-  const dictionaryId = field.dictionary ?? field.name;
-  const meaning = profile.dictionaries?.[dictionaryId]?.[String(raw)];
-  const displayValue = typeof expressionValue === "string" ? expressionValue : decodedDisplay(physical, field.unit, meaning);
-  const name = index == null ? field.name : `${field.name}[${index}]`;
-  return {
-    name,
-    raw,
-    physical,
-    displayValue,
-    unit: field.unit,
-    startBit: fieldAtIndex.startBit,
-    length: field.bitLength,
-    source: "payload",
-    meaning,
-  };
-}
+): DecodedField[] {
+  const specs = fields.flatMap((field) => toFieldSpecs(field, byteOrder));
+  const byBaseName = new Map(fields.map((field) => [field.name, field]));
+  const bytesArray = new Uint8Array(bytes);
+  const { values, fields: rich } = decodeFieldListRich(bytesArray, specs, {
+    byteOrder,
+    dictionaries: profile.dictionaries,
+  });
 
-function decodePayloadFields(bytes: number[], field: CanonicalField, byteOrder: "little" | "big", profile: CanonicalProfile, context: Record<string, number>) {
-  const count = Math.max(1, Math.floor(field.count ?? 1));
-  return Array.from({ length: count }, (_, index) => decodePayloadField(bytes, field, byteOrder, profile, context, count > 1 ? index : undefined));
+  const decoded: DecodedField[] = [];
+  for (const structField of rich) {
+    const baseName = structField.name.replace(/\[\d+]$/, "");
+    const source = byBaseName.get(baseName);
+    let physical = structField.physical as number;
+    let displayValue = structField.displayValue;
+    if (typeof structField.raw === "number" && source?.display?.expression) {
+      const expressionValue = evaluateExpression(source.display.expression, { ...context, ...(values as Record<string, number>), raw: structField.raw, value: physical });
+      if (typeof expressionValue === "number") {
+        physical = expressionValue;
+        displayValue = decodedDisplay(physical, structField.unit, structField.meaning);
+      } else if (typeof expressionValue === "string") {
+        displayValue = expressionValue;
+      }
+    }
+    const field: DecodedField = {
+      name: structField.name,
+      raw: typeof structField.raw === "number" ? structField.raw : 0,
+      physical,
+      displayValue,
+      unit: structField.unit,
+      startBit: structField.startBit,
+      length: structField.length,
+      source: "payload",
+      meaning: structField.meaning,
+    };
+    decoded.push(field);
+    putDecodedValue(context, field);
+  }
+  return decoded;
 }
 
 function putDecodedValue(context: Record<string, number>, field: DecodedField) {
   context[field.name] = field.physical;
-  const indexed = field.name.match(/^(.+)\[(\d+)]$/);
-  if (indexed) {
-    const [, baseName, index] = indexed;
-    context[`${baseName}_${index}`] = field.physical;
-    if (index === "0") context[baseName] = field.physical;
-  }
 }
 
 function valuesByName(fields: DecodedField[]) {
   return Object.fromEntries(fields.map((field) => [field.name, field.raw]));
-}
-
-function matchesExpected(actual: number | undefined, expected: number | string | boolean | null) {
-  if (expected === null) return actual == null;
-  if (actual == null) return false;
-  if (typeof expected === "boolean") return Boolean(actual) === expected;
-  if (typeof expected === "number") return actual === expected;
-  return String(actual) === expected;
-}
-
-function messageMatches(message: CanonicalProfile["messages"][number], values: Record<string, number>) {
-  const identifyByMatches = Object.entries(message.identifyBy ?? {}).every(([field, expected]) => matchesExpected(values[field], expected));
-  if (!identifyByMatches) return false;
-  if (!message.identifyWhen?.trim()) return true;
-  return Boolean(evaluateExpression(message.identifyWhen, values));
 }
 
 function expressionErrorState(expression: string, values: Record<string, number>) {
@@ -221,66 +259,39 @@ function decodeCanonical(profile: CanonicalProfile, frame: WsFrame): DecodedFram
   const canIdFields = profile.layouts.canId.fields.map((field) => decodeCanIdField(frame.id, field, profile));
   const canValues = valuesByName(canIdFields);
   canValues.can_id = frame.id;
-  const candidateMessages = profile.messages.filter((message) =>
-    Object.entries(message.identifyBy ?? {})
-      .filter(([field]) => field in canValues || field === "can_id")
-      .every(([field, expected]) => matchesExpected(canValues[field], expected)),
-  );
-
-  if (!candidateMessages.length) {
-    return {
-      serviceIdentifier: canValues.service_identifier,
-      sourceAddress: canValues.source_address,
-      destinationAddress: canValues.destination_address,
-      commandClass: canIdFields.find((field) => field.name === "command_class")?.displayValue,
-      canIdFields,
-      payloadDecodedFields: [],
-      fields: canIdFields,
-      requiresSchema: true,
-      meaning: "CAN ID does not match this profile",
-    };
-  }
 
   const context: Record<string, number> = { ...canValues };
-  const headerFields: DecodedField[] = [];
-  for (const field of profile.layouts.payloadHeader?.fields ?? []) {
-    for (const decoded of decodePayloadFields(bytes, field, byteOrder, profile, context)) {
-      headerFields.push(decoded);
-      putDecodedValue(context, decoded);
-    }
-  }
+  const commonFields = decodeFieldGroup(bytes, profile.payload.common?.fields ?? [], byteOrder, profile, context);
 
-  const headerValues = { ...valuesByName(headerFields), ...context };
-  const allIdentificationValues = { ...canValues, ...headerValues };
-  const message = candidateMessages.find((item) => messageMatches(item, allIdentificationValues));
+  const identificationValues = { ...canValues, ...context };
+  const key = discriminatorKey(profile.payload.discriminator, identificationValues);
+  const variant: CanonicalVariant | undefined = resolveVariantCandidate(profile.payload.variants[key], identificationValues);
 
-  if (!message) {
+  if (!variant) {
     return {
       serviceIdentifier: canValues.service_identifier,
+      serviceName: canIdFields.find((field) => field.name === "service_identifier")?.meaning,
       sourceAddress: canValues.source_address,
       destinationAddress: canValues.destination_address,
       commandClass: canIdFields.find((field) => field.name === "command_class")?.displayValue,
       canIdFields,
-      payloadDecodedFields: headerFields,
-      fields: [...canIdFields, ...headerFields],
+      payloadDecodedFields: commonFields,
+      payloadCommonFields: commonFields,
+      payloadVariantFields: [],
+      fields: [...canIdFields, ...commonFields],
       requiresSchema: true,
-      meaning: "CAN ID and payload header decoded; matching message definition is missing",
+      meaning: commonFields.length ? "No payload variant matches this frame" : "CAN ID does not match this profile",
+      rawCanId: frame.id,
+      rawPayloadHex: frame.data_hex,
     };
   }
 
-  const payloadValues: Record<string, number> = {};
-  const messageFields: DecodedField[] = [];
-  for (const field of message.payload.fields ?? []) {
-    for (const decoded of decodePayloadFields(bytes, field, byteOrder, profile, context)) {
-      messageFields.push(decoded);
-      putDecodedValue(context, decoded);
-      payloadValues[decoded.name] = decoded.physical;
-    }
-  }
+  const variantFields = decodeFieldGroup(bytes, variant.payload.fields ?? [], byteOrder, profile, context);
+  const payloadValues = Object.fromEntries(variantFields.map((field) => [field.name, field.physical]));
 
-  const payloadDecodedFields = [...headerFields, ...messageFields];
+  const payloadDecodedFields = [...commonFields, ...variantFields];
   const fields = [...canIdFields, ...payloadDecodedFields];
-  const allValues = { ...allIdentificationValues, ...context, ...payloadValues };
+  const allValues = { ...identificationValues, ...context, ...payloadValues };
   const errorRule = profile.errors?.find((rule) => expressionErrorState(rule.when, allValues));
   const extractedErrorCode = errorRule ? extractFromBytes(bytes, errorRule.source, errorRule.source.byteOrder ?? byteOrder) : undefined;
   const errorCode = errorRule && extractedErrorCode != null ? fieldNumericValue(extractedErrorCode, errorRule.source) : undefined;
@@ -288,25 +299,30 @@ function decodeCanonical(profile: CanonicalProfile, frame: WsFrame): DecodedFram
   const messageGoodField = fields.find((field) => field.name === "message_good");
 
   return {
-    frameName: message.id,
+    frameName: variant.id,
     commandClass: canIdFields.find((field) => field.name === "command_class")?.displayValue,
     sourceAddress: canValues.source_address,
     destinationAddress: canValues.destination_address,
     serviceIdentifier: canValues.service_identifier,
+    serviceName: fields.find((field) => field.name === "service_identifier")?.meaning,
     instanceName: fields.find((field) => field.name === "instance_index")?.meaning,
-    instanceIndex: headerValues.instance_index,
+    instanceIndex: context.instance_index,
     attributeName: fields.find((field) => field.name === "attribute_address")?.meaning,
-    attributeAddress: headerValues.attribute_address,
+    attributeAddress: context.attribute_address,
     featureName: fields.find((field) => field.name === "feature_index")?.meaning,
-    featureIndex: headerValues.feature_index,
+    featureIndex: context.feature_index,
     messageGood: messageGoodField ? Boolean(messageGoodField.raw) : undefined,
     errorCode,
     errorText,
     canIdFields,
     payloadDecodedFields,
+    payloadCommonFields: commonFields,
+    payloadVariantFields: variantFields,
     fields,
     requiresSchema: false,
-    meaning: message.label ?? message.id,
+    meaning: variant.label ?? variant.id,
+    rawCanId: frame.id,
+    rawPayloadHex: frame.data_hex,
   };
 }
 

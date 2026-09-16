@@ -1,7 +1,7 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 
-export async function openJsonFile(): Promise<string | null> {
+export async function openJsonFile(): Promise<{ path: string; text: string } | null> {
   const path = await open({
     multiple: false,
     filters: [
@@ -13,7 +13,7 @@ export async function openJsonFile(): Promise<string | null> {
   });
 
   if (!path || Array.isArray(path)) return null;
-  return await readTextFile(path);
+  return { path, text: await readTextFile(path) };
 }
 
 export async function saveJsonFile(contents: string, defaultName = "can-profile.json") {

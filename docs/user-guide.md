@@ -1,6 +1,6 @@
 # User Guide
 
-This guide explains the day-to-day workflow in Rusty CAN Studio. It is written for people using the app to inspect CAN or CAN-FD traffic, decode frames with JSON profiles, transmit frames, and run repeatable simulator sequences.
+This guide explains the day-to-day workflow in RustyCAN. It is written for people using the app to inspect CAN or CAN-FD traffic, decode frames with JSON profiles, transmit frames, and run repeatable simulator sequences.
 
 ## What You Need First
 
@@ -97,7 +97,7 @@ Sorting happens after display filtering and before pagination.
 
 ## Profiles and Decoding
 
-Profiles are JSON files that explain how raw CAN IDs, payload headers, payload values, and errors should be decoded.
+Profiles are JSON files that explain how raw CAN IDs, payload common fields, payload values, and errors should be decoded.
 
 ### Load profiles
 
@@ -116,7 +116,7 @@ Common edits:
 
 - metadata and bus settings
 - CAN ID layout fields
-- payload header fields
+- payload common fields
 - message identification values
 - message payload fields
 - dictionaries

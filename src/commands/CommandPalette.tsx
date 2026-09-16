@@ -13,6 +13,7 @@ export function CommandPalette() {
   const { open, openPalette, closePalette } = useCommandPaletteStore();
   const shortcuts = useShortcutStore((s) => s.shortcuts);
   const setView = useAppStore((s) => s.setView);
+  const setAboutOpen = useAppStore((s) => s.setAboutOpen);
   const { setTheme } = useTheme();
   const openConnectDialog = useConnectDialogStore((s) => s.openDialog);
   const openConnectionManager = useUiStore((s) => s.openConnectionManager);
@@ -50,7 +51,7 @@ export function CommandPalette() {
                     value={[cmd.title, cmd.description, ...(cmd.keywords ?? [])].filter(Boolean).join(" ")}
                     className="items-start gap-3 rounded-md px-3 py-2"
                     onSelect={() => {
-                      cmd.handler({ setView, setTheme, openConnectDialog, openConnectionManager, openPalette });
+                      cmd.handler({ setView, setTheme, setAboutOpen, openConnectDialog, openConnectionManager, openPalette });
                       closePalette();
                     }}
                   >
